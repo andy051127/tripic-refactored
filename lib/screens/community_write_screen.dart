@@ -308,7 +308,10 @@ class _CommunityWriteScreenState extends State<CommunityWriteScreen> {
                 height: 50,
                 child: ElevatedButton(
                   onPressed: () {
-                    setState(() => _selectedMembers = tempSelected);
+                    // 모달 닫으면서 메인 화면 상태 업데이트
+                    setState(() {
+                      _selectedMembers = tempSelected;
+                    });
                     Navigator.pop(context);
                   },
                   style: ElevatedButton.styleFrom(
@@ -363,6 +366,7 @@ class _CommunityWriteScreenState extends State<CommunityWriteScreen> {
 
               // 1. 새 게시글 데이터 생성
               final newPost = CommunityPost(
+                category: 'general', // 기본적으로 '게시글'로 설정 (필요시 토글 추가 가능)
                 name: _isAnonymous ? "익명" : "내 프로필",
                 // 선택된 장소가 있으면 사용, 없으면 기본값
                 location: _selectedLocation ?? "Seoul, Korea",
@@ -399,7 +403,7 @@ class _CommunityWriteScreenState extends State<CommunityWriteScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // [추가됨] 선택된 사진 미리보기 (가로 스크롤)
+                  // [1] 선택된 사진 미리보기 (가로 스크롤)
                   if (_selectedImages.isNotEmpty) ...[
                     SizedBox(
                       height: 100,
@@ -449,46 +453,68 @@ class _CommunityWriteScreenState extends State<CommunityWriteScreen> {
                     const SizedBox(height: 20),
                   ],
 
-                  // [추가됨] 선택된 정보 칩(Chip) 표시
+                  // [2] 선택된 정보 칩(Chip) 표시 영역 (수정됨: 인원 목록 개별 표시)
                   Wrap(
                     spacing: 8,
+                    runSpacing: 8,
                     children: [
+                      // 장소 칩
                       if (_selectedLocation != null)
                         Chip(
                           label: Text(_selectedLocation!),
-                          avatar: const Icon(Icons.place, size: 16),
+                          avatar: const Icon(
+                            Icons.place,
+                            size: 16,
+                            color: Colors.blue,
+                          ),
                           backgroundColor: Colors.blue[50],
                           deleteIcon: const Icon(Icons.close, size: 14),
                           onDeleted: () =>
                               setState(() => _selectedLocation = null),
                         ),
+                      // 날짜 칩
                       if (_selectedDate != null)
                         Chip(
                           label: Text(
                             DateFormat('yyyy.MM.dd').format(_selectedDate!),
                           ),
-                          avatar: const Icon(Icons.calendar_today, size: 16),
+                          avatar: const Icon(
+                            Icons.calendar_today,
+                            size: 16,
+                            color: Colors.green,
+                          ),
                           backgroundColor: Colors.green[50],
                           deleteIcon: const Icon(Icons.close, size: 14),
                           onDeleted: () => setState(() => _selectedDate = null),
                         ),
-                      if (_selectedMembers.isNotEmpty)
-                        Chip(
-                          label: Text("${_selectedMembers.length}명 함께"),
-                          avatar: const Icon(Icons.people, size: 16),
+
+                      // [수정] 선택된 인원들을 개별 칩으로 표시
+                      ..._selectedMembers.map(
+                        (member) => Chip(
+                          label: Text(member),
+                          avatar: const Icon(
+                            Icons.person,
+                            size: 16,
+                            color: Colors.orange,
+                          ),
                           backgroundColor: Colors.orange[50],
                           deleteIcon: const Icon(Icons.close, size: 14),
-                          onDeleted: () =>
-                              setState(() => _selectedMembers.clear()),
+                          onDeleted: () {
+                            setState(() {
+                              _selectedMembers.remove(member);
+                            });
+                          },
                         ),
+                      ),
                     ],
                   ),
+
                   if (_selectedLocation != null ||
                       _selectedDate != null ||
                       _selectedMembers.isNotEmpty)
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 20),
 
-                  // 제목 입력
+                  // [3] 제목 입력
                   const Text(
                     "제목",
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
@@ -504,7 +530,7 @@ class _CommunityWriteScreenState extends State<CommunityWriteScreen> {
                   ),
                   const SizedBox(height: 10),
 
-                  // 내용 입력
+                  // [4] 내용 입력
                   const Text(
                     "내용",
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
@@ -524,7 +550,7 @@ class _CommunityWriteScreenState extends State<CommunityWriteScreen> {
             ),
           ),
 
-          // 하단 메뉴 영역
+          // [5] 하단 메뉴 영역
           Container(
             decoration: const BoxDecoration(
               border: Border(top: BorderSide(color: Color(0xFFEEEEEE))),
@@ -552,7 +578,6 @@ class _CommunityWriteScreenState extends State<CommunityWriteScreen> {
                   onTap: _showMembersModal,
                 ),
 
-                // 익명 설정
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 20,
@@ -594,7 +619,6 @@ class _CommunityWriteScreenState extends State<CommunityWriteScreen> {
     );
   }
 
-  // 공통 헤더
   Widget _buildModalHeader(String title) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -611,7 +635,6 @@ class _CommunityWriteScreenState extends State<CommunityWriteScreen> {
     );
   }
 
-  // 하단 메뉴 아이템
   Widget _buildMenuItem(IconData icon, String title, {VoidCallback? onTap}) {
     return InkWell(
       onTap: onTap ?? () {},

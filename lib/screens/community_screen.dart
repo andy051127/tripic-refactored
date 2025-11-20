@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'community_detail_screen.dart';
 import 'community_write_screen.dart'; // 작성 화면 import
 
-// 커뮤니티 게시글 데이터 모델
+// 커뮤니티 게시글 데이터 모델 (카테고리 추가됨)
 class CommunityPost {
   final String name;
   final String location;
@@ -10,7 +10,8 @@ class CommunityPost {
   final String content;
   final String stats;
   final String? imageUrl;
-  final bool isFileImage; // 갤러리 사진인지 여부
+  final bool isFileImage;
+  final String category; // 'general' (게시글) 또는 'companion' (동행)
 
   CommunityPost({
     required this.name,
@@ -20,6 +21,7 @@ class CommunityPost {
     required this.stats,
     this.imageUrl,
     this.isFileImage = false,
+    required this.category, // 필수 항목
   });
 }
 
@@ -32,10 +34,15 @@ class CommunityScreen extends StatefulWidget {
 
 class _CommunityScreenState extends State<CommunityScreen> {
   String _viewMode = 'split'; // split, post, companion
+  bool _isSearching = false;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = "";
 
-  // 게시글 데이터 리스트 (초기 샘플 데이터 포함)
-  final List<CommunityPost> _posts = [
+  // 통합된 게시글 데이터 리스트
+  final List<CommunityPost> _allPosts = [
+    // [게시글] 데이터
     CommunityPost(
+      category: 'general',
       name: "leeeee_kh",
       location: "San Diego, USA",
       title: "씨월드 입장권 팝니다",
@@ -44,6 +51,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
       imageUrl: "https://via.placeholder.com/300",
     ),
     CommunityPost(
+      category: 'general',
       name: "maeng___gu",
       location: "Tokyo, Japan",
       title: "다이토구에 집 알아보는 중인데요",
@@ -51,6 +59,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
       stats: "13 · 25 · 1",
     ),
     CommunityPost(
+      category: 'general',
       name: "civa_mom",
       location: "Kota Kinabalu, Malaysia",
       title: "코타키나발루에서 그랩 외 택시 타지마세요!",
@@ -58,7 +67,47 @@ class _CommunityScreenState extends State<CommunityScreen> {
       stats: "33 · 15 · 12",
       imageUrl: "https://via.placeholder.com/300",
     ),
+    // [동행] 데이터 (기존 더미 데이터 통합)
+    CommunityPost(
+      category: 'companion',
+      name: "leeeee_kh",
+      location: "California, USA",
+      title: "조슈아트리 로드트립 동행 구해요",
+      content: "11월 5일 부터 4일간 로드트립 동행 하실 분 구합니다!\n샌디 -> 조슈아 -> LA 순으로 이동 예정이에요",
+      stats: "21 · 12 · 2",
+    ),
+    CommunityPost(
+      category: 'companion',
+      name: "maeng___gu",
+      location: "Osaka, Japan",
+      title: "오사카 동행 20대 초중반 남성 구함",
+      content: "남성들끼리 편하게 가려고 합니다.\n도쿄에서 신칸센으로 이동 예정이에요.",
+      stats: "72 · 21 · 47",
+      imageUrl: "https://via.placeholder.com/300",
+    ),
   ];
+
+  // 검색어로 필터링된 전체 리스트
+  List<CommunityPost> get _searchResults {
+    if (_searchQuery.isEmpty) {
+      return _allPosts;
+    } else {
+      return _allPosts.where((post) {
+        return post.title.contains(_searchQuery) ||
+            post.content.contains(_searchQuery) ||
+            post.name.contains(_searchQuery) ||
+            post.location.contains(_searchQuery);
+      }).toList();
+    }
+  }
+
+  // 화면에 보여줄 '게시글' 섹션 데이터
+  List<CommunityPost> get _generalPosts =>
+      _searchResults.where((p) => p.category == 'general').toList();
+
+  // 화면에 보여줄 '동행' 섹션 데이터
+  List<CommunityPost> get _companionPosts =>
+      _searchResults.where((p) => p.category == 'companion').toList();
 
   void _toggleView(String mode) {
     setState(() {
@@ -71,51 +120,84 @@ class _CommunityScreenState extends State<CommunityScreen> {
   }
 
   @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text(
-          "커뮤니티",
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-            fontSize: 24,
-          ),
-        ),
-        actions: [
-          // [+] 버튼: 글쓰기 화면으로 이동
-          IconButton(
-            onPressed: () async {
-              // 작성 화면으로 이동하고 결과(새 게시글)를 기다림
-              final newPost = await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const CommunityWriteScreen(),
+        title: _isSearching
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: "게시글, 동행 찾기...",
+                  border: InputBorder.none,
+                  hintStyle: TextStyle(color: Colors.grey),
                 ),
-              );
+                style: const TextStyle(color: Colors.black),
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value;
+                  });
+                },
+              )
+            : const Text(
+                "커뮤니티",
+                style: TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 24,
+                ),
+              ),
+        actions: [
+          if (!_isSearching)
+            IconButton(
+              onPressed: () async {
+                final newPost = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const CommunityWriteScreen(),
+                  ),
+                );
+                if (newPost != null && newPost is CommunityPost) {
+                  setState(() {
+                    _allPosts.insert(0, newPost); // 전체 리스트 맨 앞에 추가
+                  });
+                }
+              },
+              icon: const Icon(Icons.add_circle_outline, color: Colors.black),
+            ),
 
-              // 작성된 글이 있으면 리스트 맨 앞에 추가
-              if (newPost != null && newPost is CommunityPost) {
-                setState(() {
-                  _posts.insert(0, newPost);
-                });
-              }
-            },
-            icon: const Icon(Icons.add_circle_outline, color: Colors.black),
-          ),
           IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.search, color: Colors.black),
+            onPressed: () {
+              setState(() {
+                if (_isSearching) {
+                  _isSearching = false;
+                  _searchQuery = "";
+                  _searchController.clear();
+                } else {
+                  _isSearching = true;
+                }
+              });
+            },
+            icon: Icon(
+              _isSearching ? Icons.close : Icons.search,
+              color: Colors.black,
+            ),
           ),
           const SizedBox(width: 10),
         ],
       ),
       body: Column(
         children: [
-          // [1] 게시글 영역
+          // [1] 게시글 섹션
           if (_viewMode == 'split' || _viewMode == 'post')
             Expanded(
               child: Column(
@@ -133,18 +215,23 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     ),
                   ),
                   Expanded(
-                    child: ListView.builder(
-                      // ListView.builder로 변경하여 동적 리스트 처리
-                      padding: EdgeInsets.zero,
-                      itemCount: _posts.length,
-                      itemBuilder: (context, index) {
-                        final post = _posts[index];
-                        return _postItem(
-                          context,
-                          post: post, // post 객체 전체 전달
-                        );
-                      },
-                    ),
+                    child: _generalPosts.isEmpty
+                        ? const Center(
+                            child: Text(
+                              "검색 결과가 없습니다.",
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                          )
+                        : ListView.builder(
+                            padding: EdgeInsets.zero,
+                            itemCount: _generalPosts.length,
+                            itemBuilder: (context, index) {
+                              return _postItem(
+                                context,
+                                post: _generalPosts[index],
+                              );
+                            },
+                          ),
                   ),
                 ],
               ),
@@ -153,7 +240,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
           if (_viewMode == 'split')
             const Divider(thickness: 8, height: 8, color: Color(0xFFF5F5F5)),
 
-          // [2] 동행 영역 (기존 더미 데이터 유지)
+          // [2] 동행 섹션
           if (_viewMode == 'split' || _viewMode == 'companion')
             Expanded(
               child: Column(
@@ -173,21 +260,23 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     ),
                   ),
                   Expanded(
-                    child: ListView(
-                      padding: EdgeInsets.zero,
-                      children: [
-                        // 기존 동행 아이템 (CommunityPost 객체 생성해서 사용하거나 그대로 유지 가능)
-                        // 여기선 편의상 기존 방식대로 호출하지만, 실제론 이것도 리스트로 관리하면 좋음
-                        _postItemOld(
-                          context,
-                          name: "leeeee_kh",
-                          title: "조슈아트리 로드트립 동행 구해요",
-                          content: "11월 5일 부터 4일간 로드트립 동행 하실 분 구합니다!",
-                          stats: "21 · 12 · 2",
-                        ),
-                        // ... 기타 동행 아이템들
-                      ],
-                    ),
+                    child: _companionPosts.isEmpty
+                        ? const Center(
+                            child: Text(
+                              "검색 결과가 없습니다.",
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                          )
+                        : ListView.builder(
+                            padding: EdgeInsets.zero,
+                            itemCount: _companionPosts.length,
+                            itemBuilder: (context, index) {
+                              return _postItem(
+                                context,
+                                post: _companionPosts[index],
+                              );
+                            },
+                          ),
                   ),
                 ],
               ),
@@ -232,7 +321,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
     );
   }
 
-  // [수정된] 게시글 아이템 위젯 (CommunityPost 객체 사용)
   Widget _postItem(BuildContext context, {required CommunityPost post}) {
     return GestureDetector(
       onTap: () {
@@ -367,8 +455,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
                   ],
                 ),
               ),
-              // 이미지 표시 (파일 이미지인 경우 처리 로직은 CommunityDetailScreen 등에서 추가 필요)
-              // 여기선 간단히 네트워크 이미지만 있다고 가정하거나, 파일 이미지는 생략 (필요시 추가 가능)
               if (post.imageUrl != null)
                 Padding(
                   padding: const EdgeInsets.only(left: 12.0),
@@ -390,29 +476,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  // (기존 방식 유지를 위한 헬퍼 - 동행 탭용)
-  Widget _postItemOld(
-    BuildContext context, {
-    required String name,
-    String? location,
-    required String title,
-    required String content,
-    required String stats,
-    String? imageUrl,
-  }) {
-    return _postItem(
-      context,
-      post: CommunityPost(
-        name: name,
-        location: location ?? "",
-        title: title,
-        content: content,
-        stats: stats,
-        imageUrl: imageUrl,
       ),
     );
   }

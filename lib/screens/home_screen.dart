@@ -4,7 +4,10 @@ import 'community_screen.dart';
 import 'travel_plan_screen.dart';
 import 'photo_picker_screen.dart';
 import 'message_list_screen.dart';
+import 'chat_detail_screen.dart'; // DM 이동용
+import 'map_detail_screen.dart'; // [신규] 지도 상세 화면 import
 import '../models/post_model.dart'; // 데이터 모델 import (필수)
+import '../widgets/comment_modal.dart'; // 댓글 모달 import
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -17,9 +20,9 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
 
   final List<Widget> _pages = [
-    const HomeFeedPage(), // 0: 홈 (피드) - 여기가 핵심!
+    const HomeFeedPage(), // 0: 홈 (피드)
     const TravelPlanScreen(), // 1: 여행 계획
-    const SizedBox(), // 2: (사용 안 함, 버튼으로 대체)
+    const SizedBox(), // 2: (사용 안 함)
     const CommunityScreen(), // 3: 커뮤니티
     const Center(child: Text("프로필 화면 준비중")), // 4: 프로필
   ];
@@ -74,7 +77,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// [핵심] 실시간으로 게시물이 업데이트되는 홈 피드 페이지
+// 홈 피드 페이지
 class HomeFeedPage extends StatelessWidget {
   const HomeFeedPage({super.key});
 
@@ -131,25 +134,68 @@ class HomeFeedPage extends StatelessWidget {
           const SizedBox(width: 10),
         ],
       ),
-      // 이 부분이 중요합니다! globalPostsNotifier를 감시하다가 데이터가 변하면 화면을 다시 그립니다.
       body: ValueListenableBuilder<List<Post>>(
         valueListenable: globalPostsNotifier,
         builder: (context, posts, child) {
           return ListView.builder(
-            itemCount: posts.length + 1, // 0번은 지도 배너, 나머지는 게시물
+            itemCount: posts.length + 1,
             itemBuilder: (context, index) {
-              // 1. 맨 위 지도 배너
+              // 1. 상단 지도 배너 (클릭 시 지도 화면으로 이동)
               if (index == 0) {
                 return Column(
                   children: [
-                    Container(
-                      width: double.infinity,
-                      height: 120,
-                      color: Colors.blue[50],
-                      child: const Center(
-                        child: Text(
-                          "지도 이미지 영역",
-                          style: TextStyle(color: Colors.grey),
+                    GestureDetector(
+                      onTap: () {
+                        // 지도 상세 화면으로 이동
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const MapDetailScreen(),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        width: double.infinity,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          color: Colors.blue[50],
+                          image: const DecorationImage(
+                            image: NetworkImage(
+                              "https://via.placeholder.com/600x200.png?text=Map+View",
+                            ), // 임시 지도 이미지
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        child: Stack(
+                          children: [
+                            Container(color: Colors.black12), // 어둡게 처리
+                            const Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.map,
+                                    color: Colors.white,
+                                    size: 30,
+                                  ),
+                                  SizedBox(height: 8),
+                                  Text(
+                                    "내 주변 친구들의 여행 기록 보기",
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      shadows: [
+                                        Shadow(
+                                          blurRadius: 2,
+                                          color: Colors.black,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -157,23 +203,35 @@ class HomeFeedPage extends StatelessWidget {
                   ],
                 );
               }
-
-              // 2. 실제 게시물 리스트 (인덱스 하나씩 밀어서 매칭)
+              // 2. 게시물 리스트
               final post = posts[index - 1];
-              return _buildPostItem(post);
+              return PostItem(post: post);
             },
           );
         },
       ),
     );
   }
+}
 
-  // 게시물 하나를 그리는 함수
-  Widget _buildPostItem(Post post) {
+// 개별 게시물 위젯
+class PostItem extends StatefulWidget {
+  final Post post;
+  const PostItem({super.key, required this.post});
+
+  @override
+  State<PostItem> createState() => _PostItemState();
+}
+
+class _PostItemState extends State<PostItem> {
+  bool _isLiked = false;
+  int _likeCount = 72;
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 헤더 (프로필)
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
           child: Row(
@@ -188,14 +246,14 @@ class HomeFeedPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    post.userName,
+                    widget.post.userName,
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
                     ),
                   ),
                   Text(
-                    post.location,
+                    widget.post.location,
                     style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                 ],
@@ -203,54 +261,96 @@ class HomeFeedPage extends StatelessWidget {
             ],
           ),
         ),
-
-        // 이미지 영역
         Container(
           width: double.infinity,
           height: 400,
           color: Colors.grey[200],
-          // 파일 이미지인지(새로 올린 것), 에셋 이미지인지(기본) 구분하여 표시
-          child: post.isFile
-              ? Image.file(File(post.imagePath), fit: BoxFit.cover)
+          child: widget.post.isFile
+              ? Image.file(File(widget.post.imagePath), fit: BoxFit.cover)
               : Image.asset(
-                  post.imagePath,
+                  widget.post.imagePath,
                   fit: BoxFit.cover,
                   errorBuilder: (c, o, s) =>
                       const Icon(Icons.image, size: 50, color: Colors.grey),
                 ),
         ),
-
-        // 액션 버튼
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
           child: Row(
             children: [
-              const Icon(Icons.favorite_border, size: 28),
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _isLiked = !_isLiked;
+                    if (_isLiked) {
+                      _likeCount++;
+                    } else {
+                      _likeCount--;
+                    }
+                  });
+                },
+                child: Icon(
+                  _isLiked ? Icons.favorite : Icons.favorite_border,
+                  size: 28,
+                  color: _isLiked ? Colors.red : Colors.black,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                "$_likeCount",
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(width: 16),
-              const Icon(Icons.chat_bubble_outline, size: 28),
+              GestureDetector(
+                onTap: () {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (context) => const CommentModal(),
+                  );
+                },
+                child: const Icon(Icons.chat_bubble_outline, size: 28),
+              ),
+              const SizedBox(width: 6),
+              const Text(
+                "21",
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+              ),
               const SizedBox(width: 16),
-              const Icon(Icons.near_me_outlined, size: 28),
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ChatDetailScreen(),
+                    ),
+                  );
+                },
+                child: const Icon(Icons.near_me_outlined, size: 28),
+              ),
               const Spacer(),
               const Icon(Icons.bookmark_border, size: 28),
             ],
           ),
         ),
-
-        // 내용 (제목 + 본문)
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                post.title,
+                widget.post.title,
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
                 ),
               ),
               const SizedBox(height: 4),
-              Text(post.content, style: const TextStyle(fontSize: 14)),
+              Text(widget.post.content, style: const TextStyle(fontSize: 14)),
             ],
           ),
         ),
