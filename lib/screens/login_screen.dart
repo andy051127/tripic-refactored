@@ -1,0 +1,216 @@
+import 'package:flutter/material.dart';
+import '../widgets/custom_textfield.dart';
+import '../widgets/gradient_button.dart';
+import 'signup_screen.dart';
+import 'home_screen.dart'; // 홈 화면 연결을 위해 필요
+
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  bool _isChecked = false; // 로그인 상태 유지 체크박스
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const SizedBox(height: 60),
+              // 1. 로고 영역
+              Image.asset(
+                'assets/logo.png',
+                width: 100,
+                errorBuilder: (c, o, s) => const Icon(Icons.image, size: 100),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                "Tripic",
+                style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+              ),
+              const Text(
+                "세상을 걷고, 추억을 남기다",
+                style: TextStyle(fontSize: 14, color: Colors.grey),
+              ),
+
+              const SizedBox(height: 40),
+
+              // 2. 입력 필드
+              const CustomTextField(hintText: "휴대전화 번호 또는 이메일 주소"),
+              const CustomTextField(hintText: "비밀번호", isPassword: true),
+
+              // 3. 로그인 유지 및 비밀번호 찾기
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: _isChecked,
+                        onChanged: (v) => setState(() => _isChecked = v!),
+                        activeColor: Colors.grey,
+                      ),
+                      const Text("로그인 상태 유지", style: TextStyle(fontSize: 12)),
+                    ],
+                  ),
+                  TextButton(
+                    onPressed: () {},
+                    child: const Text(
+                      "비밀번호 찾기",
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 10),
+
+              // 4. 로그인 버튼 (홈 화면으로 이동)
+              GradientButton(
+                text: "로그인",
+                onPressed: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const HomeScreen()),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 30),
+
+              // 5. 간편 로그인 구분선 (디자인 복구)
+              Row(
+                children: [
+                  const Expanded(child: Divider()),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Text(
+                      "간편 로그인",
+                      style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                    ),
+                  ),
+                  const Expanded(child: Divider()),
+                ],
+              ),
+
+              const SizedBox(height: 20),
+
+              // 6. 소셜 로그인 버튼들 (중복 제거됨, 홈 화면 이동 기능 포함)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // 카카오
+                  GestureDetector(
+                    onTap: () => Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (c) => const HomeScreen()),
+                    ),
+                    child: _socialButton(Colors.yellow, "K", Colors.brown),
+                  ),
+                  const SizedBox(width: 15),
+                  // 네이버
+                  GestureDetector(
+                    onTap: () => Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (c) => const HomeScreen()),
+                    ),
+                    child: _socialButton(
+                      const Color(0xFF03C75A),
+                      "N",
+                      Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 15),
+                  // 구글
+                  GestureDetector(
+                    onTap: () => Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (c) => const HomeScreen()),
+                    ),
+                    child: _socialButton(
+                      Colors.white,
+                      "G",
+                      Colors.black,
+                      hasBorder: true,
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 30),
+
+              // 7. 회원가입 이동
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    "아직 회원이 아니신가요? ",
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const SignupScreen(),
+                        ),
+                      );
+                    },
+                    child: const Text(
+                      "회원가입",
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 소셜 버튼 디자인 헬퍼 함수
+  Widget _socialButton(
+    Color bgColor,
+    String letter,
+    Color textColor, {
+    bool hasBorder = false,
+  }) {
+    return Container(
+      width: 50,
+      height: 40,
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(4),
+        border: hasBorder ? Border.all(color: Colors.grey[300]!) : null,
+      ),
+      child: Center(
+        child: Text(
+          letter,
+          style: TextStyle(
+            color: textColor,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+      ),
+    );
+  }
+}
