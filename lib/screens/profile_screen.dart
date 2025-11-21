@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
-import 'dart:io'; // 파일 처리를 위해 필수
-import 'package:image_picker/image_picker.dart'; // 사진 변경용
-import '../models/post_model.dart'; // 데이터 모델 import
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import '../models/post_model.dart';
+import 'settings_screen.dart'; // 설정 화면 import (필수!)
+import 'splash_screen.dart'; // 로그아웃 후 이동할 화면
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
-  // [프로필 사진 변경 함수]
+  // 프로필 사진 변경 함수
   Future<void> _showImageSourceSelection(BuildContext context) async {
     final ImagePicker picker = ImagePicker();
 
@@ -28,19 +30,16 @@ class ProfileScreen extends StatelessWidget {
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
               ),
               const SizedBox(height: 20),
-
-              // 1. 갤러리에서 선택
               ListTile(
                 leading: const Icon(Icons.photo_library, color: Colors.black),
                 title: const Text("갤러리에서 선택"),
                 onTap: () async {
-                  Navigator.pop(context); // 모달 닫기
+                  Navigator.pop(context);
                   try {
                     final XFile? image = await picker.pickImage(
                       source: ImageSource.gallery,
                     );
                     if (image != null) {
-                      // 전역 변수 업데이트 -> 화면 자동 갱신
                       globalProfileImage.value = image.path;
                       isProfileImageFile.value = true;
                     }
@@ -50,19 +49,16 @@ class ProfileScreen extends StatelessWidget {
                 },
               ),
               const Divider(),
-
-              // 2. 카메라로 촬영
               ListTile(
                 leading: const Icon(Icons.camera_alt, color: Colors.black),
                 title: const Text("카메라로 촬영"),
                 onTap: () async {
-                  Navigator.pop(context); // 모달 닫기
+                  Navigator.pop(context);
                   try {
                     final XFile? image = await picker.pickImage(
                       source: ImageSource.camera,
                     );
                     if (image != null) {
-                      // 전역 변수 업데이트 -> 화면 자동 갱신
                       globalProfileImage.value = image.path;
                       isProfileImageFile.value = true;
                     }
@@ -76,6 +72,41 @@ class ProfileScreen extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  // [신규] 로그아웃 팝업 함수
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          "로그아웃",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: const Text("정말 로그아웃 하시겠습니까?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context), // 취소 -> 창 닫기
+            child: const Text("취소", style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () {
+              // 로그아웃 처리 (여기선 스플래시 화면으로 이동하여 처음으로 돌아감)
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const SplashScreen()),
+                (route) => false, // 모든 이전 화면 스택 제거
+              );
+            },
+            child: const Text(
+              "로그아웃",
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -153,7 +184,6 @@ class ProfileScreen extends StatelessWidget {
         children: [
           Row(
             children: [
-              // 프로필 사진 (클릭 시 변경 모달 표시)
               GestureDetector(
                 onTap: () => _showImageSourceSelection(context),
                 child: Stack(
@@ -164,7 +194,6 @@ class ProfileScreen extends StatelessWidget {
                         return CircleAvatar(
                           radius: 40,
                           backgroundColor: Colors.grey,
-                          // 파일인지 에셋인지에 따라 다른 ImageProvider 사용
                           backgroundImage: isProfileImageFile.value
                               ? FileImage(File(path))
                               : AssetImage(path) as ImageProvider,
@@ -191,7 +220,6 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 20),
-              // 통계
               Expanded(
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -222,15 +250,41 @@ class ProfileScreen extends StatelessWidget {
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
           ),
           const SizedBox(height: 4),
-          const Row(
+
+          // 국기 및 설정/로그아웃 버튼 영역
+          Row(
             children: [
-              Text("🇺🇸", style: TextStyle(fontSize: 20)),
-              SizedBox(width: 8),
-              Text("🇯🇵", style: TextStyle(fontSize: 20)),
-              Spacer(),
-              Icon(Icons.input, size: 20),
-              SizedBox(width: 16),
-              Icon(Icons.settings, size: 20),
+              const Text("🇺🇸", style: TextStyle(fontSize: 20)),
+              const SizedBox(width: 8),
+              const Text("🇯🇵", style: TextStyle(fontSize: 20)),
+              const Spacer(),
+
+              // [수정] 로그아웃 버튼
+              IconButton(
+                onPressed: () => _showLogoutDialog(context),
+                icon: const Icon(
+                  Icons.input,
+                  size: 24,
+                ), // input 아이콘을 로그아웃 용도로 사용 (이미지 참고)
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+              const SizedBox(width: 16),
+
+              // [수정] 설정(톱니바퀴) 버튼 -> SettingsScreen 이동
+              IconButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SettingsScreen(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.settings, size: 24),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -280,7 +334,6 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  // [오류 수정된 부분] 그리드 뷰 빌더
   Widget _buildMyPostsGrid() {
     return ValueListenableBuilder<List<Post>>(
       valueListenable: globalPostsNotifier,
@@ -298,7 +351,6 @@ class ProfileScreen extends StatelessWidget {
             return Stack(
               fit: StackFit.expand,
               children: [
-                // 1. 사진 이미지
                 post.isFile
                     ? Image.file(File(post.imagePath), fit: BoxFit.cover)
                     : Image.asset(
@@ -307,8 +359,6 @@ class ProfileScreen extends StatelessWidget {
                         errorBuilder: (c, o, s) =>
                             Container(color: Colors.grey),
                       ),
-
-                // 2. 동영상 아이콘 (컬렉션 if 문법으로 깔끔하게 처리)
                 if (index % 2 == 0)
                   const Positioned(
                     top: 8,
