@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
-import 'dart:io'; // 파일 이미지 표시용
+import 'dart:io';
 import 'community_screen.dart';
 import 'travel_plan_screen.dart';
 import 'photo_picker_screen.dart';
 import 'message_list_screen.dart';
-import 'chat_detail_screen.dart'; // DM 이동용
-import 'map_detail_screen.dart'; // 지도 상세 화면 import
-import '../models/post_model.dart'; // 데이터 모델 import
-import '../widgets/comment_modal.dart'; // 댓글 모달 import
-import 'profile_screen.dart';
-import 'search_screen.dart'; // [추가] 통합 검색 화면 import
+import 'chat_detail_screen.dart';
+import 'map_detail_screen.dart';
 import 'map_search_screen.dart';
+import 'profile_screen.dart';
+import 'search_screen.dart';
+import '../models/post_model.dart';
+import '../widgets/comment_modal.dart';
+import '../models/activity_model.dart'; // 활동 모델 import
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -23,10 +24,10 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
 
   final List<Widget> _pages = [
-    const HomeFeedPage(), // 0: 홈 (피드)
-    const TravelPlanScreen(), // 1: 여행 계획
-    const SizedBox(), // 2: (사용 안 함)
-    const CommunityScreen(), // 3: 커뮤니티
+    const HomeFeedPage(),
+    const TravelPlanScreen(),
+    const SizedBox(),
+    const CommunityScreen(),
     const ProfileScreen(),
   ];
 
@@ -80,7 +81,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// 홈 피드 페이지
 class HomeFeedPage extends StatelessWidget {
   const HomeFeedPage({super.key});
 
@@ -116,23 +116,19 @@ class HomeFeedPage extends StatelessWidget {
         ),
         actions: [
           IconButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SearchScreen()),
-              );
-            },
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const SearchScreen()),
+            ),
             icon: const Icon(Icons.search, color: Colors.black, size: 28),
           ),
           IconButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const MessageListScreen(),
-                ),
-              );
-            },
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const MessageListScreen(),
+              ),
+            ),
             icon: const Icon(
               Icons.chat_bubble_outline,
               color: Colors.black,
@@ -148,19 +144,16 @@ class HomeFeedPage extends StatelessWidget {
           return ListView.builder(
             itemCount: posts.length + 1,
             itemBuilder: (context, index) {
-              // 1. 상단 지도 배너
               if (index == 0) {
                 return Column(
                   children: [
                     GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const MapDetailScreen(),
-                          ),
-                        );
-                      },
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const MapDetailScreen(),
+                        ),
+                      ),
                       child: Container(
                         width: double.infinity,
                         height: 120,
@@ -210,9 +203,28 @@ class HomeFeedPage extends StatelessWidget {
                   ],
                 );
               }
-              // 2. 게시물 리스트
+
               final post = posts[index - 1];
-              return PostItem(post: post);
+
+              return PostItem(
+                post: post,
+                onDelete: () {
+                  final currentPosts = List<Post>.from(
+                    globalPostsNotifier.value,
+                  );
+                  currentPosts.remove(post);
+                  globalPostsNotifier.value = currentPosts;
+                },
+                onBlock: () {
+                  final currentBlocked = List<String>.from(
+                    blockedUsersNotifier.value,
+                  );
+                  if (!currentBlocked.contains(post.userName)) {
+                    currentBlocked.add(post.userName);
+                    blockedUsersNotifier.value = currentBlocked;
+                  }
+                },
+              );
             },
           );
         },
@@ -221,10 +233,17 @@ class HomeFeedPage extends StatelessWidget {
   }
 }
 
-// 개별 게시물 위젯
 class PostItem extends StatefulWidget {
   final Post post;
-  const PostItem({super.key, required this.post});
+  final VoidCallback onDelete;
+  final VoidCallback onBlock;
+
+  const PostItem({
+    super.key,
+    required this.post,
+    required this.onDelete,
+    required this.onBlock,
+  });
 
   @override
   State<PostItem> createState() => _PostItemState();
@@ -232,37 +251,147 @@ class PostItem extends StatefulWidget {
 
 class _PostItemState extends State<PostItem> {
   bool _isLiked = false;
+  bool _isSaved = false;
   int _likeCount = 72;
 
-  // [추가] 더보기 메뉴 바텀 시트
+  // [수정됨] 더보기 메뉴 (저장 버튼 제거됨)
   void _showMoreOptions() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.transparent, // 배경 투명 (둥근 모서리 효과 위해)
-      builder: (context) {
-        return Container(
-          margin: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildOptionItem(Icons.person_add_outlined, "팔로우"),
-              const Divider(height: 1),
-              _buildOptionItem(Icons.bookmark_border, "저장"),
-              const Divider(height: 1),
-              _buildOptionItem(Icons.visibility_off_outlined, "숨기기"),
-              const Divider(height: 1),
-              _buildOptionItem(
-                Icons.campaign_outlined,
-                "신고",
-                isDestructive: true,
-              ), // 빨간색 아이콘 등 강조 가능
-            ],
-          ),
-        );
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        margin: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 1. 팔로우
+            _buildOptionItem(
+              Icons.person_add_outlined,
+              "팔로우",
+              onTap: () {
+                Navigator.pop(context);
+                globalFollowingCount.value++;
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text("팔로우 했습니다!")));
+              },
+            ),
+            const Divider(height: 1),
+
+            // [삭제됨] 저장 버튼 제거
+
+            // 2. 숨기기
+            _buildOptionItem(
+              Icons.visibility_off_outlined,
+              "숨기기",
+              onTap: () {
+                Navigator.pop(context);
+                widget.onDelete(); // 게시물 삭제(숨김)
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text("게시물을 숨겼습니다.")));
+              },
+            ),
+            const Divider(height: 1),
+
+            // 3. 차단
+            _buildOptionItem(
+              Icons.block,
+              "차단",
+              isDestructive: true,
+              onTap: () {
+                Navigator.pop(context);
+                widget.onBlock(); // 차단 실행 (모델 업데이트)
+                widget.onDelete(); // 게시물 숨김
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text("${widget.post.userName}님을 차단했습니다.")),
+                );
+              },
+            ),
+            const Divider(height: 1),
+
+            // 4. 신고
+            _buildOptionItem(
+              Icons.campaign_outlined,
+              "신고",
+              isDestructive: true,
+              onTap: () {
+                Navigator.pop(context);
+                _showReportDialog(); // 신고 팝업 띄우기
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 신고 사유 선택 팝업
+  void _showReportDialog() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.7,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const SizedBox(width: 24),
+                  const Text(
+                    "신고하기",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: ListView(
+                children: [
+                  _buildReportItem("마음에 들지 않습니다"),
+                  _buildReportItem("따돌림 또는 원치 않는 연락"),
+                  _buildReportItem("자살, 자해 및 섭식 장애"),
+                  _buildReportItem("폭력, 혐오 또는 학대"),
+                  _buildReportItem("규제 품목의 판매 또는 홍보"),
+                  _buildReportItem("나체 이미지 또는 성적 행위"),
+                  _buildReportItem("스캠, 사기 또는 스팸"),
+                  _buildReportItem("거짓 정보"),
+                  _buildReportItem("지식 재산권 침해"),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReportItem(String reason) {
+    return ListTile(
+      title: Text(reason),
+      onTap: () {
+        Navigator.pop(context);
+        widget.onDelete(); // 신고 후 게시물 삭제
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("신고가 완료되었습니다.")));
       },
     );
   }
@@ -271,20 +400,19 @@ class _PostItemState extends State<PostItem> {
     IconData icon,
     String text, {
     bool isDestructive = false,
+    required VoidCallback onTap,
   }) {
     return ListTile(
-      leading: Icon(icon, color: Colors.black87),
+      leading: Icon(icon, color: isDestructive ? Colors.red : Colors.black87),
       title: Text(
         text,
-        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+          color: isDestructive ? Colors.red : Colors.black87,
+        ),
       ),
-      onTap: () {
-        Navigator.pop(context); // 메뉴 닫기
-        // 여기에 각 기능 구현 (예: 팔로우 API 호출 등)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("$text 기능이 선택되었습니다.")));
-      },
+      onTap: onTap,
     );
   }
 
@@ -321,7 +449,6 @@ class _PostItemState extends State<PostItem> {
                 ],
               ),
               const Spacer(),
-              // [수정] 더보기 버튼 클릭 연결
               GestureDetector(
                 onTap: _showMoreOptions,
                 child: const Icon(
@@ -349,17 +476,24 @@ class _PostItemState extends State<PostItem> {
                 ),
         ),
 
-        // 액션 버튼들 (좋아요, 댓글, DM)
+        // 액션 버튼 영역
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
           child: Row(
             children: [
+              // 1. 좋아요
               GestureDetector(
                 onTap: () {
                   setState(() {
                     _isLiked = !_isLiked;
                     if (_isLiked) {
                       _likeCount++;
+                      addActivity(
+                        ActivityType.like,
+                        widget.post.title,
+                        "이 게시물을 좋아합니다.",
+                        widget.post.imagePath,
+                      );
                     } else {
                       _likeCount--;
                     }
@@ -380,13 +514,18 @@ class _PostItemState extends State<PostItem> {
                 ),
               ),
               const SizedBox(width: 16),
+
+              // 2. 댓글
               GestureDetector(
                 onTap: () {
                   showModalBottomSheet(
                     context: context,
                     isScrollControlled: true,
                     backgroundColor: Colors.transparent,
-                    builder: (context) => const CommentModal(),
+                    builder: (context) => CommentModal(
+                      postTitle: widget.post.title,
+                      postImage: widget.post.imagePath,
+                    ),
                   );
                 },
                 child: const Icon(Icons.chat_bubble_outline, size: 28),
@@ -397,19 +536,52 @@ class _PostItemState extends State<PostItem> {
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
               ),
               const SizedBox(width: 16),
+
+              // 3. DM
               GestureDetector(
                 onTap: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const ChatDetailScreen(),
+                      builder: (context) => ChatDetailScreen(
+                        chatPartnerName: widget.post.userName,
+                      ),
                     ),
                   );
                 },
                 child: const Icon(Icons.near_me_outlined, size: 28),
               ),
+
               const Spacer(),
-              const Icon(Icons.bookmark_border, size: 28),
+
+              // 4. 보관함 (스크랩)
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _isSaved = !_isSaved;
+                  });
+                  if (_isSaved) {
+                    addActivity(
+                      ActivityType.save,
+                      widget.post.title,
+                      "보관함에 저장했습니다.",
+                      widget.post.imagePath,
+                    );
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("게시물이 보관함에 저장되었습니다.")),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("보관함 저장을 취소했습니다.")),
+                    );
+                  }
+                },
+                child: Icon(
+                  _isSaved ? Icons.bookmark : Icons.bookmark_border,
+                  size: 28,
+                  color: Colors.black,
+                ),
+              ),
             ],
           ),
         ),

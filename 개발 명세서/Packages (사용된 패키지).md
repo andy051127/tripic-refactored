@@ -1,0 +1,15 @@
+이 앱은 다음 패키지들을 활용하여 기능을 확장했습니다.
+
+image_picker: 갤러리 사진 선택 및 카메라 촬영 기능.
+
+flutter_naver_map: 네이버 지도 SDK 연동 (한국 지도 최적화).
+
+geolocator: 사용자의 현재 GPS 위치 좌표 획득.
+
+permission_handler: 카메라, 갤러리, 위치 권한 요청 및 관리.
+
+table_calendar: 커스텀 가능한 달력 위젯 (여행 날짜 선택).
+
+intl: 날짜 및 시간 형식 포맷팅 (한국어 날짜 표시 등).
+
+Maps_flutter (초기에 사용했으나 네이버 지도로 교체됨).

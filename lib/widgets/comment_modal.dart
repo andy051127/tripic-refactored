@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import '../models/activity_model.dart'; // 활동 모델 import
 
 class CommentModal extends StatefulWidget {
-  const CommentModal({super.key});
+  // 어떤 게시물에 댓글을 다는지 알기 위해 제목과 이미지 경로를 받음
+  final String postTitle;
+  final String? postImage;
+
+  const CommentModal({super.key, this.postTitle = "게시물", this.postImage});
 
   @override
   State<CommentModal> createState() => _CommentModalState();
@@ -22,18 +27,27 @@ class _CommentModalState extends State<CommentModal> {
     if (_controller.text.isNotEmpty) {
       setState(() {
         _comments.add({
-          'name': '나(Me)', // 실제 앱에선 로그인한 유저 이름
+          'name': '나(Me)',
           'content': _controller.text,
           'time': '방금 전',
         });
+
+        // [추가] 활동 내역에 저장
+        addActivity(
+          ActivityType.comment,
+          widget.postTitle,
+          _controller.text, // 댓글 내용
+          widget.postImage,
+        );
+
         _controller.clear();
       });
     }
   }
 
+  // ... (build 메서드 내용은 기존과 동일, 그대로 유지)
   @override
   Widget build(BuildContext context) {
-    // 키보드가 올라왔을 때 화면이 가려지지 않도록 패딩 처리
     return Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -46,7 +60,6 @@ class _CommentModalState extends State<CommentModal> {
         ),
         child: Column(
           children: [
-            // 헤더
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Row(
@@ -60,8 +73,6 @@ class _CommentModalState extends State<CommentModal> {
               ),
             ),
             const Divider(height: 1),
-
-            // 댓글 리스트
             Expanded(
               child: ListView.builder(
                 itemCount: _comments.length,
@@ -99,8 +110,6 @@ class _CommentModalState extends State<CommentModal> {
                 },
               ),
             ),
-
-            // 입력창
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
@@ -110,7 +119,7 @@ class _CommentModalState extends State<CommentModal> {
                 children: [
                   const CircleAvatar(
                     radius: 16,
-                    backgroundColor: Colors.grey, // 내 프로필 이미지
+                    backgroundColor: Colors.grey,
                     child: Icon(Icons.person, size: 20, color: Colors.white),
                   ),
                   const SizedBox(width: 10),

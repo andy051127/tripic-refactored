@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 
 class ChatDetailScreen extends StatelessWidget {
-  const ChatDetailScreen({super.key});
+  final String chatPartnerName; // 대화 상대방 이름
+
+  const ChatDetailScreen({
+    super.key,
+    this.chatPartnerName = "알 수 없음", // [수정] 기본값 설정으로 오류 방지
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -14,7 +19,16 @@ class ChatDetailScreen extends StatelessWidget {
           icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
-        // 앱바 타이틀 비움 (디자인 반영)
+        centerTitle: true,
+        // 상단 가운데 상대방 이름 표시
+        title: Text(
+          chatPartnerName,
+          style: const TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
       ),
       body: Column(
         children: [
@@ -31,11 +45,9 @@ class ChatDetailScreen extends StatelessWidget {
             child: Stack(
               children: [
                 const Center(child: Text("지도 경로 표시 (API 연동)")),
-                // 핀 예시
                 Positioned(top: 40, left: 100, child: _buildMapPin()),
                 Positioned(top: 80, left: 150, child: _buildMapPin()),
                 Positioned(top: 60, left: 220, child: _buildMapPin()),
-                // 점선 예시 (간단히 표현)
                 const Center(
                   child: Icon(
                     Icons.linear_scale,
@@ -52,13 +64,9 @@ class ChatDetailScreen extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               children: [
-                _buildMessageBubble(
-                  "국가는 재해를 예방하고 그 위험으로부터 국민을 보호하기 위하여 노력하여야 한다. 이 헌법공포 당시의 국회의원의 임기는 제1항에 의한 국회의 최초의 집회일 전일까지로 한다.",
-                  isMe: true,
-                ),
-                _buildMessageBubble("대한민국의 영토는 한반도와 그 ...", isMe: false),
-                _buildMessageBubble("대통령은 조약을 ...", isMe: false),
-                _buildMessageBubble("국가", isMe: true),
+                _buildMessageBubble("안녕하세요! 여행 계획은 잘 세우셨나요?", isMe: false),
+                _buildMessageBubble("네, 거의 다 짰어요. 일정 공유해드릴까요?", isMe: true),
+                _buildMessageBubble("좋아요! 지도 보고 같이 이야기해요.", isMe: false),
               ],
             ),
           ),
@@ -83,7 +91,7 @@ class ChatDetailScreen extends StatelessWidget {
                       ),
                       child: const TextField(
                         decoration: InputDecoration(
-                          hintText: "동해물과 백두산이 마르고 닳도록...",
+                          hintText: "메시지 보내기...",
                           border: InputBorder.none,
                           isDense: true,
                           contentPadding: EdgeInsets.symmetric(vertical: 10),
@@ -128,19 +136,19 @@ class ChatDetailScreen extends StatelessWidget {
   Widget _buildMessageBubble(String text, {required bool isMe}) {
     return Align(
       alignment: isMe
-          ? Alignment.centerLeft
-          : Alignment.centerRight, // 내 메시지 왼쪽(초록), 상대방 오른쪽(파랑) - 사진 기준
+          ? Alignment.centerRight
+          : Alignment.centerLeft, // 내 메시지 오른쪽, 상대방 왼쪽
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(12),
         constraints: const BoxConstraints(maxWidth: 280),
         decoration: BoxDecoration(
           color: isMe
-              ? const Color(0xFFE8F5E9)
-              : const Color(0xFFE0F7FA), // 초록(나) / 파랑(상대)
+              ? const Color(0xFFE0F7FA)
+              : const Color(0xFFE8F5E9), // 색상 구분
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isMe ? Colors.green[200]! : Colors.cyan[100]!,
+            color: isMe ? Colors.cyan[100]! : Colors.green[200]!,
           ),
           boxShadow: [
             BoxShadow(

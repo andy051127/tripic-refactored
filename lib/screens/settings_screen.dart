@@ -1,5 +1,12 @@
 import 'package:flutter/material.dart';
-import 'privacy_settings_screen.dart'; // [신규] 공개 범위 설정 화면 import
+import 'privacy_settings_screen.dart';
+import 'blocked_users_screen.dart';
+import 'activity_screen.dart';
+import 'notification_settings_screen.dart';
+import 'language_translation_screen.dart';
+import 'information_screen.dart';
+import 'help_screen.dart';
+import 'saved_posts_screen.dart'; // [신규] 보관함 화면 import
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -57,7 +64,6 @@ class SettingsScreen extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 children: [
-                  // [수정] 계정공개범위 클릭 시 PrivacySettingsScreen 이동
                   _buildSettingItem(
                     context,
                     Icons.lock_outline,
@@ -71,19 +77,105 @@ class SettingsScreen extends StatelessWidget {
                       );
                     },
                   ),
-                  // 나머지 메뉴는 아직 임시 화면으로 연결
-                  _buildSettingItem(context, Icons.block, "차단된계정"),
-                  _buildSettingItem(context, Icons.history, "활동"),
-                  _buildSettingItem(context, Icons.monitor, "화면"),
-                  _buildSettingItem(context, Icons.notifications_none, "알림"),
+                  _buildSettingItem(
+                    context,
+                    Icons.block,
+                    "차단된계정",
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const BlockedUsersScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildSettingItem(
+                    context,
+                    Icons.history,
+                    "활동",
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ActivityScreen(),
+                        ),
+                      );
+                    },
+                  ),
+
+                  _buildSettingItem(
+                    context,
+                    Icons.notifications_none,
+                    "알림",
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              const NotificationSettingsScreen(),
+                        ),
+                      );
+                    },
+                  ),
+
+                  // [수정] 보관 및 다운로드 -> 보관함 화면 연결
                   _buildSettingItem(
                     context,
                     Icons.download_outlined,
                     "보관 및 다운로드",
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const SavedPostsScreen(),
+                        ),
+                      );
+                    },
                   ),
-                  _buildSettingItem(context, Icons.language, "언어 및 번역"),
-                  _buildSettingItem(context, Icons.help_outline, "도움말"),
-                  _buildSettingItem(context, Icons.info_outline, "정보"),
+
+                  _buildSettingItem(
+                    context,
+                    Icons.language,
+                    "언어 및 번역",
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              const LanguageTranslationScreen(),
+                        ),
+                      );
+                    },
+                  ),
+
+                  _buildSettingItem(
+                    context,
+                    Icons.help_outline,
+                    "도움말",
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const HelpScreen(),
+                        ),
+                      );
+                    },
+                  ),
+
+                  _buildSettingItem(
+                    context,
+                    Icons.info_outline,
+                    "정보",
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const InformationScreen(),
+                        ),
+                      );
+                    },
+                  ),
                 ],
               ),
             ),
@@ -104,7 +196,6 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  // [수정] onTap 콜백을 받을 수 있도록 변경
   Widget _buildSettingItem(
     BuildContext context,
     IconData icon,
@@ -115,7 +206,6 @@ class SettingsScreen extends StatelessWidget {
       onTap:
           onTap ??
           () {
-            // onTap이 지정되지 않았으면 임시 화면으로 이동
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -163,7 +253,7 @@ class SettingsScreen extends StatelessWidget {
   }
 }
 
-// 임시 상세 화면 (그대로 유지)
+// 임시 화면 (미구현 메뉴용)
 class _SettingsDetailScreen extends StatelessWidget {
   final String title;
   const _SettingsDetailScreen({required this.title});
@@ -186,19 +276,7 @@ class _SettingsDetailScreen extends StatelessWidget {
           ),
         ),
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.settings, size: 50, color: Colors.grey[300]),
-            const SizedBox(height: 20),
-            Text(
-              "'$title' 설정 화면입니다.",
-              style: const TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-          ],
-        ),
-      ),
+      body: Center(child: Text("'$title' 설정 화면입니다.")),
     );
   }
 }

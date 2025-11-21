@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import '../models/post_model.dart';
-import 'settings_screen.dart'; // 설정 화면 import (필수!)
-import 'splash_screen.dart'; // 로그아웃 후 이동할 화면
+import 'settings_screen.dart';
+import 'splash_screen.dart';
+import 'follow_list_screen.dart';
+import 'photo_picker_screen.dart'; // + 버튼 연결용
+import 'member_info_screen.dart'; // [신규] 햄버거 버튼 연결용
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
-  // 프로필 사진 변경 함수
+  // [프로필 사진 변경 함수]
   Future<void> _showImageSourceSelection(BuildContext context) async {
     final ImagePicker picker = ImagePicker();
 
@@ -30,6 +33,7 @@ class ProfileScreen extends StatelessWidget {
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
               ),
               const SizedBox(height: 20),
+
               ListTile(
                 leading: const Icon(Icons.photo_library, color: Colors.black),
                 title: const Text("갤러리에서 선택"),
@@ -75,7 +79,7 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  // [신규] 로그아웃 팝업 함수
+  // [로그아웃 팝업]
   void _showLogoutDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -88,16 +92,15 @@ class ProfileScreen extends StatelessWidget {
         content: const Text("정말 로그아웃 하시겠습니까?"),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context), // 취소 -> 창 닫기
+            onPressed: () => Navigator.pop(context),
             child: const Text("취소", style: TextStyle(color: Colors.grey)),
           ),
           TextButton(
             onPressed: () {
-              // 로그아웃 처리 (여기선 스플래시 화면으로 이동하여 처음으로 돌아감)
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(builder: (context) => const SplashScreen()),
-                (route) => false, // 모든 이전 화면 스택 제거
+                (route) => false,
               );
             },
             child: const Text(
@@ -118,22 +121,45 @@ class ProfileScreen extends StatelessWidget {
         backgroundColor: Colors.white,
         elevation: 0,
         centerTitle: false,
-        title: const Text(
-          "leeeee_kh",
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-            fontSize: 22,
+        title: ValueListenableBuilder<String>(
+          valueListenable: globalUserName,
+          builder: (context, name, _) => Text(
+            name,
+            style: const TextStyle(
+              color: Colors.black,
+              fontWeight: FontWeight.bold,
+              fontSize: 22,
+            ),
           ),
         ),
         actions: [
+          // 1. [+] 버튼 -> 사진 선택 화면 (네비게이션 바 가운데 기능과 동일)
           IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.add_box_outlined, color: Colors.black),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const PhotoPickerScreen(),
+                ),
+              );
+            },
+            icon: const Icon(
+              Icons.add_box_outlined,
+              color: Colors.black,
+              size: 26,
+            ),
           ),
+          // 2. [햄버거] 버튼 -> 회원 정보 리스트 화면
           IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.menu, color: Colors.black),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const MemberInfoScreen(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.menu, color: Colors.black, size: 26),
           ),
           const SizedBox(width: 10),
         ],
@@ -184,6 +210,7 @@ class ProfileScreen extends StatelessWidget {
         children: [
           Row(
             children: [
+              // 프로필 사진
               GestureDetector(
                 onTap: () => _showImageSourceSelection(context),
                 child: Stack(
@@ -220,24 +247,57 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 20),
+              // 통계
               Expanded(
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     ValueListenableBuilder<List<Post>>(
                       valueListenable: globalPostsNotifier,
-                      builder: (context, posts, child) =>
-                          _buildStatItem("${posts.length}", "게시물"),
+                      builder: (context, posts, child) => _buildStatItem(
+                        "${posts.length}",
+                        "게시물",
+                        onTap: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("아래에서 게시물을 확인하세요! ↓"),
+                              duration: Duration(seconds: 1),
+                            ),
+                          );
+                        },
+                      ),
                     ),
                     ValueListenableBuilder<String>(
                       valueListenable: globalFollowerCount,
-                      builder: (context, count, child) =>
-                          _buildStatItem(count, "팔로워"),
+                      builder: (context, count, child) => _buildStatItem(
+                        count,
+                        "팔로워",
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => FollowListScreen(
+                              userName: globalUserName.value,
+                              initialIndex: 0,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                     ValueListenableBuilder<int>(
                       valueListenable: globalFollowingCount,
-                      builder: (context, count, child) =>
-                          _buildStatItem("$count", "팔로잉"),
+                      builder: (context, count, child) => _buildStatItem(
+                        "$count",
+                        "팔로잉",
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => FollowListScreen(
+                              userName: globalUserName.value,
+                              initialIndex: 1,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -245,33 +305,41 @@ class ProfileScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          const Text(
-            "leeeee_kh",
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-          ),
-          const SizedBox(height: 4),
 
-          // 국기 및 설정/로그아웃 버튼 영역
+          // 이름 및 소개
+          ValueListenableBuilder<String>(
+            valueListenable: globalUserName,
+            builder: (context, name, _) => Text(
+              name,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            ),
+          ),
+          ValueListenableBuilder<String>(
+            valueListenable: globalUserBio,
+            builder: (context, bio, _) =>
+                Text(bio, style: const TextStyle(fontSize: 14)),
+          ),
+
+          const SizedBox(height: 10),
+
+          // [수정됨] 국기 및 설정 버튼 레이아웃
           Row(
             children: [
               const Text("🇺🇸", style: TextStyle(fontSize: 20)),
               const SizedBox(width: 8),
               const Text("🇯🇵", style: TextStyle(fontSize: 20)),
-              const Spacer(),
 
-              // [수정] 로그아웃 버튼
+              const Spacer(), // 오른쪽 끝으로 밀기
+              // 1. 로그아웃 버튼 (이미지 참고)
               IconButton(
                 onPressed: () => _showLogoutDialog(context),
-                icon: const Icon(
-                  Icons.input,
-                  size: 24,
-                ), // input 아이콘을 로그아웃 용도로 사용 (이미지 참고)
+                icon: const Icon(Icons.input, size: 24),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
               ),
               const SizedBox(width: 16),
 
-              // [수정] 설정(톱니바퀴) 버튼 -> SettingsScreen 이동
+              // 2. 설정(톱니바퀴) 버튼
               IconButton(
                 onPressed: () {
                   Navigator.push(
@@ -287,50 +355,25 @@ class ProfileScreen extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade300),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Center(
-                    child: Icon(Icons.image_outlined, size: 20),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade300),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Center(
-                    child: Icon(Icons.assignment_ind_outlined, size: 20),
-                  ),
-                ),
-              ),
-            ],
-          ),
+          const SizedBox(height: 10),
         ],
       ),
     );
   }
 
-  Widget _buildStatItem(String count, String label) {
-    return Column(
-      children: [
-        Text(
-          count,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-        Text(label, style: const TextStyle(fontSize: 12)),
-      ],
+  Widget _buildStatItem(String count, String label, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.translucent,
+      child: Column(
+        children: [
+          Text(
+            count,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          ),
+          Text(label, style: const TextStyle(fontSize: 12)),
+        ],
+      ),
     );
   }
 

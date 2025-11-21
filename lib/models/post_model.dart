@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 
 // 게시물 데이터 구조 정의
 class Post {
-  final String id; // 게시물 식별을 위한 ID
+  final String id;
   final String userName;
   final String location;
   final String imagePath;
@@ -34,17 +34,30 @@ final ValueNotifier<List<Post>> globalPostsNotifier =
       ),
     ]);
 
-// [추가] 앱 전체에서 공유할 팔로잉 수 (초기값 5)
+// 팔로잉 수
 final ValueNotifier<int> globalFollowingCount = ValueNotifier<int>(5);
 
-// [추가] 앱 전체에서 공유할 팔로워 수 (초기값 "3.1M")
+// 팔로워 수
 final ValueNotifier<String> globalFollowerCount = ValueNotifier<String>("3.1M");
 
-// [추가] 내 프로필 이미지 경로 (초기값: 로고)
-// 이 부분이 없어서 오류가 났던 것입니다.
+// 프로필 이미지
 final ValueNotifier<String> globalProfileImage = ValueNotifier<String>(
   "assets/logo.png",
 );
-final ValueNotifier<bool> isProfileImageFile = ValueNotifier<bool>(
-  false,
-); // 파일인지 여부
+final ValueNotifier<bool> isProfileImageFile = ValueNotifier<bool>(false);
+
+// 차단된 사용자 목록
+final ValueNotifier<List<String>> blockedUsersNotifier =
+    ValueNotifier<List<String>>([]);
+
+// [추가] 사용자 프로필 정보 (수정 가능하도록 전역 관리)
+final ValueNotifier<String> globalUserName = ValueNotifier<String>("leeeee_kh");
+final ValueNotifier<String> globalUserBio = ValueNotifier<String>(
+  "Traveler ✈️",
+);
+final ValueNotifier<String> globalUserEmail = ValueNotifier<String>(
+  "leeeee_kh@tripic.com",
+);
+final ValueNotifier<String> globalUserPhone = ValueNotifier<String>(
+  "010-1234-5678",
+);
