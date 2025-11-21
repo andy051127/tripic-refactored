@@ -14,7 +14,7 @@ class MessageListScreen extends StatelessWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
-          onPressed: () => Navigator.pop(context), // 뒤로가기 (홈으로)
+          onPressed: () => Navigator.pop(context), // 뒤로가기
         ),
         centerTitle: true,
         title: const Text(
@@ -22,7 +22,7 @@ class MessageListScreen extends StatelessWidget {
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
         actions: [
-          // [수정됨] 오른쪽 상단 메뉴 클릭 -> 친구 목록(FriendList)으로 이동
+          // 오른쪽 상단 메뉴 -> 친구 목록으로 이동 (새 친구 찾기)
           IconButton(
             icon: const Icon(Icons.menu, color: Colors.black),
             onPressed: () {
@@ -48,15 +48,30 @@ class MessageListScreen extends StatelessWidget {
                 vertical: 10,
               ),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
                     "즐겨찾기",
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
-                  const SizedBox(width: 5),
-                  Text(
-                    "12 >",
-                    style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                  // 즐겨찾기 추가 버튼 역할 (누르면 친구 목록으로 이동)
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const FriendListScreen(),
+                        ),
+                      );
+                    },
+                    child: Text(
+                      "추가 +",
+                      style: TextStyle(
+                        color: Colors.blue[600],
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -67,11 +82,11 @@ class MessageListScreen extends StatelessWidget {
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 children: [
-                  _buildFavoriteItem("김찬희", true),
-                  _buildFavoriteItem("황종현", false),
-                  _buildFavoriteItem("이경환", false),
-                  _buildFavoriteItem("김성진", true),
-                  _buildFavoriteItem("김성우", false),
+                  _buildFavoriteItem(context, "김찬희", true),
+                  _buildFavoriteItem(context, "황종현", false),
+                  _buildFavoriteItem(context, "이경환", false),
+                  _buildFavoriteItem(context, "김성진", true),
+                  _buildFavoriteItem(context, "김성우", false),
                 ],
               ),
             ),
@@ -132,40 +147,49 @@ class MessageListScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildFavoriteItem(String name, bool isOnline) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 16.0),
-      child: Column(
-        children: [
-          Stack(
-            children: [
-              const CircleAvatar(
-                radius: 28,
-                backgroundColor: Colors.grey,
-                child: Icon(Icons.person, color: Colors.white, size: 30),
-              ),
-              if (isOnline)
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    width: 14,
-                    height: 14,
-                    decoration: BoxDecoration(
-                      color: Colors.green,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
+  // 즐겨찾기 아이템 (클릭 시 채팅방 이동)
+  Widget _buildFavoriteItem(BuildContext context, String name, bool isOnline) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const ChatDetailScreen()),
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.only(right: 16.0),
+        child: Column(
+          children: [
+            Stack(
+              children: [
+                const CircleAvatar(
+                  radius: 28,
+                  backgroundColor: Colors.grey,
+                  child: Icon(Icons.person, color: Colors.white, size: 30),
+                ),
+                if (isOnline)
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      width: 14,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
                     ),
                   ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            name,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-          ),
-        ],
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              name,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -179,7 +203,7 @@ class MessageListScreen extends StatelessWidget {
     required bool isPhoto,
   }) {
     return InkWell(
-      // [수정됨] 리스트 클릭 -> 채팅방(ChatDetail)으로 이동
+      // 리스트 클릭 -> 채팅방으로 이동
       onTap: () {
         Navigator.push(
           context,

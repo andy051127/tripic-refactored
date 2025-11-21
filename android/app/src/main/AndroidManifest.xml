@@ -1,23 +1,25 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.my_app"> 
-    <!-- ▲ 주의: 위 package 부분은 원래 파일에 적혀있던 본인 앱의 패키지명으로 유지하세요! -->
+    package="com.example.my_app"> <!-- 여기에 본인의 패키지 이름을 넣으세요. 예: com.example.my_app -->
 
-    <!-- 1. 갤러리 및 저장소 접근 권한 (구버전 Android) -->
+    <!-- 권한 설정 -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
-    
-    <!-- 2. 사진 접근 권한 (Android 13 이상) -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
-    
-    <!-- 3. 카메라 사용 권한 -->
     <uses-permission android:name="android.permission.CAMERA"/>
-    
-    <!-- 4. 마이크 권한 (동영상 촬영 시 필요, 사진만 찍으면 없어도 무방하나 넣어두면 안전함) -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
 
     <application
         android:label="Tripic"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        
+        <!-- 네이버 지도 클라이언트 ID 설정 -->
+        <!-- value에 발급받은 Client ID를 입력하세요 -->
+        <meta-data
+            android:name="com.naver.maps.map.CLIENT_ID"
+            android:value="YOUR_CLIENT_ID_HERE" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

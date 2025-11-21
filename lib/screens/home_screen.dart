@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
-import 'dart:io'; // 파일 이미지 표시용 (필수)
+import 'dart:io'; // 파일 이미지 표시용
 import 'community_screen.dart';
 import 'travel_plan_screen.dart';
 import 'photo_picker_screen.dart';
 import 'message_list_screen.dart';
 import 'chat_detail_screen.dart'; // DM 이동용
-import 'map_detail_screen.dart'; // [신규] 지도 상세 화면 import
-import '../models/post_model.dart'; // 데이터 모델 import (필수)
+import 'map_detail_screen.dart'; // 지도 상세 화면 import
+import '../models/post_model.dart'; // 데이터 모델 import
 import '../widgets/comment_modal.dart'; // 댓글 모달 import
+import 'profile_screen.dart';
+import 'search_screen.dart'; // [추가] 통합 검색 화면 import
+import 'map_search_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -24,7 +27,7 @@ class _HomeScreenState extends State<HomeScreen> {
     const TravelPlanScreen(), // 1: 여행 계획
     const SizedBox(), // 2: (사용 안 함)
     const CommunityScreen(), // 3: 커뮤니티
-    const Center(child: Text("프로필 화면 준비중")), // 4: 프로필
+    const ProfileScreen(),
   ];
 
   void _onItemTapped(int index) {
@@ -113,7 +116,12 @@ class HomeFeedPage extends StatelessWidget {
         ),
         actions: [
           IconButton(
-            onPressed: () {},
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SearchScreen()),
+              );
+            },
             icon: const Icon(Icons.search, color: Colors.black, size: 28),
           ),
           IconButton(
@@ -140,13 +148,12 @@ class HomeFeedPage extends StatelessWidget {
           return ListView.builder(
             itemCount: posts.length + 1,
             itemBuilder: (context, index) {
-              // 1. 상단 지도 배너 (클릭 시 지도 화면으로 이동)
+              // 1. 상단 지도 배너
               if (index == 0) {
                 return Column(
                   children: [
                     GestureDetector(
                       onTap: () {
-                        // 지도 상세 화면으로 이동
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -162,13 +169,13 @@ class HomeFeedPage extends StatelessWidget {
                           image: const DecorationImage(
                             image: NetworkImage(
                               "https://via.placeholder.com/600x200.png?text=Map+View",
-                            ), // 임시 지도 이미지
+                            ),
                             fit: BoxFit.cover,
                           ),
                         ),
                         child: Stack(
                           children: [
-                            Container(color: Colors.black12), // 어둡게 처리
+                            Container(color: Colors.black12),
                             const Center(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -227,11 +234,66 @@ class _PostItemState extends State<PostItem> {
   bool _isLiked = false;
   int _likeCount = 72;
 
+  // [추가] 더보기 메뉴 바텀 시트
+  void _showMoreOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent, // 배경 투명 (둥근 모서리 효과 위해)
+      builder: (context) {
+        return Container(
+          margin: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildOptionItem(Icons.person_add_outlined, "팔로우"),
+              const Divider(height: 1),
+              _buildOptionItem(Icons.bookmark_border, "저장"),
+              const Divider(height: 1),
+              _buildOptionItem(Icons.visibility_off_outlined, "숨기기"),
+              const Divider(height: 1),
+              _buildOptionItem(
+                Icons.campaign_outlined,
+                "신고",
+                isDestructive: true,
+              ), // 빨간색 아이콘 등 강조 가능
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildOptionItem(
+    IconData icon,
+    String text, {
+    bool isDestructive = false,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: Colors.black87),
+      title: Text(
+        text,
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+      ),
+      onTap: () {
+        Navigator.pop(context); // 메뉴 닫기
+        // 여기에 각 기능 구현 (예: 팔로우 API 호출 등)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("$text 기능이 선택되었습니다.")));
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // 헤더 (프로필 + 더보기 버튼)
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
           child: Row(
@@ -258,9 +320,21 @@ class _PostItemState extends State<PostItem> {
                   ),
                 ],
               ),
+              const Spacer(),
+              // [수정] 더보기 버튼 클릭 연결
+              GestureDetector(
+                onTap: _showMoreOptions,
+                child: const Icon(
+                  Icons.more_horiz,
+                  size: 24,
+                  color: Colors.black,
+                ),
+              ),
             ],
           ),
         ),
+
+        // 이미지
         Container(
           width: double.infinity,
           height: 400,
@@ -274,6 +348,8 @@ class _PostItemState extends State<PostItem> {
                       const Icon(Icons.image, size: 50, color: Colors.grey),
                 ),
         ),
+
+        // 액션 버튼들 (좋아요, 댓글, DM)
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
           child: Row(
@@ -337,6 +413,8 @@ class _PostItemState extends State<PostItem> {
             ],
           ),
         ),
+
+        // 본문 내용
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
           child: Column(

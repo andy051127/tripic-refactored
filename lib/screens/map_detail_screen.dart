@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_naver_map/flutter_naver_map.dart'; // 네이버 지도 패키지
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:async';
@@ -12,16 +12,10 @@ class MapDetailScreen extends StatefulWidget {
 }
 
 class _MapDetailScreenState extends State<MapDetailScreen> {
-  final Completer<GoogleMapController> _controller = Completer();
+  final Completer<NaverMapController> _controller = Completer();
 
-  // 초기 위치 (서울 시청) - GPS를 못 잡을 경우 대비
-  static const CameraPosition _kGooglePlex = CameraPosition(
-    target: LatLng(37.5665, 126.9780),
-    zoom: 14.4746,
-  );
-
-  // 지도에 표시할 마커들
-  final Set<Marker> _markers = {};
+  // 초기 위치 (서울 시청)
+  static const NLatLng _kSeoulCityHall = NLatLng(37.5666805, 126.9784147);
 
   // 친구들의 게시물 데이터 (더미 데이터)
   final List<Map<String, dynamic>> _friendPosts = [
@@ -31,7 +25,7 @@ class _MapDetailScreenState extends State<MapDetailScreen> {
       "title": "남산 타워 뷰 맛집!",
       "lat": 37.5512,
       "lng": 126.9882,
-      "image": "assets/logo.png", // 실제 이미지 경로라면 FileImage 등 사용
+      "image": "assets/logo.png",
     },
     {
       "id": "2",
@@ -55,57 +49,32 @@ class _MapDetailScreenState extends State<MapDetailScreen> {
   void initState() {
     super.initState();
     _checkPermissions();
-    _createMarkers();
   }
 
-  // 1. 위치 권한 확인 및 현재 위치로 이동
+  // 위치 권한 확인
   Future<void> _checkPermissions() async {
-    var status = await Permission.location.request();
-    if (status.isGranted) {
-      _getCurrentLocation();
-    }
+    await Permission.location.request();
   }
 
-  // 2. 현재 위치 가져오기
-  Future<void> _getCurrentLocation() async {
+  // 현재 위치로 이동
+  Future<void> _moveToCurrentLocation() async {
     try {
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
 
-      final GoogleMapController controller = await _controller.future;
-      controller.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(
-            target: LatLng(position.latitude, position.longitude),
-            zoom: 15,
-          ),
-        ),
+      final NaverMapController controller = await _controller.future;
+      final cameraUpdate = NCameraUpdate.withParams(
+        target: NLatLng(position.latitude, position.longitude),
+        zoom: 15,
       );
+      controller.updateCamera(cameraUpdate);
     } catch (e) {
       print("위치 가져오기 실패: $e");
     }
   }
 
-  // 3. 친구들 게시물 위치에 마커 찍기
-  void _createMarkers() {
-    for (var post in _friendPosts) {
-      _markers.add(
-        Marker(
-          markerId: MarkerId(post['id']),
-          position: LatLng(post['lat'], post['lng']),
-          infoWindow: InfoWindow(title: post['name'], snippet: post['title']),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-          onTap: () {
-            _showPostPreview(post);
-          },
-        ),
-      );
-    }
-    setState(() {});
-  }
-
-  // 마커 클릭 시 하단에 뜨는 미리보기 창
+  // 마커 클릭 시 미리보기 창 표시
   void _showPostPreview(Map<String, dynamic> post) {
     showModalBottomSheet(
       context: context,
@@ -138,16 +107,11 @@ class _MapDetailScreenState extends State<MapDetailScreen> {
                   ),
                   color: Colors.grey[200],
                   image: const DecorationImage(
-                    image: AssetImage(
-                      'assets/logo.png',
-                    ), // 실제론 post['image'] 사용
+                    image: AssetImage('assets/logo.png'),
                     fit: BoxFit.cover,
                   ),
                 ),
-                child: const Icon(
-                  Icons.image,
-                  color: Colors.grey,
-                ), // 이미지가 없을 때 아이콘
+                child: const Icon(Icons.image, color: Colors.grey),
               ),
               // 정보 영역
               Expanded(
@@ -216,16 +180,33 @@ class _MapDetailScreenState extends State<MapDetailScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          GoogleMap(
-            mapType: MapType.normal,
-            initialCameraPosition: _kGooglePlex,
-            onMapCreated: (GoogleMapController controller) {
+          NaverMap(
+            options: const NaverMapViewOptions(
+              initialCameraPosition: NCameraPosition(
+                target: _kSeoulCityHall,
+                zoom: 15,
+              ),
+              locationButtonEnable: false, // 기본 버튼 숨김
+              consumeSymbolTapEvents: false,
+            ),
+            onMapReady: (controller) {
               _controller.complete(controller);
+
+              // 마커 추가
+              for (var post in _friendPosts) {
+                final marker = NMarker(
+                  id: post['id'],
+                  position: NLatLng(post['lat'], post['lng']),
+                  caption: NOverlayCaption(text: post['name']),
+                );
+
+                marker.setOnTapListener((overlay) {
+                  _showPostPreview(post);
+                });
+
+                controller.addOverlay(marker);
+              }
             },
-            markers: _markers,
-            myLocationEnabled: true, // 내 위치 파란 점 표시
-            myLocationButtonEnabled: false, // 기본 버튼 숨김 (커스텀 버튼 사용)
-            zoomControlsEnabled: false,
           ),
 
           // 상단 뒤로가기 버튼
@@ -247,7 +228,7 @@ class _MapDetailScreenState extends State<MapDetailScreen> {
             right: 20,
             child: FloatingActionButton(
               backgroundColor: Colors.white,
-              onPressed: _getCurrentLocation,
+              onPressed: _moveToCurrentLocation,
               child: const Icon(Icons.my_location, color: Colors.black),
             ),
           ),
