@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // DB 패키지 임포트
 import '../widgets/custom_textfield.dart';
 import '../widgets/gradient_button.dart';
+import '../services/auth_service.dart'; // 인증 서비스 import
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -12,82 +11,14 @@ class SignupScreen extends StatefulWidget {
 }
 
 class _SignupScreenState extends State<SignupScreen> {
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _nameController = TextEditingController(); // 성명
-  final _usernameController = TextEditingController(); // 사용자 이름
+  // 입력값을 가져오기 위한 컨트롤러들
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _usernameController = TextEditingController();
 
-  // 실제 회원가입 및 DB 저장 함수
-  Future<void> _signup() async {
-    // 1. 빈칸 검사
-    if (_emailController.text.isEmpty ||
-        _passwordController.text.isEmpty ||
-        _nameController.text.isEmpty ||
-        _usernameController.text.isEmpty) {
-      // 사용자 이름도 검사 추가
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("모든 정보를 입력해주세요.")));
-      return;
-    }
-
-    try {
-      // 2. [Auth] Firebase 인증 계정 생성
-      UserCredential userCredential = await FirebaseAuth.instance
-          .createUserWithEmailAndPassword(
-            email: _emailController.text.trim(),
-            password: _passwordController.text.trim(),
-          );
-
-      // 3. [Auth] 프로필 이름(displayName) 업데이트
-      await userCredential.user?.updateDisplayName(_nameController.text.trim());
-
-      // 4. [Firestore] DB에 유저 정보 저장 (★ 여기가 추가된 핵심 코드입니다!)
-      if (userCredential.user != null) {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(userCredential.user!.uid)
-            .set({
-              'uid': userCredential.user!.uid, // 고유 ID
-              'email': _emailController.text.trim(), // 이메일
-              'name': _nameController.text.trim(), // 성명
-              'username': _usernameController.text.trim(), // 사용자 이름
-              'createdAt': DateTime.now(), // 가입 시간
-              'profileImage': '', // 프로필 사진 (나중을 위해 비워둠)
-              'bio': '', // 자기소개 (나중을 위해 비워둠)
-            });
-      }
-
-      // 5. 성공 처리
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("회원가입 성공! 로그인해주세요.")));
-      Navigator.pop(context); // 로그인 화면으로 복귀
-    } on FirebaseAuthException catch (e) {
-      // 에러 처리
-      String message = "회원가입 실패";
-      if (e.code == 'email-already-in-use') {
-        message = "이미 사용 중인 이메일입니다.";
-      } else if (e.code == 'weak-password') {
-        message = "비밀번호는 6자리 이상이어야 합니다.";
-      } else if (e.code == 'invalid-email') {
-        message = "이메일 형식이 올바르지 않습니다.";
-      }
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
-    } catch (e) {
-      // 기타 에러 (DB 저장 실패 등)
-      print("에러 발생: $e");
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("오류가 발생했습니다: $e")));
-    }
-  }
+  final AuthService _authService = AuthService(); // 인증 서비스 인스턴스
+  bool _isLoading = false; // 로딩 상태 표시용
 
   @override
   void dispose() {
@@ -96,6 +27,47 @@ class _SignupScreenState extends State<SignupScreen> {
     _nameController.dispose();
     _usernameController.dispose();
     super.dispose();
+  }
+
+  void _handleSignUp() async {
+    // 1. 입력값 확인
+    if (_emailController.text.isEmpty ||
+        _passwordController.text.isEmpty ||
+        _nameController.text.isEmpty ||
+        _usernameController.text.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("모든 정보를 입력해주세요.")));
+      return;
+    }
+
+    setState(() => _isLoading = true); // 로딩 시작
+
+    // 2. Firebase 회원가입 요청
+    String? error = await _authService.signUp(
+      email: _emailController.text.trim(),
+      password: _passwordController.text.trim(),
+      name: _nameController.text.trim(),
+      username: _usernameController.text.trim(),
+    );
+
+    setState(() => _isLoading = false); // 로딩 끝
+
+    // 3. 결과 처리
+    if (error == null) {
+      // 성공: 로그인 화면으로 복귀 (또는 홈으로 바로 이동)
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("회원가입 성공! 로그인해주세요.")));
+      Navigator.pop(context);
+    } else {
+      // 실패: 에러 메시지 표시
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("오류: $error")));
+    }
   }
 
   @override
@@ -138,29 +110,25 @@ class _SignupScreenState extends State<SignupScreen> {
 
               const SizedBox(height: 30),
 
-              // 입력 필드들
+              // 입력 필드들에 컨트롤러 연결
+              CustomTextField(hintText: "이메일 주소", controller: _emailController),
               CustomTextField(
-                hintText: "휴대전화 번호 또는 이메일 주소",
-                controller: _emailController,
-              ),
-
-              CustomTextField(
-                hintText: "비밀번호",
+                hintText: "비밀번호 (6자리 이상)",
                 isPassword: true,
                 controller: _passwordController,
               ),
-
               CustomTextField(hintText: "성명", controller: _nameController),
-
               CustomTextField(
-                hintText: "사용자 이름",
+                hintText: "사용자 이름 (ID)",
                 controller: _usernameController,
               ),
 
               const SizedBox(height: 20),
 
-              // 가입 버튼
-              GradientButton(text: "가입하기", onPressed: _signup),
+              // 가입 버튼 (로딩 중일 땐 뺑뺑이 표시)
+              _isLoading
+                  ? const CircularProgressIndicator()
+                  : GradientButton(text: "가입하기", onPressed: _handleSignUp),
 
               const SizedBox(height: 20),
               Row(

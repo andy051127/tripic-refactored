@@ -3,7 +3,10 @@ import 'package:image_picker/image_picker.dart'; // 갤러리 연동
 import 'dart:io'; // 파일 처리
 import 'package:table_calendar/table_calendar.dart'; // 달력
 import 'package:intl/intl.dart'; // 날짜 포맷
-import 'community_screen.dart'; // 데이터 모델 import
+// import 'community_screen.dart'; // 로컬 모델은 이제 필요 없으므로 주석 처리 (DB 직접 저장)
+import 'package:firebase_storage/firebase_storage.dart'; // 스토리지
+import 'package:cloud_firestore/cloud_firestore.dart'; // DB
+import 'package:firebase_auth/firebase_auth.dart'; // 인증
 
 class CommunityWriteScreen extends StatefulWidget {
   const CommunityWriteScreen({super.key});
@@ -18,10 +21,11 @@ class _CommunityWriteScreenState extends State<CommunityWriteScreen> {
 
   // 데이터 상태 변수들
   bool _isAnonymous = false;
-  List<String> _selectedImages = []; // 선택된 사진 경로 리스트
+  List<String> _selectedImages = []; // 선택된 사진 경로 리스트 (로컬)
   String? _selectedLocation; // 선택된 장소
   DateTime? _selectedDate; // 선택된 날짜
   List<String> _selectedMembers = []; // 선택된 인원 이름 리스트
+  bool _isUploading = false; // 업로드 중 상태 확인
 
   final ImagePicker _picker = ImagePicker();
 
@@ -30,6 +34,90 @@ class _CommunityWriteScreenState extends State<CommunityWriteScreen> {
     _titleController.dispose();
     _contentController.dispose();
     super.dispose();
+  }
+
+  // ★ [핵심] Firebase에 커뮤니티 글 업로드
+  Future<void> _uploadCommunityPost() async {
+    // 1. 유효성 검사
+    if (_titleController.text.trim().isEmpty ||
+        _contentController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("제목과 내용을 입력해주세요.")));
+      return;
+    }
+
+    setState(() {
+      _isUploading = true; // 로딩 시작
+    });
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("로그인이 필요합니다.")));
+        return;
+      }
+
+      // 2. [Storage] 이미지 여러 장 업로드
+      List<String> downloadUrls = [];
+
+      if (_selectedImages.isNotEmpty) {
+        for (int i = 0; i < _selectedImages.length; i++) {
+          File imageFile = File(_selectedImages[i]);
+          // 파일명: community_images/시간_유저ID_순서.jpg
+          String fileName =
+              '${DateTime.now().millisecondsSinceEpoch}_${user.uid}_$i.jpg';
+          Reference ref = FirebaseStorage.instance.ref().child(
+            'community_images/$fileName',
+          );
+
+          await ref.putFile(imageFile); // 업로드
+          String url = await ref.getDownloadURL(); // URL 받기
+          downloadUrls.add(url);
+        }
+      }
+
+      // 3. [Firestore] DB에 저장
+      // 커뮤니티 글은 'community_posts' 라는 별도 컬렉션에 저장합니다.
+      await FirebaseFirestore.instance.collection('community_posts').add({
+        'uid': user.uid, // 작성자 ID
+        'writerName': _isAnonymous
+            ? "익명"
+            : (user.displayName ?? "알 수 없음"), // 작성자 표시 이름
+        'isAnonymous': _isAnonymous, // 익명 여부
+        'title': _titleController.text.trim(), // 제목
+        'content': _contentController.text.trim(), // 내용
+        'location': _selectedLocation ?? "", // 장소
+        'tripDate': _selectedDate != null
+            ? Timestamp.fromDate(_selectedDate!)
+            : null, // 여행 날짜
+        'members': _selectedMembers, // 함께한 멤버 리스트
+        'imageUrls': downloadUrls, // 업로드된 이미지 URL 리스트
+        'likeCount': 0, // 좋아요 수 초기화
+        'commentCount': 0, // 댓글 수 초기화
+        'viewCount': 0, // 조회수 초기화
+        'createdAt': FieldValue.serverTimestamp(), // 작성 시간
+        'category': 'general', // 카테고리 (필요시 확장)
+      });
+
+      // 4. 성공 처리
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("게시글이 등록되었습니다!")));
+      Navigator.pop(context); // 목록 화면으로 돌아가기
+    } catch (e) {
+      print("업로드 에러: $e");
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("업로드 중 오류가 발생했습니다.")));
+    } finally {
+      setState(() {
+        _isUploading = false; // 로딩 끝
+      });
+    }
   }
 
   // 1. 갤러리에서 사진 가져오기
@@ -48,7 +136,7 @@ class _CommunityWriteScreenState extends State<CommunityWriteScreen> {
     }
   }
 
-  // 2. 장소 선택 모달 (지도 UI)
+  // 2. 장소 선택 모달
   void _showLocationModal() {
     String tempLocation = "";
     showModalBottomSheet(
@@ -93,34 +181,20 @@ class _CommunityWriteScreenState extends State<CommunityWriteScreen> {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.blue.withOpacity(0.3)),
                 ),
-                child: Stack(
-                  children: [
-                    const Center(
-                      child: Icon(Icons.map, size: 80, color: Colors.black12),
-                    ),
-                    const Center(
-                      child: Text(
+                child: const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.map, size: 80, color: Colors.black12),
+                      Text(
                         "지도에서 위치 선택",
                         style: TextStyle(
                           color: Colors.grey,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                    ),
-                    Positioned(
-                      bottom: 20,
-                      right: 20,
-                      child: FloatingActionButton(
-                        mini: true,
-                        backgroundColor: Colors.white,
-                        onPressed: () {},
-                        child: const Icon(
-                          Icons.my_location,
-                          color: Colors.black,
-                        ),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -233,9 +307,8 @@ class _CommunityWriteScreenState extends State<CommunityWriteScreen> {
     );
   }
 
-  // 4. 인원 설정 모달 (스크롤 리스트 + 체크박스)
+  // 4. 인원 설정 모달
   void _showMembersModal() {
-    // 더미 친구 데이터
     final List<String> friends = [
       "김찬희",
       "이경환",
@@ -247,7 +320,6 @@ class _CommunityWriteScreenState extends State<CommunityWriteScreen> {
       "강호동",
       "이수근",
     ];
-    // 임시 선택 리스트 (모달 안에서만 유효)
     List<String> tempSelected = List.from(_selectedMembers);
 
     showModalBottomSheet(
@@ -308,10 +380,7 @@ class _CommunityWriteScreenState extends State<CommunityWriteScreen> {
                 height: 50,
                 child: ElevatedButton(
                   onPressed: () {
-                    // 모달 닫으면서 메인 화면 상태 업데이트
-                    setState(() {
-                      _selectedMembers = tempSelected;
-                    });
+                    setState(() => _selectedMembers = tempSelected);
                     Navigator.pop(context);
                   },
                   style: ElevatedButton.styleFrom(
@@ -354,44 +423,23 @@ class _CommunityWriteScreenState extends State<CommunityWriteScreen> {
           ),
         ),
         actions: [
+          // 게시하기 버튼 (로딩 중에는 뺑뺑이)
           TextButton(
-            onPressed: () {
-              if (_titleController.text.isEmpty ||
-                  _contentController.text.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("제목과 내용을 입력해주세요.")),
-                );
-                return;
-              }
-
-              // 1. 새 게시글 데이터 생성
-              final newPost = CommunityPost(
-                category: 'general', // 기본적으로 '게시글'로 설정 (필요시 토글 추가 가능)
-                name: _isAnonymous ? "익명" : "내 프로필",
-                // 선택된 장소가 있으면 사용, 없으면 기본값
-                location: _selectedLocation ?? "Seoul, Korea",
-                title: _titleController.text,
-                content: _contentController.text,
-                // 통계는 초기값
-                stats: "0 · 0 · 0",
-                // 갤러리 이미지가 있으면 첫번째 것 사용
-                imageUrl: _selectedImages.isNotEmpty
-                    ? _selectedImages[0]
-                    : null,
-                isFileImage: _selectedImages.isNotEmpty,
-              );
-
-              // 2. 이전 화면으로 데이터 전달하며 종료
-              Navigator.pop(context, newPost);
-            },
-            child: const Text(
-              "게시하기",
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.blue,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            onPressed: _isUploading ? null : _uploadCommunityPost,
+            child: _isUploading
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text(
+                    "게시하기",
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.blue,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
           ),
         ],
       ),
@@ -453,7 +501,7 @@ class _CommunityWriteScreenState extends State<CommunityWriteScreen> {
                     const SizedBox(height: 20),
                   ],
 
-                  // [2] 선택된 정보 칩(Chip) 표시 영역 (수정됨: 인원 목록 개별 표시)
+                  // [2] 선택된 정보 칩(Chip) 표시 영역
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
@@ -487,8 +535,7 @@ class _CommunityWriteScreenState extends State<CommunityWriteScreen> {
                           deleteIcon: const Icon(Icons.close, size: 14),
                           onDeleted: () => setState(() => _selectedDate = null),
                         ),
-
-                      // [수정] 선택된 인원들을 개별 칩으로 표시
+                      // 인원 칩 (개별 표시)
                       ..._selectedMembers.map(
                         (member) => Chip(
                           label: Text(member),
@@ -499,11 +546,8 @@ class _CommunityWriteScreenState extends State<CommunityWriteScreen> {
                           ),
                           backgroundColor: Colors.orange[50],
                           deleteIcon: const Icon(Icons.close, size: 14),
-                          onDeleted: () {
-                            setState(() {
-                              _selectedMembers.remove(member);
-                            });
-                          },
+                          onDeleted: () =>
+                              setState(() => _selectedMembers.remove(member)),
                         ),
                       ),
                     ],
@@ -600,11 +644,7 @@ class _CommunityWriteScreenState extends State<CommunityWriteScreen> {
                       const Spacer(),
                       Switch(
                         value: _isAnonymous,
-                        onChanged: (val) {
-                          setState(() {
-                            _isAnonymous = val;
-                          });
-                        },
+                        onChanged: (val) => setState(() => _isAnonymous = val),
                         activeColor: const Color(0xFF4CA1AF),
                       ),
                     ],
