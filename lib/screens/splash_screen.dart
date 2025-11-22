@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'login_screen.dart';
+import 'home_screen.dart'; // [추가] 홈 화면 import
+import '../services/auth_service.dart'; // [추가] 인증 서비스 import
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -13,13 +15,26 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    // 2초 뒤에 로그인 화면으로 이동
-    /* Timer(const Duration(seconds: 2), () {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-      ); 
-    }); */
+
+    // 2초 뒤에 로그인 상태를 확인하여 이동
+    Timer(const Duration(seconds: 2), () {
+      // 현재 로그인된 사용자가 있는지 확인
+      final user = AuthService().getCurrentUser();
+
+      if (user != null) {
+        // 로그인 되어있으면 홈 화면으로 이동
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+        );
+      } else {
+        // 로그인 안 되어있으면 로그인 화면으로 이동
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+        );
+      }
+    });
   }
 
   @override

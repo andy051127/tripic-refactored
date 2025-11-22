@@ -2,11 +2,9 @@ import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import '../models/post_model.dart';
-import 'settings_screen.dart';
-import 'splash_screen.dart';
-import 'follow_list_screen.dart';
-import 'photo_picker_screen.dart'; // + 버튼 연결용
-import 'member_info_screen.dart'; // [신규] 햄버거 버튼 연결용
+import 'settings_screen.dart'; // 설정 화면 연결
+import 'login_screen.dart'; // [수정] 로그아웃 후 이동할 로그인 화면
+import '../services/auth_service.dart'; // [수정] 실제 로그아웃 기능을 위해 필요
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -96,12 +94,18 @@ class ProfileScreen extends StatelessWidget {
             child: const Text("취소", style: TextStyle(color: Colors.grey)),
           ),
           TextButton(
-            onPressed: () {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => const SplashScreen()),
-                (route) => false,
-              );
+            onPressed: () async {
+              // 1. Firebase 로그아웃 실행
+              await AuthService().signOut();
+
+              // 2. 로그인 화면으로 이동 (이전 화면 스택 모두 제거)
+              if (context.mounted) {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LoginScreen()),
+                  (route) => false,
+                );
+              }
             },
             child: const Text(
               "로그아웃",
@@ -133,33 +137,13 @@ class ProfileScreen extends StatelessWidget {
           ),
         ),
         actions: [
-          // 1. [+] 버튼 -> 사진 선택 화면 (네비게이션 바 가운데 기능과 동일)
           IconButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const PhotoPickerScreen(),
-                ),
-              );
-            },
-            icon: const Icon(
-              Icons.add_box_outlined,
-              color: Colors.black,
-              size: 26,
-            ),
+            onPressed: () {},
+            icon: const Icon(Icons.add_box_outlined, color: Colors.black),
           ),
-          // 2. [햄버거] 버튼 -> 회원 정보 리스트 화면
           IconButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const MemberInfoScreen(),
-                ),
-              );
-            },
-            icon: const Icon(Icons.menu, color: Colors.black, size: 26),
+            onPressed: () {},
+            icon: const Icon(Icons.menu, color: Colors.black),
           ),
           const SizedBox(width: 10),
         ],
@@ -247,57 +231,24 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 20),
-              // 통계
               Expanded(
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     ValueListenableBuilder<List<Post>>(
                       valueListenable: globalPostsNotifier,
-                      builder: (context, posts, child) => _buildStatItem(
-                        "${posts.length}",
-                        "게시물",
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text("아래에서 게시물을 확인하세요! ↓"),
-                              duration: Duration(seconds: 1),
-                            ),
-                          );
-                        },
-                      ),
+                      builder: (context, posts, child) =>
+                          _buildStatItem("${posts.length}", "게시물"),
                     ),
                     ValueListenableBuilder<String>(
                       valueListenable: globalFollowerCount,
-                      builder: (context, count, child) => _buildStatItem(
-                        count,
-                        "팔로워",
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => FollowListScreen(
-                              userName: globalUserName.value,
-                              initialIndex: 0,
-                            ),
-                          ),
-                        ),
-                      ),
+                      builder: (context, count, child) =>
+                          _buildStatItem(count, "팔로워"),
                     ),
                     ValueListenableBuilder<int>(
                       valueListenable: globalFollowingCount,
-                      builder: (context, count, child) => _buildStatItem(
-                        "$count",
-                        "팔로잉",
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => FollowListScreen(
-                              userName: globalUserName.value,
-                              initialIndex: 1,
-                            ),
-                          ),
-                        ),
-                      ),
+                      builder: (context, count, child) =>
+                          _buildStatItem("$count", "팔로잉"),
                     ),
                   ],
                 ),
@@ -306,7 +257,6 @@ class ProfileScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          // 이름 및 소개
           ValueListenableBuilder<String>(
             valueListenable: globalUserName,
             builder: (context, name, _) => Text(
@@ -320,17 +270,14 @@ class ProfileScreen extends StatelessWidget {
                 Text(bio, style: const TextStyle(fontSize: 14)),
           ),
 
-          const SizedBox(height: 10),
-
-          // [수정됨] 국기 및 설정 버튼 레이아웃
+          const SizedBox(height: 4),
           Row(
             children: [
               const Text("🇺🇸", style: TextStyle(fontSize: 20)),
               const SizedBox(width: 8),
               const Text("🇯🇵", style: TextStyle(fontSize: 20)),
+              const Spacer(),
 
-              const Spacer(), // 오른쪽 끝으로 밀기
-              // 1. 로그아웃 버튼 (이미지 참고)
               IconButton(
                 onPressed: () => _showLogoutDialog(context),
                 icon: const Icon(Icons.input, size: 24),
@@ -339,7 +286,7 @@ class ProfileScreen extends StatelessWidget {
               ),
               const SizedBox(width: 16),
 
-              // 2. 설정(톱니바퀴) 버튼
+              // 톱니바퀴 누르면 SettingsScreen으로 이동
               IconButton(
                 onPressed: () {
                   Navigator.push(
@@ -361,19 +308,15 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatItem(String count, String label, {VoidCallback? onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.translucent,
-      child: Column(
-        children: [
-          Text(
-            count,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-          ),
-          Text(label, style: const TextStyle(fontSize: 12)),
-        ],
-      ),
+  Widget _buildStatItem(String count, String label) {
+    return Column(
+      children: [
+        Text(
+          count,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+        ),
+        Text(label, style: const TextStyle(fontSize: 12)),
+      ],
     );
   }
 
@@ -390,18 +333,11 @@ class ProfileScreen extends StatelessWidget {
           ),
           itemCount: posts.length,
           itemBuilder: (context, index) {
-            final post = posts[index];
             return Stack(
               fit: StackFit.expand,
               children: [
-                post.isFile
-                    ? Image.file(File(post.imagePath), fit: BoxFit.cover)
-                    : Image.asset(
-                        post.imagePath,
-                        fit: BoxFit.cover,
-                        errorBuilder: (c, o, s) =>
-                            Container(color: Colors.grey),
-                      ),
+                // 이미지 대신 회색 박스 표시
+                Container(color: Colors.grey[300]),
                 if (index % 2 == 0)
                   const Positioned(
                     top: 8,
