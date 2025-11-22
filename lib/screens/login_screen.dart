@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // [추가됨] 1. 임포트
 import '../widgets/custom_textfield.dart';
 import '../widgets/gradient_button.dart';
 import 'signup_screen.dart';
-import 'home_screen.dart'; // 홈 화면 연결을 위해 필요
+import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -12,7 +13,58 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  bool _isChecked = false; // 로그인 상태 유지 체크박스
+  bool _isChecked = false;
+
+  // [추가됨] 2. 텍스트 필드 컨트롤러 생성
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+
+  // [추가됨] 3. 실제 로그인 함수
+  Future<void> _login() async {
+    // 빈칸인지 확인
+    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("이메일과 비밀번호를 입력해주세요.")));
+      return;
+    }
+
+    try {
+      // 파이어베이스 로그인 시도
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+
+      // 성공 시 홈 화면으로 이동
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
+      );
+    } on FirebaseAuthException catch (e) {
+      // 실패 시 에러 메시지 표시
+      String message = "로그인 실패";
+      if (e.code == 'user-not-found') {
+        message = "가입되지 않은 이메일입니다.";
+      } else if (e.code == 'wrong-password') {
+        message = "비밀번호가 틀렸습니다.";
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
+  // [추가됨] 4. 메모리 청소
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +77,6 @@ class _LoginScreenState extends State<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const SizedBox(height: 60),
-              // 1. 로고 영역
               Image.asset(
                 'assets/logo.png',
                 width: 100,
@@ -43,11 +94,21 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 40),
 
-              // 2. 입력 필드
-              const CustomTextField(hintText: "휴대전화 번호 또는 이메일 주소"),
-              const CustomTextField(hintText: "비밀번호", isPassword: true),
+              // [수정됨] 5. 컨트롤러 연결
+              // 주의: CustomTextField가 controller를 받을 수 있어야 합니다!
+              CustomTextField(
+                hintText: "휴대전화 번호 또는 이메일 주소",
+                controller: _emailController, // 컨트롤러 전달
+              ),
+              const SizedBox(height: 10), // 간격 추가
+              CustomTextField(
+                hintText: "비밀번호",
+                isPassword: true,
+                controller: _passwordController, // 컨트롤러 전달
+              ),
 
-              // 3. 로그인 유지 및 비밀번호 찾기
+              // ... (중간 생략: 체크박스 등 기존 코드 유지) ...
+              const SizedBox(height: 10),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -74,23 +135,18 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 10),
 
-              // 4. 로그인 버튼 (홈 화면으로 이동)
+              // [수정됨] 6. 로그인 버튼에 함수 연결
               GradientButton(
                 text: "로그인",
-                onPressed: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (context) => const HomeScreen()),
-                  );
-                },
+                onPressed: _login, // 위에서 만든 _login 함수 연결
               ),
 
               const SizedBox(height: 30),
 
-              // 5. 간편 로그인 구분선 (디자인 복구)
+              // ... (아래 소셜 로그인 부분은 그대로 두세요) ...
+              // ... (맨 아래 회원가입 버튼 부분도 그대로 두세요) ...
               Row(
                 children: [
                   const Expanded(child: Divider()),
@@ -104,10 +160,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   const Expanded(child: Divider()),
                 ],
               ),
-
               const SizedBox(height: 20),
-
-              // 6. 소셜 로그인 버튼들 (중복 제거됨, 홈 화면 이동 기능 포함)
+              // 소셜 버튼들...
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -186,13 +240,13 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // 소셜 버튼 디자인 헬퍼 함수
   Widget _socialButton(
     Color bgColor,
     String letter,
     Color textColor, {
     bool hasBorder = false,
   }) {
+    // ... 기존 코드 ...
     return Container(
       width: 50,
       height: 40,
