@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import '../models/post_model.dart';
 import 'settings_screen.dart';
-import 'login_screen.dart';
+import 'splash_screen.dart';
 import 'follow_list_screen.dart';
 import 'photo_picker_screen.dart';
 import 'member_info_screen.dart';
@@ -12,7 +12,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
-  // [프로필 사진 변경 함수]
   Future<void> _showImageSourceSelection(BuildContext context) async {
     final ImagePicker picker = ImagePicker();
 
@@ -79,7 +78,6 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  // [로그아웃 팝업]
   void _showLogoutDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -96,21 +94,12 @@ class ProfileScreen extends StatelessWidget {
             child: const Text("취소", style: TextStyle(color: Colors.grey)),
           ),
           TextButton(
-            onPressed: () async {
-              // 1. 다이얼로그 닫기
-              Navigator.pop(context);
-
-              // 2. Firebase 로그아웃 실행
-              await FirebaseAuth.instance.signOut();
-
-              // 3. 로그인 화면으로 이동
-              if (context.mounted) {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
-                  (route) => false,
-                );
-              }
+            onPressed: () {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const SplashScreen()),
+                (route) => false,
+              );
             },
             child: const Text(
               "로그아웃",
@@ -217,7 +206,6 @@ class ProfileScreen extends StatelessWidget {
         children: [
           Row(
             children: [
-              // 프로필 사진
               GestureDetector(
                 onTap: () => _showImageSourceSelection(context),
                 child: Stack(
@@ -258,21 +246,17 @@ class ProfileScreen extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    // 게시물 수
                     ValueListenableBuilder<List<Post>>(
                       valueListenable: globalPostsNotifier,
                       builder: (context, posts, child) {
-                        // 내 게시물 필터링
                         final myPosts = posts
                             .where(
                               (p) =>
                                   p.userName == globalUserName.value ||
                                   p.uid ==
-                                      FirebaseAuth.instance.currentUser?.uid ||
-                                  p.userName == "내 프로필", // 호환성 추가
+                                      FirebaseAuth.instance.currentUser?.uid,
                             )
                             .toList();
-
                         return _buildStatItem(
                           "${myPosts.length}",
                           "게시물",
@@ -287,11 +271,10 @@ class ProfileScreen extends StatelessWidget {
                         );
                       },
                     ),
-                    // 팔로워 수
-                    ValueListenableBuilder<String>(
+                    ValueListenableBuilder<int>(
                       valueListenable: globalFollowerCount,
                       builder: (context, count, child) => _buildStatItem(
-                        count,
+                        "$count",
                         "팔로워",
                         onTap: () {
                           Navigator.push(
@@ -306,7 +289,6 @@ class ProfileScreen extends StatelessWidget {
                         },
                       ),
                     ),
-                    // 팔로잉 수
                     ValueListenableBuilder<int>(
                       valueListenable: globalFollowingCount,
                       builder: (context, count, child) => _buildStatItem(
@@ -331,7 +313,6 @@ class ProfileScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-
           ValueListenableBuilder<String>(
             valueListenable: globalUserName,
             builder: (context, name, _) => Text(
@@ -344,7 +325,6 @@ class ProfileScreen extends StatelessWidget {
             builder: (context, bio, _) =>
                 Text(bio, style: const TextStyle(fontSize: 14)),
           ),
-
           const SizedBox(height: 4),
           Row(
             children: [
@@ -352,7 +332,6 @@ class ProfileScreen extends StatelessWidget {
               const SizedBox(width: 8),
               const Text("🇯🇵", style: TextStyle(fontSize: 20)),
               const Spacer(),
-
               IconButton(
                 onPressed: () => _showLogoutDialog(context),
                 icon: const Icon(Icons.input, size: 24),
@@ -360,7 +339,6 @@ class ProfileScreen extends StatelessWidget {
                 constraints: const BoxConstraints(),
               ),
               const SizedBox(width: 16),
-
               IconButton(
                 onPressed: () {
                   Navigator.push(
@@ -398,18 +376,15 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  // [수정됨] 이미지를 제대로 표시하는 그리드
   Widget _buildMyPostsGrid() {
     return ValueListenableBuilder<List<Post>>(
       valueListenable: globalPostsNotifier,
       builder: (context, posts, child) {
-        // [필터링] 내 게시물만 가져오기
         final myPosts = posts
             .where(
               (p) =>
                   p.userName == globalUserName.value ||
-                  p.uid == FirebaseAuth.instance.currentUser?.uid ||
-                  p.userName == "내 프로필", // 임시 호환성
+                  p.uid == FirebaseAuth.instance.currentUser?.uid,
             )
             .toList();
 
@@ -432,21 +407,11 @@ class ProfileScreen extends StatelessWidget {
             return Stack(
               fit: StackFit.expand,
               children: [
-                // [복구] 실제 이미지를 표시하는 코드
                 post.isFile
                     ? Image.file(File(post.imagePath), fit: BoxFit.cover)
                     : (post.imageUrl.isNotEmpty
-                          ? Image.network(
-                              post.imageUrl,
-                              fit: BoxFit.cover,
-                            ) // Firestore 이미지
-                          : Image.asset(
-                              post.imagePath,
-                              fit: BoxFit.cover, // 기본 에셋
-                              errorBuilder: (c, o, s) =>
-                                  Container(color: Colors.grey[300]),
-                            )),
-
+                          ? Image.network(post.imageUrl, fit: BoxFit.cover)
+                          : Image.asset(post.imagePath, fit: BoxFit.cover)),
                 if (index % 2 == 0)
                   const Positioned(
                     top: 8,
