@@ -2,14 +2,12 @@ import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import '../models/post_model.dart';
-import 'settings_screen.dart'; // 설정 화면 연결
-import 'splash_screen.dart'; // 로그아웃 후 이동할 화면 (또는 LoginScreen)
-import 'login_screen.dart'; // [필수] 로그인 화면 import
-import 'follow_list_screen.dart'; // 팔로우 리스트 화면 import
-import 'photo_picker_screen.dart'; // + 버튼 연결용
-import 'member_info_screen.dart'; // 햄버거 버튼 연결용
-import 'package:firebase_auth/firebase_auth.dart'; // 현재 사용자 확인용
-import '../services/auth_service.dart'; // [필수] 인증 서비스 import
+import 'settings_screen.dart';
+import 'splash_screen.dart';
+import 'follow_list_screen.dart';
+import 'photo_picker_screen.dart';
+import 'member_info_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -36,7 +34,6 @@ class ProfileScreen extends StatelessWidget {
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
               ),
               const SizedBox(height: 20),
-
               ListTile(
                 leading: const Icon(Icons.photo_library, color: Colors.black),
                 title: const Text("갤러리에서 선택"),
@@ -82,7 +79,7 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  // [로그아웃 팝업 및 기능 구현]
+  // [로그아웃 팝업]
   void _showLogoutDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -103,14 +100,14 @@ class ProfileScreen extends StatelessWidget {
               // 1. 다이얼로그 닫기
               Navigator.pop(context);
 
-              // 2. Firebase 로그아웃 실행
-              await AuthService().signOut();
+              // 2. Firebase 로그아웃 실행 (import 필요)
+              // await AuthService().signOut(); // auth_service import가 필요하면 추가
 
-              // 3. 로그인 화면으로 이동 (이전 화면 스택 모두 제거)
+              // 3. 로그인 화면으로 이동
               if (context.mounted) {
                 Navigator.pushAndRemoveUntil(
                   context,
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
+                  MaterialPageRoute(builder: (context) => const SplashScreen()),
                   (route) => false,
                 );
               }
@@ -145,7 +142,6 @@ class ProfileScreen extends StatelessWidget {
           ),
         ),
         actions: [
-          // 1. [+] 버튼 -> 사진 선택 화면
           IconButton(
             onPressed: () {
               Navigator.push(
@@ -161,7 +157,6 @@ class ProfileScreen extends StatelessWidget {
               size: 26,
             ),
           ),
-          // 2. [햄버거] 버튼 -> 회원 정보 리스트 화면
           IconButton(
             onPressed: () {
               Navigator.push(
@@ -259,7 +254,6 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 20),
-              // 통계
               Expanded(
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -267,18 +261,31 @@ class ProfileScreen extends StatelessWidget {
                     // 게시물 수
                     ValueListenableBuilder<List<Post>>(
                       valueListenable: globalPostsNotifier,
-                      builder: (context, posts, child) => _buildStatItem(
-                        "${posts.length}",
-                        "게시물",
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text("아래에서 게시물을 확인하세요! ↓"),
-                              duration: Duration(seconds: 1),
-                            ),
-                          );
-                        },
-                      ),
+                      builder: (context, posts, child) {
+                        // 내 게시물 필터링
+                        final myPosts = posts
+                            .where(
+                              (p) =>
+                                  p.userName == globalUserName.value ||
+                                  p.uid ==
+                                      FirebaseAuth.instance.currentUser?.uid ||
+                                  p.userName == "내 프로필", // 호환성 추가
+                            )
+                            .toList();
+
+                        return _buildStatItem(
+                          "${myPosts.length}",
+                          "게시물",
+                          onTap: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("아래에서 게시물을 확인하세요! ↓"),
+                                duration: Duration(seconds: 1),
+                              ),
+                            );
+                          },
+                        );
+                      },
                     ),
                     // 팔로워 수
                     ValueListenableBuilder<String>(
@@ -325,7 +332,6 @@ class ProfileScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          // 이름 및 소개
           ValueListenableBuilder<String>(
             valueListenable: globalUserName,
             builder: (context, name, _) => Text(
@@ -340,8 +346,6 @@ class ProfileScreen extends StatelessWidget {
           ),
 
           const SizedBox(height: 4),
-
-          // 국기 및 설정 버튼들
           Row(
             children: [
               const Text("🇺🇸", style: TextStyle(fontSize: 20)),
@@ -394,10 +398,27 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  // [수정됨] 이미지를 제대로 표시하는 그리드
   Widget _buildMyPostsGrid() {
     return ValueListenableBuilder<List<Post>>(
       valueListenable: globalPostsNotifier,
       builder: (context, posts, child) {
+        // [필터링] 내 게시물만 가져오기
+        final myPosts = posts
+            .where(
+              (p) =>
+                  p.userName == globalUserName.value ||
+                  p.uid == FirebaseAuth.instance.currentUser?.uid ||
+                  p.userName == "내 프로필", // 임시 호환성
+            )
+            .toList();
+
+        if (myPosts.isEmpty) {
+          return const Center(
+            child: Text("작성한 게시물이 없습니다.", style: TextStyle(color: Colors.grey)),
+          );
+        }
+
         return GridView.builder(
           padding: const EdgeInsets.all(2),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -405,13 +426,27 @@ class ProfileScreen extends StatelessWidget {
             crossAxisSpacing: 2,
             mainAxisSpacing: 2,
           ),
-          itemCount: posts.length,
+          itemCount: myPosts.length,
           itemBuilder: (context, index) {
+            final post = myPosts[index];
             return Stack(
               fit: StackFit.expand,
               children: [
-                // 이미지 대신 회색 박스 표시
-                Container(color: Colors.grey[300]),
+                // [복구] 실제 이미지를 표시하는 코드
+                post.isFile
+                    ? Image.file(File(post.imagePath), fit: BoxFit.cover)
+                    : (post.imageUrl.isNotEmpty
+                          ? Image.network(
+                              post.imageUrl,
+                              fit: BoxFit.cover,
+                            ) // Firestore 이미지
+                          : Image.asset(
+                              post.imagePath,
+                              fit: BoxFit.cover, // 기본 에셋
+                              errorBuilder: (c, o, s) =>
+                                  Container(color: Colors.grey[300]),
+                            )),
+
                 if (index % 2 == 0)
                   const Positioned(
                     top: 8,

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
 import '../services/firestore_service.dart';
-import '../models/post_model.dart'; // [중요] 로컬 상태 업데이트를 위해 import
+import '../models/post_model.dart'; // 로컬 상태 업데이트용
+import 'package:firebase_auth/firebase_auth.dart'; // 사용자 정보 확인
 
 class WritePostScreen extends StatefulWidget {
   final List<String> images;
@@ -43,30 +44,33 @@ class _WritePostScreenState extends State<WritePostScreen> {
       await _firestoreService.addPost(
         title: _titleController.text,
         content: _contentController.text,
-        location: "Seoul, Korea", // 추후 위치 선택 연동 가능
+        location: "Seoul, Korea",
         localImagePath: widget.images[0],
         taggedFriend: widget.taggedFriend,
       );
 
-      // 2. [핵심 추가] 로컬 상태(globalPostsNotifier)에도 추가하여 즉시 반영
-      // (Firestore 스트림을 쓰는 곳은 자동 반영되지만, 로컬 상태를 쓰는 곳을 위해 추가)
+      // 2. 로컬 상태(globalPostsNotifier) 업데이트
+      // [수정] 실제 사용자 정보를 사용하여 Post 생성
+      final currentUser = FirebaseAuth.instance.currentUser;
+      final String currentUserName = globalUserName.value; // 전역 변수(내 닉네임) 사용
+
       final newLocalPost = Post(
-        userName: "내 프로필", // 또는 현재 로그인 유저 정보
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        uid: currentUser?.uid ?? '',
+        userName: currentUserName, // 올바른 닉네임 사용
         location: "Seoul, Korea",
         imagePath: widget.images[0],
         title: _titleController.text,
         content: _contentController.text,
-        isFile: true, // 로컬 파일이므로 true
+        isFile: true,
       );
 
-      // 리스트 맨 앞에 추가
       final currentPosts = List<Post>.from(globalPostsNotifier.value);
       currentPosts.insert(0, newLocalPost);
       globalPostsNotifier.value = currentPosts;
 
       if (!mounted) return;
 
-      // 홈으로 복귀
       Navigator.of(context).popUntil((route) => route.isFirst);
 
       ScaffoldMessenger.of(
