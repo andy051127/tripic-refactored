@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import '../models/post_model.dart';
 import 'settings_screen.dart';
-import 'splash_screen.dart';
+import 'login_screen.dart';
 import 'follow_list_screen.dart';
 import 'photo_picker_screen.dart';
 import 'member_info_screen.dart';
@@ -100,14 +100,14 @@ class ProfileScreen extends StatelessWidget {
               // 1. 다이얼로그 닫기
               Navigator.pop(context);
 
-              // 2. Firebase 로그아웃 실행 (import 필요)
-              // await AuthService().signOut(); // auth_service import가 필요하면 추가
+              // 2. Firebase 로그아웃 실행
+              await FirebaseAuth.instance.signOut();
 
               // 3. 로그인 화면으로 이동
               if (context.mounted) {
                 Navigator.pushAndRemoveUntil(
                   context,
-                  MaterialPageRoute(builder: (context) => const SplashScreen()),
+                  MaterialPageRoute(builder: (context) => const LoginScreen()),
                   (route) => false,
                 );
               }
