@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'travel_plan_setup_screen.dart';
-import '../models/travel_plan_model.dart'; // 모델 import
+import 'travel_plan_detail_screen.dart'; // [신규] 상세 화면 import
+import '../models/travel_plan_model.dart';
+import '../services/firestore_service.dart';
 
 class TravelPlanScreen extends StatefulWidget {
   const TravelPlanScreen({super.key});
@@ -10,22 +13,14 @@ class TravelPlanScreen extends StatefulWidget {
 }
 
 class _TravelPlanScreenState extends State<TravelPlanScreen> {
-  // 여행 계획 목록을 저장할 리스트
-  final List<TravelPlan> _myPlans = [];
+  final FirestoreService _firestoreService = FirestoreService();
 
-  // 설정 화면으로 이동하고 결과를 받아오는 함수
-  Future<void> _navigateAndAddPlan() async {
-    final result = await Navigator.push(
+  // 설정 화면으로 이동 (새 계획 추가)
+  void _navigateAndAddPlan() {
+    Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const TravelPlanSetupScreen()),
     );
-
-    // 받아온 데이터가 있다면 리스트에 추가
-    if (result != null && result is TravelPlan) {
-      setState(() {
-        _myPlans.add(result);
-      });
-    }
   }
 
   @override
@@ -52,18 +47,35 @@ class _TravelPlanScreenState extends State<TravelPlanScreen> {
               color: Colors.black,
               size: 26,
             ),
-            onPressed: _navigateAndAddPlan, // 상단 + 버튼도 동일한 함수 연결
+            onPressed: _navigateAndAddPlan,
           ),
           const SizedBox(width: 10),
         ],
       ),
-      // 계획이 없으면 빈 화면 (클릭 가능), 있으면 리스트 화면 (하단 추가 버튼 포함)
-      body: _myPlans.isEmpty
-          ? Center(
+      body: StreamBuilder<QuerySnapshot>(
+        stream: _firestoreService.getMyTravelPlansStream(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError)
+            return const Center(child: Text("오류가 발생했습니다."));
+          if (snapshot.connectionState == ConnectionState.waiting)
+            return const Center(child: CircularProgressIndicator());
+
+          final docs = snapshot.data?.docs ?? [];
+
+          // 정렬 (최신순)
+          docs.sort((a, b) {
+            final t1 = (b.data() as Map)['createdAt'] as Timestamp?;
+            final t2 = (a.data() as Map)['createdAt'] as Timestamp?;
+            if (t1 == null) return -1;
+            if (t2 == null) return 1;
+            return t1.compareTo(t2);
+          });
+
+          if (docs.isEmpty) {
+            return Center(
               child: GestureDetector(
-                // 빈 화면 클릭 시에도 추가 화면으로 이동
                 onTap: _navigateAndAddPlan,
-                behavior: HitTestBehavior.translucent, // 텍스트 주변 빈 공간도 클릭 인식
+                behavior: HitTestBehavior.translucent,
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: const [
@@ -71,7 +83,7 @@ class _TravelPlanScreenState extends State<TravelPlanScreen> {
                       Icons.add_circle_outline,
                       size: 60,
                       color: Colors.grey,
-                    ), // 아이콘 추가
+                    ),
                     SizedBox(height: 20),
                     Text(
                       "아직 나의 여행 계획이 없어요",
@@ -89,49 +101,60 @@ class _TravelPlanScreenState extends State<TravelPlanScreen> {
                   ],
                 ),
               ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              // 리스트 개수 + 1 (마지막에 '추가하기' 버튼용)
-              itemCount: _myPlans.length + 1,
-              itemBuilder: (context, index) {
-                // 마지막 항목이면 '추가하기' 버튼 표시
-                if (index == _myPlans.length) {
-                  return GestureDetector(
-                    onTap: _navigateAndAddPlan,
-                    child: Container(
-                      margin: const EdgeInsets.only(bottom: 16, top: 10),
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[50], // 배경색 다르게
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: Colors.grey.shade300,
-                          style: BorderStyle.solid,
-                        ), // 점선 느낌 대신 실선
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(Icons.add, color: Colors.grey),
-                          SizedBox(width: 8),
-                          Text(
-                            "새로운 여행 추가하기",
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey,
-                            ),
+            );
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: docs.length + 1,
+            itemBuilder: (context, index) {
+              if (index == docs.length) {
+                return GestureDetector(
+                  onTap: _navigateAndAddPlan,
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 16, top: 10),
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        Icon(Icons.add, color: Colors.grey),
+                        SizedBox(width: 8),
+                        Text(
+                          "새로운 여행 추가하기",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              final doc = docs[index];
+              final plan = TravelPlan.fromMap(
+                doc.data() as Map<String, dynamic>,
+                doc.id,
+              );
+
+              // [수정] 리스트 아이템 클릭 시 상세 화면으로 이동
+              return GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => TravelPlanDetailScreen(plan: plan),
                     ),
                   );
-                }
-
-                // 일반 계획 카드
-                final plan = _myPlans[index];
-                return Container(
+                },
+                child: Container(
                   margin: const EdgeInsets.only(bottom: 16),
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
@@ -148,17 +171,16 @@ class _TravelPlanScreenState extends State<TravelPlanScreen> {
                   ),
                   child: Row(
                     children: [
-                      // 둥근 이미지 (국가별 이미지 or 지도 아이콘)
                       Container(
                         width: 60,
                         height: 60,
-                        decoration: BoxDecoration(
-                          color: Colors.blue[50],
+                        decoration: const BoxDecoration(
+                          color: Colors.blue,
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
                           Icons.flight_takeoff,
-                          color: Color(0xFF4CA1AF),
+                          color: Colors.white,
                           size: 30,
                         ),
                       ),
@@ -182,6 +204,17 @@ class _TravelPlanScreenState extends State<TravelPlanScreen> {
                                 color: Colors.grey[600],
                               ),
                             ),
+                            if (plan.members.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  "함께: ${plan.members.length}명",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.blue[300],
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                       ),
@@ -192,9 +225,12 @@ class _TravelPlanScreenState extends State<TravelPlanScreen> {
                       ),
                     ],
                   ),
-                );
-              },
-            ),
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }

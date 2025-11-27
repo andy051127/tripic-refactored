@@ -1,18 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // DB 패키지
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'community_detail_screen.dart';
 import 'community_write_screen.dart';
+import '../models/post_model.dart'; // 통합된 Post 모델 사용
+import '../services/firestore_service.dart';
+import 'package:intl/intl.dart'; // 날짜 포맷용
 
-// 커뮤니티 게시글 데이터 모델
+// [수정됨] 커뮤니티 게시글 데이터 모델 (createdAt 추가)
 class CommunityPost {
   final String name;
   final String location;
   final String title;
   final String content;
-  final String stats; // "좋아요 · 댓글 · 조회수" 형태
+  final String stats;
   final String? imageUrl;
   final bool isFileImage;
   final String category;
+  final DateTime createdAt; // [추가] 작성 시간
 
   CommunityPost({
     required this.name,
@@ -23,32 +27,8 @@ class CommunityPost {
     this.imageUrl,
     this.isFileImage = false,
     required this.category,
-  });
-
-  // ★ [추가] Firestore 문서(Document)를 객체로 변환하는 함수
-  factory CommunityPost.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
-
-    // 이미지 리스트에서 첫 번째 사진 가져오기 (없으면 null)
-    List<dynamic> images = data['imageUrls'] ?? [];
-    String? firstImage = images.isNotEmpty ? images[0] : null;
-
-    // 통계 문자열 만들기 (좋아요 · 댓글 · 조회수)
-    int likes = data['likeCount'] ?? 0;
-    int comments = data['commentCount'] ?? 0;
-    int views = data['viewCount'] ?? 0;
-
-    return CommunityPost(
-      name: data['writerName'] ?? '익명',
-      location: data['location'] ?? '',
-      title: data['title'] ?? '',
-      content: data['content'] ?? '',
-      stats: "$likes · $comments · $views",
-      imageUrl: firstImage,
-      category: data['category'] ?? 'general',
-      isFileImage: false, // DB 이미지는 항상 URL(네트워크)입니다.
-    );
-  }
+    DateTime? createdAt, // 선택적 매개변수
+  }) : createdAt = createdAt ?? DateTime.now(); // 없으면 현재 시간
 }
 
 class CommunityScreen extends StatefulWidget {
@@ -60,11 +40,8 @@ class CommunityScreen extends StatefulWidget {
 
 class _CommunityScreenState extends State<CommunityScreen> {
   String _viewMode = 'split'; // split, post, companion
-  bool _isSearching = false;
-  final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = "";
+  final FirestoreService _firestoreService = FirestoreService();
 
-  // 화면 보기 모드 변경
   void _toggleView(String mode) {
     setState(() {
       if (_viewMode == mode) {
@@ -76,132 +53,82 @@ class _CommunityScreenState extends State<CommunityScreen> {
   }
 
   @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: _isSearching
-            ? TextField(
-                controller: _searchController,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  hintText: "게시글, 동행 찾기...",
-                  border: InputBorder.none,
-                  hintStyle: TextStyle(color: Colors.grey),
-                ),
-                style: const TextStyle(color: Colors.black),
-                onChanged: (value) {
-                  setState(() {
-                    _searchQuery = value;
-                  });
-                },
-              )
-            : const Text(
-                "커뮤니티",
-                style: TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 24,
-                ),
-              ),
+        title: const Text(
+          "커뮤니티",
+          style: TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+            fontSize: 24,
+          ),
+        ),
         actions: [
-          // 글쓰기 버튼
-          if (!_isSearching)
-            IconButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const CommunityWriteScreen(),
-                  ),
-                );
-                // StreamBuilder가 알아서 업데이트하므로 별도 처리가 필요 없습니다.
-              },
-              icon: const Icon(Icons.add_circle_outline, color: Colors.black),
-            ),
-
-          // 검색 버튼
           IconButton(
             onPressed: () {
-              setState(() {
-                if (_isSearching) {
-                  _isSearching = false;
-                  _searchQuery = "";
-                  _searchController.clear();
-                } else {
-                  _isSearching = true;
-                }
-              });
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const CommunityWriteScreen(),
+                ),
+              );
             },
-            icon: Icon(
-              _isSearching ? Icons.close : Icons.search,
-              color: Colors.black,
-            ),
+            icon: const Icon(Icons.add_circle_outline, color: Colors.black),
+          ),
+          IconButton(
+            onPressed: () {},
+            icon: const Icon(Icons.search, color: Colors.black),
           ),
           const SizedBox(width: 10),
         ],
       ),
-
-      // ★ [핵심] DB 데이터를 실시간으로 받아오는 StreamBuilder
+      // StreamBuilder로 데이터 수신
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('community_posts') // 'community_posts' 컬렉션 구독
-            .orderBy('createdAt', descending: true) // 최신순 정렬
-            .snapshots(),
+        stream: _firestoreService.getPostsStream(),
         builder: (context, snapshot) {
-          // 1. 로딩 중
-          if (snapshot.connectionState == ConnectionState.waiting) {
+          if (snapshot.hasError) return const Center(child: Text("오류 발생"));
+          if (snapshot.connectionState == ConnectionState.waiting)
             return const Center(child: CircularProgressIndicator());
-          }
 
-          // 2. 데이터 없음
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text("등록된 게시글이 없습니다."));
-          }
+          final docs = snapshot.data?.docs ?? [];
 
-          // 3. 데이터 변환 (Snapshot -> List<CommunityPost>)
-          final allDocs = snapshot.data!.docs;
-          final allPosts = allDocs
-              .map((doc) => CommunityPost.fromFirestore(doc))
-              .toList();
+          // Firestore 데이터를 CommunityPost로 변환
+          final allPosts = docs.map((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            return CommunityPost(
+              name: data['userName'] ?? 'Unknown',
+              location: data['location'] ?? '',
+              title: data['title'] ?? '',
+              content: data['content'] ?? '',
+              stats: "${data['likeCount'] ?? 0} · 0 · 0",
+              imageUrl: data['imageUrl'],
+              category: data['category'] ?? 'general',
+              createdAt: (data['createdAt'] as Timestamp?)
+                  ?.toDate(), // Firestore Timestamp -> DateTime 변환
+            );
+          }).toList();
 
-          // 4. 검색어 필터링
-          final filteredPosts = _searchQuery.isEmpty
-              ? allPosts
-              : allPosts.where((post) {
-                  return post.title.contains(_searchQuery) ||
-                      post.content.contains(_searchQuery) ||
-                      post.name.contains(_searchQuery) ||
-                      post.location.contains(_searchQuery);
-                }).toList();
-
-          // 5. 카테고리별 분류
-          final generalPosts = filteredPosts
+          // 카테고리별 분류
+          final generalPosts = allPosts
               .where((p) => p.category == 'general')
               .toList();
-          final companionPosts = filteredPosts
+          final companionPosts = allPosts
               .where((p) => p.category == 'companion')
               .toList();
 
-          // 6. 화면 구성 (기존 로직 유지)
           return Column(
             children: [
-              // [섹션 1] 게시글 (General)
+              // [1] 게시글 영역
               if (_viewMode == 'split' || _viewMode == 'post')
                 Expanded(
                   child: Column(
                     children: [
                       GestureDetector(
                         onTap: () => _toggleView('post'),
-                        behavior: HitTestBehavior.translucent,
                         child: Container(
                           width: double.infinity,
                           color: Colors.white,
@@ -213,21 +140,14 @@ class _CommunityScreenState extends State<CommunityScreen> {
                       ),
                       Expanded(
                         child: generalPosts.isEmpty
-                            ? const Center(
-                                child: Text(
-                                  "게시글이 없습니다.",
-                                  style: TextStyle(color: Colors.grey),
-                                ),
-                              )
+                            ? const Center(child: Text("게시글이 없습니다."))
                             : ListView.builder(
                                 padding: EdgeInsets.zero,
                                 itemCount: generalPosts.length,
-                                itemBuilder: (context, index) {
-                                  return _postItem(
-                                    context,
-                                    post: generalPosts[index],
-                                  );
-                                },
+                                itemBuilder: (context, index) => _postItem(
+                                  context,
+                                  post: generalPosts[index],
+                                ),
                               ),
                       ),
                     ],
@@ -241,14 +161,13 @@ class _CommunityScreenState extends State<CommunityScreen> {
                   color: Color(0xFFF5F5F5),
                 ),
 
-              // [섹션 2] 동행 (Companion)
+              // [2] 동행 영역
               if (_viewMode == 'split' || _viewMode == 'companion')
                 Expanded(
                   child: Column(
                     children: [
                       GestureDetector(
                         onTap: () => _toggleView('companion'),
-                        behavior: HitTestBehavior.translucent,
                         child: Container(
                           width: double.infinity,
                           color: Colors.white,
@@ -262,21 +181,14 @@ class _CommunityScreenState extends State<CommunityScreen> {
                       ),
                       Expanded(
                         child: companionPosts.isEmpty
-                            ? const Center(
-                                child: Text(
-                                  "동행 글이 없습니다.",
-                                  style: TextStyle(color: Colors.grey),
-                                ),
-                              )
+                            ? const Center(child: Text("동행 글이 없습니다."))
                             : ListView.builder(
                                 padding: EdgeInsets.zero,
                                 itemCount: companionPosts.length,
-                                itemBuilder: (context, index) {
-                                  return _postItem(
-                                    context,
-                                    post: companionPosts[index],
-                                  );
-                                },
+                                itemBuilder: (context, index) => _postItem(
+                                  context,
+                                  post: companionPosts[index],
+                                ),
                               ),
                       ),
                     ],
@@ -337,6 +249,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
               content: post.content,
               stats: post.stats,
               imageUrl: post.imageUrl,
+              createdAt: post.createdAt, // [추가] 작성일 전달
             ),
           ),
         );
@@ -360,8 +273,12 @@ class _CommunityScreenState extends State<CommunityScreen> {
                       children: [
                         const CircleAvatar(
                           radius: 12,
-                          backgroundImage: AssetImage('assets/logo.png'),
                           backgroundColor: Colors.grey,
+                          child: Icon(
+                            Icons.person,
+                            size: 16,
+                            color: Colors.white,
+                          ),
                         ),
                         const SizedBox(width: 8),
                         Text(
@@ -409,58 +326,10 @@ class _CommunityScreenState extends State<CommunityScreen> {
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.favorite_border,
-                          size: 14,
-                          color: Colors.grey,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          post.stats.split(" · ")[0],
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        const Icon(
-                          Icons.chat_bubble_outline,
-                          size: 14,
-                          color: Colors.grey,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          post.stats.split(" · ")[1],
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        const Icon(
-                          Icons.near_me_outlined,
-                          size: 14,
-                          color: Colors.grey,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          post.stats.split(" · ")[2],
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ],
-                    ),
                   ],
                 ),
               ),
-
-              // 이미지가 있을 때만 표시 (네트워크 이미지)
-              if (post.imageUrl != null)
+              if (post.imageUrl != null && post.imageUrl!.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(left: 12.0),
                   child: ClipRRect(
@@ -472,8 +341,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                       child: Image.network(
                         post.imageUrl!,
                         fit: BoxFit.cover,
-                        errorBuilder: (c, o, s) =>
-                            const Icon(Icons.image, color: Colors.grey),
+                        errorBuilder: (c, o, s) => const Icon(Icons.image),
                       ),
                     ),
                   ),

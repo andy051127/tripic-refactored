@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';
-import 'package:cloud_firestore/cloud_firestore.dart'; // DB 패키지
-import 'package:firebase_auth/firebase_auth.dart'; // 로그인 정보
 import 'community_screen.dart';
 import 'travel_plan_screen.dart';
 import 'photo_picker_screen.dart';
@@ -14,6 +13,7 @@ import 'search_screen.dart';
 import '../models/post_model.dart';
 import '../widgets/comment_modal.dart';
 import '../models/activity_model.dart';
+import '../services/firestore_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -28,7 +28,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<Widget> _pages = [
     const HomeFeedPage(),
     const TravelPlanScreen(),
-    const SizedBox(), // Add 버튼 자리 (onItemTapped에서 처리)
+    const SizedBox(),
     const CommunityScreen(),
     const ProfileScreen(),
   ];
@@ -88,6 +88,8 @@ class HomeFeedPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final FirestoreService firestoreService = FirestoreService();
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -140,57 +142,101 @@ class HomeFeedPage extends StatelessWidget {
           const SizedBox(width: 10),
         ],
       ),
-      // ★ [수정됨] 기존 ValueListenableBuilder 대신 StreamBuilder 사용
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('posts') // 'posts' 컬렉션 구독
-            .orderBy('timestamp', descending: true) // 최신순 정렬
-            .snapshots(),
+        stream: firestoreService.getPostsStream(),
         builder: (context, snapshot) {
-          // 1. 로딩 중
-          if (snapshot.connectionState == ConnectionState.waiting) {
+          if (snapshot.hasError) return const Center(child: Text("오류 발생"));
+          if (snapshot.connectionState == ConnectionState.waiting)
             return const Center(child: CircularProgressIndicator());
-          }
 
-          // 2. 게시글 없음
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return _buildEmptyState(context); // 빈 화면 표시
-          }
+          final docs = snapshot.data?.docs ?? [];
 
-          final docs = snapshot.data!.docs;
+          // 전체 데이터를 Post 객체로 변환
+          final allPosts = docs
+              .map(
+                (doc) =>
+                    Post.fromMap(doc.data() as Map<String, dynamic>, doc.id),
+              )
+              .toList();
+
+          // [수정됨] 홈 화면에는 'feed' 카테고리만 보여주도록 필터링
+          // (커뮤니티 글은 'general' 또는 'companion' 이므로 제외됨)
+          final feedPosts = allPosts
+              .where((post) => post.category == 'feed')
+              .toList();
 
           return ListView.builder(
-            itemCount: docs.length + 1, // 헤더(지도 배너) 포함
+            itemCount: feedPosts.length + 1,
             itemBuilder: (context, index) {
-              // 0번 인덱스는 지도 배너
               if (index == 0) {
-                return _buildMapBanner(context);
+                return Column(
+                  children: [
+                    GestureDetector(
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const MapDetailScreen(),
+                        ),
+                      ),
+                      child: Container(
+                        width: double.infinity,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          color: Colors.blue[50],
+                          image: const DecorationImage(
+                            image: NetworkImage(
+                              "https://via.placeholder.com/600x200.png?text=Map+View",
+                            ),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        child: Stack(
+                          children: [
+                            Container(color: Colors.black12),
+                            const Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.map,
+                                    color: Colors.white,
+                                    size: 30,
+                                  ),
+                                  SizedBox(height: 8),
+                                  Text(
+                                    "내 주변 친구들의 여행 기록 보기",
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      shadows: [
+                                        Shadow(
+                                          blurRadius: 2,
+                                          color: Colors.black,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                );
               }
 
-              // 실제 게시글 데이터 (index - 1)
-              final doc = docs[index - 1];
-              final data = doc.data() as Map<String, dynamic>;
-
-              // Firestore 데이터를 기존 Post 모델로 변환
-              final post = Post(
-                userName: data['username'] ?? '익명',
-                location: data['location'] ?? 'Seoul, Korea',
-                imagePath: data['imageUrl'] ?? '', // URL이 들어갑니다
-                title: data['title'] ?? '', // 제목이 없는 경우 대비
-                content:
-                    data['content'] ?? '', // 내용 필드 (기존 title, content 매핑 확인)
-                isFile: false, // Firestore 이미지는 URL이므로 false
-              );
+              final post = feedPosts[index - 1]; // 필터링된 리스트 사용
 
               return PostItem(
                 post: post,
-                docId: doc.id, // 삭제를 위해 문서 ID 전달
-                uid: data['uid'] ?? '', // 작성자 ID 전달
                 onDelete: () {
-                  // 여기에 로컬 삭제 로직이 있었으나, PostItem 내부에서 DB 삭제 처리하도록 변경
+                  // 삭제 로직 (로컬 state만 갱신하는 것이 아니라 Firestore 삭제가 필요하지만, 일단 UI 갱신용)
                 },
                 onBlock: () {
-                  // 차단 로직 (기존 유지)
+                  // 차단 로직
                   final currentBlocked = List<String>.from(
                     blockedUsersNotifier.value,
                   );
@@ -206,82 +252,16 @@ class HomeFeedPage extends StatelessWidget {
       ),
     );
   }
-
-  // 게시글 없을 때 화면
-  Widget _buildEmptyState(BuildContext context) {
-    return Column(
-      children: [
-        _buildMapBanner(context),
-        const Expanded(
-          child: Center(child: Text("아직 게시물이 없어요.\n첫 번째 여행을 기록해보세요!")),
-        ),
-      ],
-    );
-  }
-
-  // 상단 지도 배너 위젯 분리
-  Widget _buildMapBanner(BuildContext context) {
-    return Column(
-      children: [
-        GestureDetector(
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const MapDetailScreen()),
-          ),
-          child: Container(
-            width: double.infinity,
-            height: 120,
-            decoration: BoxDecoration(
-              color: Colors.blue[50],
-              image: const DecorationImage(
-                image: NetworkImage(
-                  "https://via.placeholder.com/600x200.png?text=Map+View",
-                ),
-                fit: BoxFit.cover,
-              ),
-            ),
-            child: Stack(
-              children: [
-                Container(color: Colors.black12),
-                const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.map, color: Colors.white, size: 30),
-                      SizedBox(height: 8),
-                      Text(
-                        "내 주변 친구들의 여행 기록 보기",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          shadows: [Shadow(blurRadius: 2, color: Colors.black)],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
-      ],
-    );
-  }
 }
 
 class PostItem extends StatefulWidget {
   final Post post;
-  final String docId; // [추가] DB 삭제용 문서 ID
-  final String uid; // [추가] 작성자 본인 확인용
   final VoidCallback onDelete;
   final VoidCallback onBlock;
 
   const PostItem({
     super.key,
     required this.post,
-    required this.docId, // 필수
-    required this.uid, // 필수
     required this.onDelete,
     required this.onBlock,
   });
@@ -293,38 +273,15 @@ class PostItem extends StatefulWidget {
 class _PostItemState extends State<PostItem> {
   bool _isLiked = false;
   bool _isSaved = false;
-  int _likeCount = 72; // 실제로는 DB에서 가져와야 함
+  int _likeCount = 0;
 
-  // 게시글 삭제 함수 (DB 연동)
-  Future<void> _deletePost() async {
-    final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser?.uid == widget.uid) {
-      try {
-        await FirebaseFirestore.instance
-            .collection('posts')
-            .doc(widget.docId)
-            .delete();
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("게시물이 삭제되었습니다.")));
-      } catch (e) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("삭제 실패")));
-      }
-    } else {
-      // 내 글이 아님 -> 숨기기 처리 (로컬)
-      widget.onDelete();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("게시물이 숨겨졌습니다.")));
-    }
+  @override
+  void initState() {
+    super.initState();
+    _likeCount = widget.post.likeCount;
   }
 
   void _showMoreOptions() {
-    // 내 글인지 확인
-    final isMyPost = FirebaseAuth.instance.currentUser?.uid == widget.uid;
-
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -337,7 +294,6 @@ class _PostItemState extends State<PostItem> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 팔로우
             _buildOptionItem(
               Icons.person_add_outlined,
               "팔로우",
@@ -350,31 +306,18 @@ class _PostItemState extends State<PostItem> {
               },
             ),
             const Divider(height: 1),
-
-            // 삭제 (내 글일 때만 표시) 또는 숨기기
-            if (isMyPost)
-              _buildOptionItem(
-                Icons.delete_outline,
-                "삭제하기",
-                isDestructive: true,
-                onTap: () {
-                  Navigator.pop(context);
-                  _deletePost(); // DB 삭제 실행
-                },
-              )
-            else
-              _buildOptionItem(
-                Icons.visibility_off_outlined,
-                "숨기기",
-                onTap: () {
-                  Navigator.pop(context);
-                  _deletePost(); // 숨김 처리 실행
-                },
-              ),
-
+            _buildOptionItem(
+              Icons.visibility_off_outlined,
+              "숨기기",
+              onTap: () {
+                Navigator.pop(context);
+                widget.onDelete();
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text("게시물을 숨겼습니다.")));
+              },
+            ),
             const Divider(height: 1),
-
-            // 차단
             _buildOptionItem(
               Icons.block,
               "차단",
@@ -382,15 +325,13 @@ class _PostItemState extends State<PostItem> {
               onTap: () {
                 Navigator.pop(context);
                 widget.onBlock();
-                _deletePost(); // 숨김 처리
+                widget.onDelete();
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text("${widget.post.userName}님을 차단했습니다.")),
                 );
               },
             ),
             const Divider(height: 1),
-
-            // 신고
             _buildOptionItem(
               Icons.campaign_outlined,
               "신고",
@@ -406,7 +347,6 @@ class _PostItemState extends State<PostItem> {
     );
   }
 
-  // 신고 사유 선택 팝업
   void _showReportDialog() {
     showModalBottomSheet(
       context: context,
@@ -464,7 +404,7 @@ class _PostItemState extends State<PostItem> {
       title: Text(reason),
       onTap: () {
         Navigator.pop(context);
-        // 신고 로직 (실제로는 DB에 신고 기록)
+        widget.onDelete();
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text("신고가 완료되었습니다.")));
@@ -497,7 +437,6 @@ class _PostItemState extends State<PostItem> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 헤더 (프로필 + 더보기 버튼)
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
           child: Row(
@@ -536,36 +475,35 @@ class _PostItemState extends State<PostItem> {
             ],
           ),
         ),
-
-        // 이미지 (★ 수정된 부분: URL 이미지와 로컬 이미지 구분)
         Container(
           width: double.infinity,
           height: 400,
           color: Colors.grey[200],
-          child: _buildPostImage(),
+          child: Image.network(
+            widget.post.imageUrl,
+            fit: BoxFit.cover,
+            errorBuilder: (c, o, s) => const Center(
+              child: Icon(
+                Icons.image_not_supported,
+                size: 50,
+                color: Colors.grey,
+              ),
+            ),
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return const Center(child: CircularProgressIndicator());
+            },
+          ),
         ),
-
-        // 액션 버튼 영역
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
           child: Row(
             children: [
-              // 1. 좋아요
               GestureDetector(
                 onTap: () {
                   setState(() {
                     _isLiked = !_isLiked;
-                    if (_isLiked) {
-                      _likeCount++;
-                      addActivity(
-                        ActivityType.like,
-                        widget.post.title,
-                        "이 게시물을 좋아합니다.",
-                        widget.post.imagePath,
-                      );
-                    } else {
-                      _likeCount--;
-                    }
+                    _isLiked ? _likeCount++ : _likeCount--;
                   });
                 },
                 child: Icon(
@@ -583,18 +521,13 @@ class _PostItemState extends State<PostItem> {
                 ),
               ),
               const SizedBox(width: 16),
-
-              // 2. 댓글
               GestureDetector(
                 onTap: () {
                   showModalBottomSheet(
                     context: context,
                     isScrollControlled: true,
                     backgroundColor: Colors.transparent,
-                    builder: (context) => CommentModal(
-                      postTitle: widget.post.title,
-                      postImage: widget.post.imagePath,
-                    ),
+                    builder: (context) => const CommentModal(),
                   );
                 },
                 child: const Icon(Icons.chat_bubble_outline, size: 28),
@@ -605,8 +538,6 @@ class _PostItemState extends State<PostItem> {
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
               ),
               const SizedBox(width: 16),
-
-              // 3. DM
               GestureDetector(
                 onTap: () {
                   Navigator.push(
@@ -620,10 +551,7 @@ class _PostItemState extends State<PostItem> {
                 },
                 child: const Icon(Icons.near_me_outlined, size: 28),
               ),
-
               const Spacer(),
-
-              // 4. 보관함
               GestureDetector(
                 onTap: () {
                   setState(() {
@@ -634,14 +562,10 @@ class _PostItemState extends State<PostItem> {
                       ActivityType.save,
                       widget.post.title,
                       "보관함에 저장했습니다.",
-                      widget.post.imagePath,
+                      widget.post.imageUrl,
                     );
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text("게시물이 보관함에 저장되었습니다.")),
-                    );
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("보관함 저장을 취소했습니다.")),
                     );
                   }
                 },
@@ -654,21 +578,18 @@ class _PostItemState extends State<PostItem> {
             ],
           ),
         ),
-
-        // 본문 내용
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (widget.post.title.isNotEmpty)
-                Text(
-                  widget.post.title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
+              Text(
+                widget.post.title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
                 ),
+              ),
               const SizedBox(height: 4),
               Text(widget.post.content, style: const TextStyle(fontSize: 14)),
             ],
@@ -677,37 +598,5 @@ class _PostItemState extends State<PostItem> {
         const SizedBox(height: 30),
       ],
     );
-  }
-
-  // ★ [핵심] 이미지 처리 함수 (네트워크 URL vs 로컬 파일)
-  Widget _buildPostImage() {
-    final path = widget.post.imagePath;
-
-    // 1. URL인 경우 (Firebase Storage)
-    if (path.startsWith('http')) {
-      return Image.network(
-        path,
-        fit: BoxFit.cover,
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
-          return const Center(child: CircularProgressIndicator());
-        },
-        errorBuilder: (context, error, stackTrace) =>
-            const Icon(Icons.broken_image, size: 50, color: Colors.grey),
-      );
-    }
-    // 2. 로컬 파일인 경우
-    else if (widget.post.isFile) {
-      return Image.file(File(path), fit: BoxFit.cover);
-    }
-    // 3. 에셋 이미지인 경우 (기존 샘플 데이터)
-    else {
-      return Image.asset(
-        path,
-        fit: BoxFit.cover,
-        errorBuilder: (c, o, s) =>
-            const Icon(Icons.image, size: 50, color: Colors.grey),
-      );
-    }
   }
 }

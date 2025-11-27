@@ -1,12 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart'; // 갤러리 연동
-import 'dart:io'; // 파일 처리
-import 'package:table_calendar/table_calendar.dart'; // 달력
-import 'package:intl/intl.dart'; // 날짜 포맷
-// import 'community_screen.dart'; // 로컬 모델은 이제 필요 없으므로 주석 처리 (DB 직접 저장)
-import 'package:firebase_storage/firebase_storage.dart'; // 스토리지
-import 'package:cloud_firestore/cloud_firestore.dart'; // DB
-import 'package:firebase_auth/firebase_auth.dart'; // 인증
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'package:intl/intl.dart';
+import '../services/firestore_service.dart'; // Firestore 서비스 import
 
 class CommunityWriteScreen extends StatefulWidget {
   const CommunityWriteScreen({super.key});
@@ -19,15 +15,20 @@ class _CommunityWriteScreenState extends State<CommunityWriteScreen> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _contentController = TextEditingController();
 
-  // 데이터 상태 변수들
-  bool _isAnonymous = false;
-  List<String> _selectedImages = []; // 선택된 사진 경로 리스트 (로컬)
-  String? _selectedLocation; // 선택된 장소
-  DateTime? _selectedDate; // 선택된 날짜
-  List<String> _selectedMembers = []; // 선택된 인원 이름 리스트
-  bool _isUploading = false; // 업로드 중 상태 확인
-
+  // [수정] _firestoreService 멤버 변수 선언
+  final FirestoreService _firestoreService = FirestoreService();
   final ImagePicker _picker = ImagePicker();
+
+  // 상태 변수들
+  String _selectedCategory = 'general'; // 'general' or 'companion'
+  bool _isUploading = false;
+  List<String> _selectedImages = [];
+
+  // 동행글 전용 상태 변수
+  String? _selectedLocation;
+  DateTimeRange? _selectedDateRange;
+  int? _selectedMemberCount;
+  bool _isAnonymous = false;
 
   @override
   void dispose() {
@@ -36,369 +37,191 @@ class _CommunityWriteScreenState extends State<CommunityWriteScreen> {
     super.dispose();
   }
 
-  // ★ [핵심] Firebase에 커뮤니티 글 업로드
-  Future<void> _uploadCommunityPost() async {
-    // 1. 유효성 검사
-    if (_titleController.text.trim().isEmpty ||
-        _contentController.text.trim().isEmpty) {
+  // 게시하기 버튼 클릭 시 실행
+  void _uploadCommunityPost() async {
+    if (_titleController.text.isEmpty || _contentController.text.isEmpty) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text("제목과 내용을 입력해주세요.")));
       return;
     }
 
-    setState(() {
-      _isUploading = true; // 로딩 시작
-    });
-
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("로그인이 필요합니다.")));
+    // 동행글 필수 정보 확인
+    if (_selectedCategory == 'companion') {
+      if (_selectedLocation == null ||
+          _selectedDateRange == null ||
+          _selectedMemberCount == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("여행 장소, 날짜, 인원을 모두 설정해주세요.")),
+        );
         return;
       }
+    }
 
-      // 2. [Storage] 이미지 여러 장 업로드
-      List<String> downloadUrls = [];
+    setState(() => _isUploading = true);
 
-      if (_selectedImages.isNotEmpty) {
-        for (int i = 0; i < _selectedImages.length; i++) {
-          File imageFile = File(_selectedImages[i]);
-          // 파일명: community_images/시간_유저ID_순서.jpg
-          String fileName =
-              '${DateTime.now().millisecondsSinceEpoch}_${user.uid}_$i.jpg';
-          Reference ref = FirebaseStorage.instance.ref().child(
-            'community_images/$fileName',
-          );
+    try {
+      // 이미지 경로 처리 (첫 번째 이미지만 사용하거나 여러 개를 리스트로 저장할 수 있음)
+      List<String> imagePaths = _selectedImages;
 
-          await ref.putFile(imageFile); // 업로드
-          String url = await ref.getDownloadURL(); // URL 받기
-          downloadUrls.add(url);
-        }
+      // 날짜 포맷팅
+      String? formattedDateRange;
+      if (_selectedDateRange != null) {
+        formattedDateRange =
+            "${DateFormat('yyyy.MM.dd').format(_selectedDateRange!.start)} - ${DateFormat('yyyy.MM.dd').format(_selectedDateRange!.end)}";
       }
 
-      // 3. [Firestore] DB에 저장
-      // 커뮤니티 글은 'community_posts' 라는 별도 컬렉션에 저장합니다.
-      await FirebaseFirestore.instance.collection('community_posts').add({
-        'uid': user.uid, // 작성자 ID
-        'writerName': _isAnonymous
-            ? "익명"
-            : (user.displayName ?? "알 수 없음"), // 작성자 표시 이름
-        'isAnonymous': _isAnonymous, // 익명 여부
-        'title': _titleController.text.trim(), // 제목
-        'content': _contentController.text.trim(), // 내용
-        'location': _selectedLocation ?? "", // 장소
-        'tripDate': _selectedDate != null
-            ? Timestamp.fromDate(_selectedDate!)
-            : null, // 여행 날짜
-        'members': _selectedMembers, // 함께한 멤버 리스트
-        'imageUrls': downloadUrls, // 업로드된 이미지 URL 리스트
-        'likeCount': 0, // 좋아요 수 초기화
-        'commentCount': 0, // 댓글 수 초기화
-        'viewCount': 0, // 조회수 초기화
-        'createdAt': FieldValue.serverTimestamp(), // 작성 시간
-        'category': 'general', // 카테고리 (필요시 확장)
-      });
+      await _firestoreService.addPost(
+        title: _titleController.text,
+        content: _contentController.text,
+        category: _selectedCategory,
+        // TODO: FirestoreService.addPost 메소드가 아래 필드들을 받을 수 있도록 수정 필요
+        // images: imagePaths,
+        // location: _selectedLocation,
+        // dateRange: formattedDateRange,
+        // memberCount: _selectedMemberCount,
+        // isAnonymous: _isAnonymous,
+        location: _selectedLocation ?? "", // location 필수값이므로 임시값 설정 또는 수정 필요
+        localImagePath: imagePaths.isNotEmpty ? imagePaths[0] : "", // 필수값 처리
+      );
 
-      // 4. 성공 처리
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("게시글이 등록되었습니다.")));
+    } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text("게시글이 등록되었습니다!")));
-      Navigator.pop(context); // 목록 화면으로 돌아가기
-    } catch (e) {
-      print("업로드 에러: $e");
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("업로드 중 오류가 발생했습니다.")));
+      ).showSnackBar(SnackBar(content: Text("오류 발생: $e")));
     } finally {
-      setState(() {
-        _isUploading = false; // 로딩 끝
-      });
+      if (mounted) setState(() => _isUploading = false);
     }
   }
 
-  // 1. 갤러리에서 사진 가져오기
+  // 이미지 선택 기능
   Future<void> _pickImages() async {
     try {
       final List<XFile> images = await _picker.pickMultiImage();
       if (images.isNotEmpty) {
         setState(() {
-          for (var img in images) {
-            _selectedImages.add(img.path);
-          }
+          for (var img in images) _selectedImages.add(img.path);
         });
       }
     } catch (e) {
-      print("Error picking images: $e");
+      print("Error: $e");
     }
   }
 
-  // 2. 장소 선택 모달
+  // 장소 선택 모달 (임시 구현 - 추후 구글 맵 연동 등으로 교체)
   void _showLocationModal() {
-    String tempLocation = "";
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.8,
-        padding: const EdgeInsets.all(20),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildModalHeader("여행 장소 추가"),
-            const SizedBox(height: 20),
-            // 검색창
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: TextField(
-                onChanged: (val) => tempLocation = val,
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                  hintText: "장소 검색 (예: 에펠탑)",
-                  suffixIcon: Icon(Icons.search),
-                ),
-              ),
+      builder: (context) {
+        String tempLocation = '';
+        return AlertDialog(
+          title: const Text("여행 장소 선택"),
+          content: TextField(
+            onChanged: (value) => tempLocation = value,
+            decoration: const InputDecoration(
+              hintText: "장소를 입력하세요 (예: 서울, 부산)",
             ),
-            const SizedBox(height: 20),
-            // 지도 이미지 (더미)
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.blue[50],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.blue.withOpacity(0.3)),
-                ),
-                child: const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.map, size: 80, color: Colors.black12),
-                      Text(
-                        "지도에서 위치 선택",
-                        style: TextStyle(
-                          color: Colors.grey,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+          ),
+          actions: [
+            TextButton(
+              child: const Text("취소"),
+              onPressed: () => Navigator.pop(context),
             ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: () {
-                  if (tempLocation.isNotEmpty) {
-                    setState(() => _selectedLocation = tempLocation);
-                  } else {
-                    setState(() => _selectedLocation = "선택된 지도 위치"); // 기본값
-                  }
-                  Navigator.pop(context);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4CA1AF),
-                ),
-                child: const Text(
-                  "이 장소 선택",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
+            TextButton(
+              child: const Text("확인"),
+              onPressed: () {
+                setState(() => _selectedLocation = tempLocation);
+                Navigator.pop(context);
+              },
             ),
           ],
-        ),
-      ),
+        );
+      },
     );
   }
 
-  // 3. 날짜 선택 모달 (달력)
-  void _showDateModal() {
-    DateTime focusedDay = _selectedDate ?? DateTime.now();
-    DateTime? selectedDay = _selectedDate;
-
-    showModalBottomSheet(
+  // 날짜 선택 모달 (기간 선택)
+  void _showDateModal() async {
+    final DateTimeRange? picked = await showDateRangePicker(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) => Container(
-          height: MediaQuery.of(context).size.height * 0.7,
-          padding: const EdgeInsets.all(20),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2030),
+      initialDateRange: _selectedDateRange,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF4CA1AF), // 선택된 날짜 색상
+              onPrimary: Colors.white,
+              onSurface: Colors.black,
+            ),
           ),
-          child: Column(
-            children: [
-              _buildModalHeader("여행 날짜 선택"),
-              const SizedBox(height: 20),
-              TableCalendar(
-                locale: 'ko_KR',
-                firstDay: DateTime.now().subtract(const Duration(days: 365)),
-                lastDay: DateTime.now().add(const Duration(days: 365)),
-                focusedDay: focusedDay,
-                selectedDayPredicate: (day) => isSameDay(selectedDay, day),
-                onDaySelected: (selected, focused) {
-                  setModalState(() {
-                    selectedDay = selected;
-                    focusedDay = focused;
-                  });
-                },
-                headerStyle: const HeaderStyle(
-                  titleCentered: true,
-                  formatButtonVisible: false,
-                ),
-                calendarStyle: const CalendarStyle(
-                  selectedDecoration: BoxDecoration(
-                    color: Color(0xFF4CA1AF),
-                    shape: BoxShape.circle,
+          child: child!,
+        );
+      },
+    );
+    if (picked != null && picked != _selectedDateRange) {
+      setState(() => _selectedDateRange = picked);
+    }
+  }
+
+  // 인원 설정 모달
+  void _showMemberCountModal() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        int tempCount = _selectedMemberCount ?? 1;
+        return StatefulBuilder(
+          builder: (context, setStateModal) {
+            return AlertDialog(
+              title: const Text("인원 설정"),
+              content: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.remove_circle_outline),
+                    onPressed: () => setStateModal(() {
+                      if (tempCount > 1) tempCount--;
+                    }),
                   ),
-                  todayDecoration: BoxDecoration(
-                    color: Color(0xFF81C784),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-              const Spacer(),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: selectedDay != null
-                      ? () {
-                          setState(() => _selectedDate = selectedDay);
-                          Navigator.pop(context);
-                        }
-                      : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4CA1AF),
-                  ),
-                  child: const Text(
-                    "날짜 적용",
-                    style: TextStyle(
-                      color: Colors.white,
+                  Text(
+                    "$tempCount명",
+                    style: const TextStyle(
+                      fontSize: 20,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+                  IconButton(
+                    icon: const Icon(Icons.add_circle_outline),
+                    onPressed: () => setStateModal(() {
+                      tempCount++;
+                    }),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  child: const Text("취소"),
+                  onPressed: () => Navigator.pop(context),
                 ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // 4. 인원 설정 모달
-  void _showMembersModal() {
-    final List<String> friends = [
-      "김찬희",
-      "이경환",
-      "안해진",
-      "박지성",
-      "손흥민",
-      "아이유",
-      "유재석",
-      "강호동",
-      "이수근",
-    ];
-    List<String> tempSelected = List.from(_selectedMembers);
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) => Container(
-          height: MediaQuery.of(context).size.height * 0.6,
-          padding: const EdgeInsets.all(20),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildModalHeader("함께할 인원 선택"),
-              const SizedBox(height: 10),
-              Text(
-                "선택됨: ${tempSelected.length}명",
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-              const SizedBox(height: 10),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: friends.length,
-                  itemBuilder: (context, index) {
-                    final name = friends[index];
-                    final isSelected = tempSelected.contains(name);
-                    return CheckboxListTile(
-                      title: Text(
-                        name,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      secondary: const CircleAvatar(
-                        backgroundColor: Colors.grey,
-                        child: Icon(Icons.person, color: Colors.white),
-                      ),
-                      value: isSelected,
-                      activeColor: const Color(0xFF4CA1AF),
-                      onChanged: (val) {
-                        setModalState(() {
-                          if (val == true) {
-                            tempSelected.add(name);
-                          } else {
-                            tempSelected.remove(name);
-                          }
-                        });
-                      },
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
+                TextButton(
+                  child: const Text("확인"),
                   onPressed: () {
-                    setState(() => _selectedMembers = tempSelected);
+                    setState(() => _selectedMemberCount = tempCount);
                     Navigator.pop(context);
                   },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4CA1AF),
-                  ),
-                  child: const Text(
-                    "완료",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
                 ),
-              ),
-            ],
-          ),
-        ),
-      ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
@@ -415,7 +238,7 @@ class _CommunityWriteScreenState extends State<CommunityWriteScreen> {
         ),
         centerTitle: true,
         title: const Text(
-          "동행 새 게시물",
+          "새 게시물 작성",
           style: TextStyle(
             color: Colors.black,
             fontWeight: FontWeight.bold,
@@ -423,273 +246,313 @@ class _CommunityWriteScreenState extends State<CommunityWriteScreen> {
           ),
         ),
         actions: [
-          // 게시하기 버튼 (로딩 중에는 뺑뺑이)
-          TextButton(
-            onPressed: _isUploading ? null : _uploadCommunityPost,
-            child: _isUploading
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text(
+          _isUploading
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation(Color(0xFF4CA1AF)),
+                      ),
+                    ),
+                  ),
+                )
+              : TextButton(
+                  onPressed: _uploadCommunityPost,
+                  child: const Text(
                     "게시하기",
                     style: TextStyle(
                       fontSize: 16,
-                      color: Colors.blue,
+                      color: Color(0xFF4CA1AF),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-          ),
+                ),
         ],
       ),
       body: Column(
         children: [
+          // 1. 상단 카테고리 선택 탭
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              children: [
+                _buildCategoryTab("게시글", "general"),
+                _buildCategoryTab("동행", "companion"),
+              ],
+            ),
+          ),
+
+          // 2. 메인 컨텐츠 영역
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // [1] 선택된 사진 미리보기 (가로 스크롤)
-                  if (_selectedImages.isNotEmpty) ...[
-                    SizedBox(
-                      height: 100,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: _selectedImages.length,
-                        itemBuilder: (context, index) {
-                          return Stack(
-                            children: [
-                              Container(
-                                margin: const EdgeInsets.only(right: 10),
-                                width: 100,
-                                height: 100,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(8),
-                                  image: DecorationImage(
-                                    image: FileImage(
-                                      File(_selectedImages[index]),
-                                    ),
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                              ),
-                              Positioned(
-                                right: 15,
-                                top: 5,
-                                child: GestureDetector(
-                                  onTap: () => setState(
-                                    () => _selectedImages.removeAt(index),
-                                  ),
-                                  child: const CircleAvatar(
-                                    radius: 10,
-                                    backgroundColor: Colors.black54,
-                                    child: Icon(
-                                      Icons.close,
-                                      size: 14,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
+                  // 선택된 사진 미리보기
+                  if (_selectedImages.isNotEmpty) _buildImagePreview(),
 
-                  // [2] 선택된 정보 칩(Chip) 표시 영역
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      // 장소 칩
-                      if (_selectedLocation != null)
-                        Chip(
-                          label: Text(_selectedLocation!),
-                          avatar: const Icon(
-                            Icons.place,
-                            size: 16,
-                            color: Colors.blue,
-                          ),
-                          backgroundColor: Colors.blue[50],
-                          deleteIcon: const Icon(Icons.close, size: 14),
-                          onDeleted: () =>
-                              setState(() => _selectedLocation = null),
-                        ),
-                      // 날짜 칩
-                      if (_selectedDate != null)
-                        Chip(
-                          label: Text(
-                            DateFormat('yyyy.MM.dd').format(_selectedDate!),
-                          ),
-                          avatar: const Icon(
-                            Icons.calendar_today,
-                            size: 16,
-                            color: Colors.green,
-                          ),
-                          backgroundColor: Colors.green[50],
-                          deleteIcon: const Icon(Icons.close, size: 14),
-                          onDeleted: () => setState(() => _selectedDate = null),
-                        ),
-                      // 인원 칩 (개별 표시)
-                      ..._selectedMembers.map(
-                        (member) => Chip(
-                          label: Text(member),
-                          avatar: const Icon(
-                            Icons.person,
-                            size: 16,
-                            color: Colors.orange,
-                          ),
-                          backgroundColor: Colors.orange[50],
-                          deleteIcon: const Icon(Icons.close, size: 14),
-                          onDeleted: () =>
-                              setState(() => _selectedMembers.remove(member)),
-                        ),
-                      ),
-                    ],
-                  ),
+                  // 동행 정보 표시 (동행 탭일 때만)
+                  if (_selectedCategory == 'companion') _buildCompanionInfo(),
 
-                  if (_selectedLocation != null ||
-                      _selectedDate != null ||
-                      _selectedMembers.isNotEmpty)
-                    const SizedBox(height: 20),
-
-                  // [3] 제목 입력
-                  const Text(
-                    "제목",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
+                  // 제목 입력
                   TextField(
                     controller: _titleController,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
                     decoration: const InputDecoration(
                       hintText: "제목을 입력하세요",
-                      hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
                       border: InputBorder.none,
+                      hintStyle: TextStyle(color: Colors.grey),
                     ),
-                    maxLength: 30,
                   ),
-                  const SizedBox(height: 10),
+                  const Divider(
+                    height: 30,
+                    thickness: 1,
+                    color: Color(0xFFEEEEEE),
+                  ),
 
-                  // [4] 내용 입력
-                  const Text(
-                    "내용",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
+                  // 내용 입력
                   TextField(
                     controller: _contentController,
-                    maxLines: 10,
+                    maxLines: null, // 다중 행 입력 허용
+                    keyboardType: TextInputType.multiline,
                     decoration: const InputDecoration(
-                      hintText: "여행의 즐거운 순간을 기록해보세요.",
-                      hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
+                      hintText: "내용을 입력하세요.\n(동행 모집 글 작성 시 자세한 일정과 조건을 적어주세요.)",
                       border: InputBorder.none,
+                      hintStyle: TextStyle(color: Colors.grey),
                     ),
-                    maxLength: 1000,
                   ),
+                  const SizedBox(height: 100), // 하단 메뉴 공간 확보
                 ],
               ),
             ),
           ),
 
-          // [5] 하단 메뉴 영역
-          Container(
-            decoration: const BoxDecoration(
-              border: Border(top: BorderSide(color: Color(0xFFEEEEEE))),
-            ),
-            child: Column(
-              children: [
-                _buildMenuItem(
-                  Icons.image_outlined,
-                  "사진 추가",
-                  onTap: _pickImages,
-                ),
-                _buildMenuItem(
-                  Icons.location_on_outlined,
-                  "여행 장소 추가",
-                  onTap: _showLocationModal,
-                ),
-                _buildMenuItem(
-                  Icons.calendar_today_outlined,
-                  "여행 날짜 추가",
-                  onTap: _showDateModal,
-                ),
-                _buildMenuItem(
-                  Icons.people_outline,
-                  "인원 설정",
-                  onTap: _showMembersModal,
-                ),
-
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 8,
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.visibility_off_outlined,
-                        color: Colors.black54,
-                      ),
-                      const SizedBox(width: 16),
-                      const Text(
-                        "익명 설정",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const Spacer(),
-                      Switch(
-                        value: _isAnonymous,
-                        onChanged: (val) => setState(() => _isAnonymous = val),
-                        activeColor: const Color(0xFF4CA1AF),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-              ],
-            ),
-          ),
+          // 3. 하단 메뉴 (고정)
+          _buildBottomMenu(),
         ],
       ),
     );
   }
 
-  Widget _buildModalHeader(String title) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  // 카테고리 탭 버튼 위젯
+  Widget _buildCategoryTab(String label, String categoryValue) {
+    final bool isSelected = _selectedCategory == categoryValue;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _selectedCategory = categoryValue;
+            // 탭 변경 시 동행 정보 초기화 (선택 사항)
+            // if (_selectedCategory == 'general') {
+            //   _selectedLocation = null; _selectedDateRange = null; _selectedMemberCount = null;
+            // }
+          });
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFF4CA1AF) : Colors.transparent,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? Colors.white : Colors.grey,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 이미지 미리보기 위젯
+  Widget _buildImagePreview() {
+    return Column(
       children: [
-        Text(
-          title,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        SizedBox(
+          height: 100,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: _selectedImages.length,
+            itemBuilder: (context, index) {
+              return Stack(
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(right: 10),
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      image: DecorationImage(
+                        image: FileImage(File(_selectedImages[index])),
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 5,
+                    right: 15,
+                    child: GestureDetector(
+                      onTap: () =>
+                          setState(() => _selectedImages.removeAt(index)),
+                      child: const CircleAvatar(
+                        backgroundColor: Colors.black54,
+                        radius: 10,
+                        child: Icon(Icons.close, size: 15, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
         ),
-        IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: () => Navigator.pop(context),
-        ),
+        const SizedBox(height: 20),
       ],
     );
   }
 
-  Widget _buildMenuItem(IconData icon, String title, {VoidCallback? onTap}) {
-    return InkWell(
-      onTap: onTap ?? () {},
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        child: Row(
-          children: [
-            Icon(icon, color: Colors.black54),
-            const SizedBox(width: 16),
-            Text(
-              title,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+  // 동행 정보 표시 위젯
+  Widget _buildCompanionInfo() {
+    if (_selectedLocation == null &&
+        _selectedDateRange == null &&
+        _selectedMemberCount == null)
+      return const SizedBox.shrink();
+
+    String dateText = _selectedDateRange != null
+        ? "${DateFormat('yyyy.MM.dd').format(_selectedDateRange!.start)} - ${DateFormat('yyyy.MM.dd').format(_selectedDateRange!.end)} (${_selectedDateRange!.duration.inDays + 1}일)"
+        : "여행 날짜 선택";
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        children: [
+          if (_selectedLocation != null)
+            _buildInfoRow(Icons.location_on, _selectedLocation!),
+          if (_selectedDateRange != null)
+            _buildInfoRow(Icons.calendar_today, dateText),
+          if (_selectedMemberCount != null)
+            _buildInfoRow(Icons.person, "$_selectedMemberCount명 모집"),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: const Color(0xFF4CA1AF)),
+          const SizedBox(width: 10),
+          Text(text, style: const TextStyle(fontSize: 15)),
+        ],
+      ),
+    );
+  }
+
+  // 하단 메뉴 위젯
+  Widget _buildBottomMenu() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Color(0xFFEEEEEE))),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildBottomMenuItem(Icons.image_outlined, "사진 추가", _pickImages),
+          if (_selectedCategory == 'companion') ...[
+            _buildBottomMenuItem(
+              Icons.location_on_outlined,
+              "장소 추가",
+              _showLocationModal,
             ),
-            const Spacer(),
-            const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+            _buildBottomMenuItem(
+              Icons.calendar_today_outlined,
+              "날짜 추가",
+              _showDateModal,
+            ),
+            _buildBottomMenuItem(
+              Icons.person_add_outlined,
+              "인원 설정",
+              _showMemberCountModal,
+            ),
+            _buildAnonymousToggle(),
+          ] else ...[
+            _buildBottomMenuItem(
+              Icons.location_on_outlined,
+              "장소 추가",
+              _showLocationModal,
+            ), // 게시글에도 장소 추가는 유지
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomMenuItem(IconData icon, String label, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: Colors.grey[700]),
+            const SizedBox(height: 5),
+            Text(
+              label,
+              style: TextStyle(color: Colors.grey[700], fontSize: 12),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAnonymousToggle() {
+    return InkWell(
+      onTap: () => setState(() => _isAnonymous = !_isAnonymous),
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              _isAnonymous ? Icons.check_circle : Icons.radio_button_unchecked,
+              color: _isAnonymous ? const Color(0xFF4CA1AF) : Colors.grey[700],
+            ),
+            const SizedBox(height: 5),
+            Text(
+              "익명 설정",
+              style: TextStyle(
+                color: _isAnonymous
+                    ? const Color(0xFF4CA1AF)
+                    : Colors.grey[700],
+                fontSize: 12,
+              ),
+            ),
           ],
         ),
       ),

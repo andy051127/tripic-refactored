@@ -3,8 +3,11 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import '../models/post_model.dart';
 import 'settings_screen.dart'; // 설정 화면 연결
-import 'login_screen.dart'; // [수정] 로그아웃 후 이동할 로그인 화면
-import '../services/auth_service.dart'; // [수정] 실제 로그아웃 기능을 위해 필요
+import 'splash_screen.dart'; // 로그아웃 후 이동할 화면
+import 'follow_list_screen.dart'; // 팔로우 리스트 화면 import
+import 'photo_picker_screen.dart'; // + 버튼 연결용
+import 'member_info_screen.dart'; // 햄버거 버튼 연결용
+import 'package:firebase_auth/firebase_auth.dart'; // [추가] 현재 사용자 확인용
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -94,18 +97,12 @@ class ProfileScreen extends StatelessWidget {
             child: const Text("취소", style: TextStyle(color: Colors.grey)),
           ),
           TextButton(
-            onPressed: () async {
-              // 1. Firebase 로그아웃 실행
-              await AuthService().signOut();
-
-              // 2. 로그인 화면으로 이동 (이전 화면 스택 모두 제거)
-              if (context.mounted) {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
-                  (route) => false,
-                );
-              }
+            onPressed: () {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const SplashScreen()),
+                (route) => false,
+              );
             },
             child: const Text(
               "로그아웃",
@@ -137,13 +134,33 @@ class ProfileScreen extends StatelessWidget {
           ),
         ),
         actions: [
+          // 1. [+] 버튼 -> 사진 선택 화면
           IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.add_box_outlined, color: Colors.black),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const PhotoPickerScreen(),
+                ),
+              );
+            },
+            icon: const Icon(
+              Icons.add_box_outlined,
+              color: Colors.black,
+              size: 26,
+            ),
           ),
+          // 2. [햄버거] 버튼 -> 회원 정보 리스트 화면
           IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.menu, color: Colors.black),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const MemberInfoScreen(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.menu, color: Colors.black, size: 26),
           ),
           const SizedBox(width: 10),
         ],
@@ -231,24 +248,76 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 20),
+              // 통계
               Expanded(
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
+                    // [수정] 게시물 수: 내 게시물만 카운트
                     ValueListenableBuilder<List<Post>>(
                       valueListenable: globalPostsNotifier,
-                      builder: (context, posts, child) =>
-                          _buildStatItem("${posts.length}", "게시물"),
+                      builder: (context, posts, child) {
+                        // 내 게시물 필터링 (로그인 안된 경우 이름으로, 로그인 된 경우 uid로 비교 가능)
+                        // 여기선 간단히 userName으로 필터링 (실제로는 uid 권장)
+                        final myPosts = posts
+                            .where(
+                              (p) =>
+                                  p.userName == globalUserName.value ||
+                                  p.uid ==
+                                      FirebaseAuth.instance.currentUser?.uid,
+                            )
+                            .toList();
+                        return _buildStatItem(
+                          "${myPosts.length}",
+                          "게시물",
+                          onTap: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("아래에서 게시물을 확인하세요! ↓"),
+                                duration: Duration(seconds: 1),
+                              ),
+                            );
+                          },
+                        );
+                      },
                     ),
+                    // 팔로워 수
                     ValueListenableBuilder<String>(
                       valueListenable: globalFollowerCount,
-                      builder: (context, count, child) =>
-                          _buildStatItem(count, "팔로워"),
+                      builder: (context, count, child) => _buildStatItem(
+                        count,
+                        "팔로워",
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => FollowListScreen(
+                                userName: globalUserName.value,
+                                initialIndex: 0,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                     ),
+                    // 팔로잉 수
                     ValueListenableBuilder<int>(
                       valueListenable: globalFollowingCount,
-                      builder: (context, count, child) =>
-                          _buildStatItem("$count", "팔로잉"),
+                      builder: (context, count, child) => _buildStatItem(
+                        "$count",
+                        "팔로잉",
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => FollowListScreen(
+                                userName: globalUserName.value,
+                                initialIndex: 1,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ],
                 ),
@@ -271,6 +340,8 @@ class ProfileScreen extends StatelessWidget {
           ),
 
           const SizedBox(height: 4),
+
+          // 국기 및 설정 버튼들
           Row(
             children: [
               const Text("🇺🇸", style: TextStyle(fontSize: 20)),
@@ -286,7 +357,6 @@ class ProfileScreen extends StatelessWidget {
               ),
               const SizedBox(width: 16),
 
-              // 톱니바퀴 누르면 SettingsScreen으로 이동
               IconButton(
                 onPressed: () {
                   Navigator.push(
@@ -308,15 +378,19 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatItem(String count, String label) {
-    return Column(
-      children: [
-        Text(
-          count,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-        Text(label, style: const TextStyle(fontSize: 12)),
-      ],
+  Widget _buildStatItem(String count, String label, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.translucent,
+      child: Column(
+        children: [
+          Text(
+            count,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          ),
+          Text(label, style: const TextStyle(fontSize: 12)),
+        ],
+      ),
     );
   }
 
@@ -324,6 +398,21 @@ class ProfileScreen extends StatelessWidget {
     return ValueListenableBuilder<List<Post>>(
       valueListenable: globalPostsNotifier,
       builder: (context, posts, child) {
+        // [핵심 수정] 전체 게시물 중 "내 게시물"만 필터링
+        final myPosts = posts
+            .where(
+              (p) =>
+                  p.userName == globalUserName.value ||
+                  p.uid == FirebaseAuth.instance.currentUser?.uid,
+            )
+            .toList();
+
+        if (myPosts.isEmpty) {
+          return const Center(
+            child: Text("작성한 게시물이 없습니다.", style: TextStyle(color: Colors.grey)),
+          );
+        }
+
         return GridView.builder(
           padding: const EdgeInsets.all(2),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -331,13 +420,25 @@ class ProfileScreen extends StatelessWidget {
             crossAxisSpacing: 2,
             mainAxisSpacing: 2,
           ),
-          itemCount: posts.length,
+          itemCount: myPosts.length,
           itemBuilder: (context, index) {
+            final post = myPosts[index];
             return Stack(
               fit: StackFit.expand,
               children: [
-                // 이미지 대신 회색 박스 표시
-                Container(color: Colors.grey[300]),
+                // 이미지 표시 (파일 or 에셋 or 네트워크)
+                post.isFile
+                    ? Image.file(File(post.imagePath), fit: BoxFit.cover)
+                    : (post.imageUrl.isNotEmpty
+                          ? Image.network(
+                              post.imageUrl,
+                              fit: BoxFit.cover,
+                            ) // Firestore 이미지
+                          : Image.asset(
+                              post.imagePath,
+                              fit: BoxFit.cover,
+                            )), // 기본 에셋
+
                 if (index % 2 == 0)
                   const Positioned(
                     top: 8,

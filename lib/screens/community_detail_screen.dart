@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'chat_detail_screen.dart'; // DM 이동용
+import 'package:intl/intl.dart'; // 날짜 포맷용
 
 class CommunityDetailScreen extends StatefulWidget {
   final String name;
@@ -8,6 +9,7 @@ class CommunityDetailScreen extends StatefulWidget {
   final String content;
   final String stats;
   final String? imageUrl;
+  final DateTime createdAt; // [추가] 작성일 받기
 
   const CommunityDetailScreen({
     super.key,
@@ -17,6 +19,7 @@ class CommunityDetailScreen extends StatefulWidget {
     required this.content,
     required this.stats,
     this.imageUrl,
+    required this.createdAt, // 필수 인자로 변경
   });
 
   @override
@@ -30,14 +33,14 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
 
   // 댓글 상태
   final TextEditingController _commentController = TextEditingController();
-  final List<Map<String, String>> _comments = [
-    {'name': 'chanhui_kk', 'content': '2명만 구매 가능한가요?????', 'time': '5시간 전'},
-  ];
+
+  // 댓글 리스트 초기화 (기본 댓글 삭제됨)
+  final List<Map<String, String>> _comments = [];
 
   @override
   void initState() {
     super.initState();
-    // stats 문자열에서 초기 좋아요 수 파싱 (예: "72 · 21 · 47")
+    // stats 문자열에서 초기 좋아요 수 파싱
     try {
       _likeCount = int.parse(widget.stats.split(' · ')[0]);
     } catch (e) {
@@ -56,7 +59,6 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
         });
         _commentController.clear();
       });
-      // 키보드 내리기
       FocusScope.of(context).unfocus();
     }
   }
@@ -102,7 +104,6 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
               "숨기기",
               onTap: () {
                 Navigator.pop(context);
-                // 리스트에서 삭제하는 로직은 여기서 구현하기 어려우므로(화면 이동 필요) 메시지만 표시
                 ScaffoldMessenger.of(
                   context,
                 ).showSnackBar(const SnackBar(content: Text("게시물을 숨겼습니다.")));
@@ -148,6 +149,9 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // [수정] 날짜 포맷팅
+    String formattedDate = DateFormat('yyyy.MM.dd').format(widget.createdAt);
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -167,7 +171,6 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
           ),
         ),
         actions: [
-          // [추가] 상단 점 3개 버튼
           IconButton(
             onPressed: _showMoreOptions,
             icon: const Icon(Icons.more_vert, color: Colors.black),
@@ -276,20 +279,23 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                           ),
                         ),
                         const SizedBox(height: 20),
-                        const Text(
-                          "2025.10.16 작성",
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        // [수정됨] 실제 작성 날짜 표시
+                        Text(
+                          "$formattedDate 작성",
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
                         ),
                       ],
                     ),
                   ),
 
-                  // 4. 통계 및 액션 버튼 (기능 연결)
+                  // 4. 통계 및 액션 버튼
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
                     child: Row(
                       children: [
-                        // 좋아요 버튼
                         GestureDetector(
                           onTap: () {
                             setState(() {
@@ -314,17 +320,15 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
 
                         const SizedBox(width: 20),
 
-                        // 댓글 아이콘 (누르면 입력창 포커스)
                         const Icon(Icons.chat_bubble_outline, size: 28),
                         const SizedBox(width: 6),
                         Text(
                           "${_comments.length}",
                           style: const TextStyle(fontSize: 16),
-                        ), // 댓글 수 실시간 반영
+                        ),
 
                         const SizedBox(width: 20),
 
-                        // DM 버튼 (누르면 채팅방 이동)
                         GestureDetector(
                           onTap: () {
                             Navigator.push(
@@ -340,8 +344,6 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                         ),
 
                         const Spacer(),
-
-                        // 북마크 버튼 (기능 없음, UI만)
                         const Icon(Icons.bookmark_border, size: 28),
                       ],
                     ),
@@ -365,87 +367,98 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                         ),
                         const SizedBox(height: 10),
 
-                        // 댓글 목록 표시
-                        ListView.builder(
-                          shrinkWrap: true, // 스크롤 중첩 방지
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _comments.length,
-                          itemBuilder: (context, index) {
-                            final comment = _comments[index];
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 16.0),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const CircleAvatar(
-                                    radius: 18,
-                                    backgroundColor: Colors.grey,
-                                    child: Icon(
-                                      Icons.person,
-                                      size: 20,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Text(
-                                              comment['name']!,
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 14,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Text(
-                                              comment['time']!,
-                                              style: const TextStyle(
-                                                fontSize: 12,
-                                                color: Colors.grey,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          comment['content']!,
-                                          style: const TextStyle(fontSize: 14),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  // [추가] 댓글 옆 DM 버튼
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.near_me_outlined,
-                                      size: 16,
-                                      color: Colors.grey,
-                                    ),
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              ChatDetailScreen(
-                                                chatPartnerName:
-                                                    comment['name']!,
-                                              ),
-                                        ),
-                                      );
-                                    },
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(),
-                                  ),
-                                ],
+                        if (_comments.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 20),
+                            child: Center(
+                              child: Text(
+                                "아직 댓글이 없습니다. 첫 댓글을 남겨보세요!",
+                                style: TextStyle(color: Colors.grey),
                               ),
-                            );
-                          },
-                        ),
+                            ),
+                          )
+                        else
+                          ListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: _comments.length,
+                            itemBuilder: (context, index) {
+                              final comment = _comments[index];
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 16.0),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const CircleAvatar(
+                                      radius: 18,
+                                      backgroundColor: Colors.grey,
+                                      child: Icon(
+                                        Icons.person,
+                                        size: 20,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Text(
+                                                comment['name']!,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                comment['time']!,
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            comment['content']!,
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.near_me_outlined,
+                                        size: 16,
+                                        color: Colors.grey,
+                                      ),
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                ChatDetailScreen(
+                                                  chatPartnerName:
+                                                      comment['name']!,
+                                                ),
+                                          ),
+                                        );
+                                      },
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
                       ],
                     ),
                   ),
@@ -454,7 +467,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
             ),
           ),
 
-          // 6. 하단 댓글 입력창 (고정)
+          // 6. 하단 댓글 입력창
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
@@ -465,7 +478,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
               children: [
                 const CircleAvatar(
                   radius: 16,
-                  backgroundColor: Colors.grey, // 내 프로필
+                  backgroundColor: Colors.grey,
                   child: Icon(Icons.person, size: 20, color: Colors.white),
                 ),
                 const SizedBox(width: 10),
@@ -483,7 +496,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                         border: InputBorder.none,
                         contentPadding: EdgeInsets.symmetric(vertical: 10),
                       ),
-                      onSubmitted: (_) => _addComment(), // 엔터 누르면 전송
+                      onSubmitted: (_) => _addComment(),
                     ),
                   ),
                 ),
