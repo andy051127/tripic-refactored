@@ -37,8 +37,9 @@ class MessageListScreen extends StatelessWidget {
           const SizedBox(width: 10),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // 1. 즐겨찾기 영역
@@ -142,6 +143,7 @@ class MessageListScreen extends StatelessWidget {
               isPhoto: false,
             ),
           ],
+        ),
         ),
       ),
     );

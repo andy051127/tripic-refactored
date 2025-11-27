@@ -177,8 +177,9 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
+      body: SafeArea(
+        child: Column(
+          children: [
           Expanded(
             child: SingleChildScrollView(
               child: Column(
@@ -515,6 +516,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
             ),
           ),
         ],
+        ),
       ),
     );
   }

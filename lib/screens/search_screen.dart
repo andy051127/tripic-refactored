@@ -69,8 +69,9 @@ class _SearchScreenState extends State<SearchScreen> {
           ),
         ),
       ),
-      body: Column(
-        children: [
+      body: SafeArea(
+        child: Column(
+          children: [
           // 상단 탭 (계정 / 장소) - 간단히 버튼으로 구현
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 10),
@@ -143,6 +144,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   ),
           ),
         ],
+        ),
       ),
     );
   }

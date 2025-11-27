@@ -33,7 +33,8 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
       ),
-      body: ListView(
+      body: SafeArea(
+        child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
           const Text(
@@ -182,6 +183,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
             ),
           ),
         ],
+        ),
       ),
     );
   }

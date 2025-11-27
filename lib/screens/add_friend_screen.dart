@@ -31,7 +31,8 @@ class AddFriendScreen extends StatelessWidget {
         ),
         centerTitle: true,
       ),
-      body: ListView.builder(
+      body: SafeArea(
+        child: ListView.builder(
         itemCount: friends.length,
         itemBuilder: (context, index) {
           return ListTile(
@@ -53,6 +54,7 @@ class AddFriendScreen extends StatelessWidget {
             },
           );
         },
+        ),
       ),
     );
   }

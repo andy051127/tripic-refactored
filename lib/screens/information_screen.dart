@@ -20,8 +20,9 @@ class InformationScreen extends StatelessWidget {
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
       ),
-      body: Center(
-        child: Column(
+      body: SafeArea(
+        child: Center(
+          child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             // 로고
@@ -67,6 +68,7 @@ class InformationScreen extends StatelessWidget {
             ),
             const SizedBox(height: 30),
           ],
+        ),
         ),
       ),
     );

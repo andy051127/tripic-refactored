@@ -22,7 +22,8 @@ class SavedPostsScreen extends StatelessWidget {
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
       ),
-      body: ValueListenableBuilder<List<ActivityItem>>(
+      body: SafeArea(
+        child: ValueListenableBuilder<List<ActivityItem>>(
         valueListenable: savedPostsNotifier,
         builder: (context, savedPosts, child) {
           if (savedPosts.isEmpty) {
@@ -97,6 +98,7 @@ class SavedPostsScreen extends StatelessWidget {
             },
           );
         },
+        ),
       ),
     );
   }

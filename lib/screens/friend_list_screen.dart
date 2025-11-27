@@ -72,7 +72,8 @@ class _FriendListScreenState extends State<FriendListScreen> {
           const SizedBox(width: 10),
         ],
       ),
-      body: ListView.builder(
+      body: SafeArea(
+        child: ListView.builder(
         itemCount: friends.length,
         padding: const EdgeInsets.symmetric(vertical: 10),
         itemBuilder: (context, index) {
@@ -147,6 +148,7 @@ class _FriendListScreenState extends State<FriendListScreen> {
                   ),
           );
         },
+        ),
       ),
     );
   }

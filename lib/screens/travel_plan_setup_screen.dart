@@ -147,7 +147,8 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
                 ),
         ],
       ),
-      body: SingleChildScrollView(
+      body: SafeArea(
+        child: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
         child: Column(
           children: [
@@ -203,6 +204,7 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
             ),
             const SizedBox(height: 30),
           ],
+        ),
         ),
       ),
     );

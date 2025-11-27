@@ -21,7 +21,8 @@ class MemberInfoScreen extends StatelessWidget {
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
       ),
-      body: ValueListenableBuilder<String>(
+      body: SafeArea(
+        child: ValueListenableBuilder<String>(
         valueListenable: globalUserName,
         builder: (context, name, _) {
           return ListView(
@@ -76,6 +77,7 @@ class MemberInfoScreen extends StatelessWidget {
             ],
           );
         },
+        ),
       ),
     );
   }

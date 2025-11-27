@@ -86,7 +86,8 @@ class _PhotoPickerScreenState extends State<PhotoPickerScreen> {
           ),
         ],
       ),
-      body: Column(
+      body: SafeArea(
+        child: Column(
         children: [
           // 상단 버튼 (갤러리/카메라)
           Padding(
@@ -202,6 +203,7 @@ class _PhotoPickerScreenState extends State<PhotoPickerScreen> {
                   ),
           ),
         ],
+        ),
       ),
     );
   }

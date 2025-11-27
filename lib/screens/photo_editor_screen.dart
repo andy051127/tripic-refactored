@@ -4,6 +4,9 @@ import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_editor_plus/image_editor_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
+import 'dart:async';
 import 'add_friend_screen.dart';
 import 'write_post_screen.dart';
 
@@ -20,11 +23,34 @@ class _PhotoEditorScreenState extends State<PhotoEditorScreen> {
   late List<String> _images;
   String? _taggedFriend;
   final ImagePicker _picker = ImagePicker();
+  final Completer<GoogleMapController> _mapController = Completer();
+  LatLng? _selectedLocation;
+  LatLng _currentPosition = const LatLng(37.5666805, 126.9784147); // 서울 시청 기본값
 
   @override
   void initState() {
     super.initState();
     _images = List.from(widget.initialImages);
+    _getCurrentLocation();
+  }
+
+  // 현재 위치 가져오기
+  Future<void> _getCurrentLocation() async {
+    try {
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      setState(() {
+        _currentPosition = LatLng(position.latitude, position.longitude);
+      });
+      
+      final controller = await _mapController.future;
+      controller.animateCamera(
+        CameraUpdate.newLatLng(_currentPosition),
+      );
+    } catch (e) {
+      print("위치 가져오기 실패: $e");
+    }
   }
 
   void _showMenu(int index) {
@@ -195,9 +221,11 @@ class _PhotoEditorScreenState extends State<PhotoEditorScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
+      body: SafeArea(
+        bottom: true,
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
             if (_images.isEmpty)
               SizedBox(
                 height: 400,
@@ -290,21 +318,179 @@ class _PhotoEditorScreenState extends State<PhotoEditorScreen> {
 
             // 지도 영역
             Container(
-              height: 200,
+              height: 250,
               margin: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.blue[50],
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.blue[100]!),
               ),
-              child: const Center(
-                child: Text(
-                  "지도 API 연동 영역",
-                  style: TextStyle(color: Colors.grey),
-                ),
+              clipBehavior: Clip.antiAlias,
+              child: Stack(
+                children: [
+                  GoogleMap(
+                    initialCameraPosition: CameraPosition(
+                      target: _currentPosition,
+                      zoom: 15,
+                    ),
+                    myLocationEnabled: true,
+                    myLocationButtonEnabled: false,
+                    zoomControlsEnabled: false,
+                    mapToolbarEnabled: false,
+                    onMapCreated: (GoogleMapController controller) {
+                      _mapController.complete(controller);
+                    },
+                    onTap: (LatLng location) {
+                      setState(() {
+                        _selectedLocation = location;
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            '위치 선택됨: ${location.latitude.toStringAsFixed(4)}, ${location.longitude.toStringAsFixed(4)}',
+                          ),
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                    markers: _selectedLocation != null
+                        ? {
+                            Marker(
+                              markerId: const MarkerId('selected'),
+                              position: _selectedLocation!,
+                              infoWindow: const InfoWindow(title: '선택한 위치'),
+                            ),
+                          }
+                        : {},
+                  ),
+                  Positioned(
+                    top: 10,
+                    left: 10,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.location_on, size: 16, color: Colors.blue),
+                          SizedBox(width: 4),
+                          Text(
+                            '지도를 탭하여 위치 선택',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 10,
+                    left: 10,
+                    child: FloatingActionButton.small(
+                      backgroundColor: Colors.white,
+                      onPressed: () {
+                        // 지도 전체화면 모달 열기
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (context) => Container(
+                            height: MediaQuery.of(context).size.height * 0.9,
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.vertical(
+                                top: Radius.circular(20),
+                              ),
+                            ),
+                            child: Column(
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.all(16.0),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text(
+                                        "위치 선택",
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.close),
+                                        onPressed: () => Navigator.pop(context),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Expanded(
+                                  child: GoogleMap(
+                                    initialCameraPosition: CameraPosition(
+                                      target: _selectedLocation ?? _currentPosition,
+                                      zoom: 15,
+                                    ),
+                                    myLocationEnabled: true,
+                                    myLocationButtonEnabled: true,
+                                    zoomControlsEnabled: true,
+                                    onTap: (LatLng location) {
+                                      setState(() {
+                                        _selectedLocation = location;
+                                      });
+                                      Navigator.pop(context);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            '위치 선택됨: ${location.latitude.toStringAsFixed(4)}, ${location.longitude.toStringAsFixed(4)}',
+                                          ),
+                                          duration: const Duration(seconds: 2),
+                                        ),
+                                      );
+                                    },
+                                    markers: _selectedLocation != null
+                                        ? {
+                                            Marker(
+                                              markerId: const MarkerId('selected'),
+                                              position: _selectedLocation!,
+                                              infoWindow: const InfoWindow(
+                                                title: '선택한 위치',
+                                              ),
+                                            ),
+                                          }
+                                        : {},
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                      child: const Icon(Icons.fullscreen, color: Colors.blue),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 10,
+                    right: 10,
+                    child: FloatingActionButton.small(
+                      backgroundColor: Colors.white,
+                      onPressed: _getCurrentLocation,
+                      child: const Icon(Icons.my_location, color: Colors.blue),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );

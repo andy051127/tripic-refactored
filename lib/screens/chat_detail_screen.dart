@@ -30,8 +30,9 @@ class ChatDetailScreen extends StatelessWidget {
           ),
         ),
       ),
-      body: Column(
-        children: [
+      body: SafeArea(
+        child: Column(
+          children: [
           // 1. 상단 지도 영역
           Container(
             height: 180,
@@ -117,6 +118,7 @@ class ChatDetailScreen extends StatelessWidget {
             ),
           ),
         ],
+        ),
       ),
     );
   }

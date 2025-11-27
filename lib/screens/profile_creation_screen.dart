@@ -77,7 +77,8 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
       ),
-      body: SingleChildScrollView(
+      body: SafeArea(
+        child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -206,6 +207,7 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
               ),
             ),
           ],
+        ),
         ),
       ),
     );

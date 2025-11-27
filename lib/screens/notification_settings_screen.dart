@@ -34,7 +34,8 @@ class _NotificationSettingsScreenState
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
       ),
-      body: ListView(
+      body: SafeArea(
+        child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
           const Text(
@@ -101,6 +102,7 @@ class _NotificationSettingsScreenState
                 : (val) => setState(() => _marketingAlert = val),
           ),
         ],
+        ),
       ),
     );
   }

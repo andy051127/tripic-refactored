@@ -126,8 +126,9 @@ class _WritePostScreenState extends State<WritePostScreen> {
                 ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
           children: [
             Container(
               margin: const EdgeInsets.all(16),
@@ -221,6 +222,7 @@ class _WritePostScreenState extends State<WritePostScreen> {
             ),
             const SizedBox(height: 30),
           ],
+        ),
         ),
       ),
     );
