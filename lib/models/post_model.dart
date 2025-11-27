@@ -13,8 +13,6 @@ class Post {
   final String imageUrl;
   final String imagePath;
   final bool isFile;
-
-  // [추가] 카테고리 필드 ('feed', 'general', 'companion')
   final String category;
 
   Post({
@@ -29,7 +27,7 @@ class Post {
     this.imageUrl = '',
     this.imagePath = '',
     this.isFile = false,
-    this.category = 'feed', // 기본값은 피드
+    this.category = 'feed',
   }) : this.id = id ?? DateTime.now().millisecondsSinceEpoch.toString(),
        this.createdAt = createdAt ?? Timestamp.now();
 
@@ -46,7 +44,7 @@ class Post {
       imageUrl: data['imageUrl'] ?? '',
       imagePath: data['imageUrl'] ?? '',
       isFile: false,
-      category: data['category'] ?? 'feed', // 불러올 때 카테고리 매핑
+      category: data['category'] ?? 'feed',
     );
   }
 
@@ -60,23 +58,27 @@ class Post {
       'likeCount': likeCount,
       'createdAt': createdAt,
       'imageUrl': imageUrl,
-      'category': category, // 저장할 때 카테고리 포함
+      'category': category,
     };
   }
 }
 
-// --- 전역 상태 변수들 (기존 유지) ---
 final ValueNotifier<List<Post>> globalPostsNotifier = ValueNotifier<List<Post>>(
   [],
 );
-final ValueNotifier<int> globalFollowingCount = ValueNotifier<int>(5);
-final ValueNotifier<String> globalFollowerCount = ValueNotifier<String>("3.1M");
+
+// 팔로워/팔로잉 수 관리 (초기값 0)
+final ValueNotifier<int> globalFollowingCount = ValueNotifier<int>(0);
+final ValueNotifier<int> globalFollowerCount = ValueNotifier<int>(0);
+
 final ValueNotifier<String> globalProfileImage = ValueNotifier<String>(
   "assets/logo.png",
 );
 final ValueNotifier<bool> isProfileImageFile = ValueNotifier<bool>(false);
+
 final ValueNotifier<List<String>> blockedUsersNotifier =
     ValueNotifier<List<String>>([]);
+
 final ValueNotifier<String> globalUserName = ValueNotifier<String>("leeeee_kh");
 final ValueNotifier<String> globalUserBio = ValueNotifier<String>(
   "Traveler ✈️",
