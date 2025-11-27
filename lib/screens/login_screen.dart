@@ -72,7 +72,7 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               const SizedBox(height: 60),
               Image.asset(
-                'assets/logo.png',
+                'assets/tripicLogo.png',
                 width: 100,
                 errorBuilder: (c, o, s) => const Icon(Icons.image, size: 100),
               ),

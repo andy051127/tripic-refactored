@@ -101,7 +101,7 @@ class HomeFeedPage extends StatelessWidget {
           child: Row(
             children: [
               Image.asset(
-                'assets/logo.png',
+                'assets/tripicLogo.png',
                 height: 30,
                 errorBuilder: (c, o, s) =>
                     const Icon(Icons.waves, color: Color(0xFF4CA1AF)),
