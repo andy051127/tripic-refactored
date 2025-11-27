@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
 import '../services/firestore_service.dart';
+import '../models/post_model.dart'; // [중요] 로컬 상태 업데이트를 위해 import
 
 class WritePostScreen extends StatefulWidget {
   final List<String> images;
@@ -34,23 +35,38 @@ class _WritePostScreenState extends State<WritePostScreen> {
       return;
     }
 
-    // 키보드 내리기
     FocusScope.of(context).unfocus();
-
     setState(() => _isUploading = true);
 
     try {
+      // 1. Firestore에 저장 (서버)
       await _firestoreService.addPost(
         title: _titleController.text,
         content: _contentController.text,
-        location: "Seoul, Korea", // 나중에 위치 선택 기능 연동
+        location: "Seoul, Korea", // 추후 위치 선택 연동 가능
         localImagePath: widget.images[0],
         taggedFriend: widget.taggedFriend,
       );
 
+      // 2. [핵심 추가] 로컬 상태(globalPostsNotifier)에도 추가하여 즉시 반영
+      // (Firestore 스트림을 쓰는 곳은 자동 반영되지만, 로컬 상태를 쓰는 곳을 위해 추가)
+      final newLocalPost = Post(
+        userName: "내 프로필", // 또는 현재 로그인 유저 정보
+        location: "Seoul, Korea",
+        imagePath: widget.images[0],
+        title: _titleController.text,
+        content: _contentController.text,
+        isFile: true, // 로컬 파일이므로 true
+      );
+
+      // 리스트 맨 앞에 추가
+      final currentPosts = List<Post>.from(globalPostsNotifier.value);
+      currentPosts.insert(0, newLocalPost);
+      globalPostsNotifier.value = currentPosts;
+
       if (!mounted) return;
 
-      // 성공 시 모든 스택 제거하고 홈으로 이동 (새로고침 효과)
+      // 홈으로 복귀
       Navigator.of(context).popUntil((route) => route.isFirst);
 
       ScaffoldMessenger.of(
@@ -58,13 +74,8 @@ class _WritePostScreenState extends State<WritePostScreen> {
       ).showSnackBar(const SnackBar(content: Text("게시물이 성공적으로 업로드되었습니다! 🎉")));
     } catch (e) {
       if (!mounted) return;
-      // 에러 메시지를 자세히 보여줌
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("업로드 실패: $e"),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 3),
-        ),
+        SnackBar(content: Text("업로드 실패: $e"), backgroundColor: Colors.red),
       );
     } finally {
       if (mounted) setState(() => _isUploading = false);
