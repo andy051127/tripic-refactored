@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
+import 'package:image_editor_plus/image_editor_plus.dart';
+import 'package:path_provider/path_provider.dart';
 import 'add_friend_screen.dart';
-import 'write_post_screen.dart'; // 이제 정상적으로 불러와질 겁니다.
+import 'write_post_screen.dart';
 
 class PhotoEditorScreen extends StatefulWidget {
   final List<String> initialImages;
@@ -39,9 +42,17 @@ class _PhotoEditorScreenState extends State<PhotoEditorScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                title: const Center(
-                  child: Text("사진 삭제", style: TextStyle(color: Colors.red)),
-                ),
+                leading: const Icon(Icons.edit, color: Colors.blue),
+                title: const Text("사진 편집"),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _editImage(index);
+                },
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.delete, color: Colors.red),
+                title: const Text("사진 삭제", style: TextStyle(color: Colors.red)),
                 onTap: () {
                   setState(() => _images.removeAt(index));
                   Navigator.pop(context);
@@ -49,7 +60,8 @@ class _PhotoEditorScreenState extends State<PhotoEditorScreen> {
               ),
               const Divider(height: 1),
               ListTile(
-                title: const Center(child: Text("사진 추가")),
+                leading: const Icon(Icons.add_photo_alternate, color: Colors.green),
+                title: const Text("사진 추가"),
                 onTap: () async {
                   Navigator.pop(context);
                   try {
@@ -70,7 +82,8 @@ class _PhotoEditorScreenState extends State<PhotoEditorScreen> {
               ),
               const Divider(height: 1),
               ListTile(
-                title: const Center(child: Text("함께 있는 사람 +")),
+                leading: const Icon(Icons.person_add, color: Colors.orange),
+                title: const Text("함께 있는 사람 +"),
                 onTap: () async {
                   Navigator.pop(context);
                   final result = await Navigator.push(
@@ -89,6 +102,56 @@ class _PhotoEditorScreenState extends State<PhotoEditorScreen> {
         );
       },
     );
+  }
+
+  // 이미지 편집 기능 추가
+  Future<void> _editImage(int index) async {
+    try {
+      final File imageFile = File(_images[index]);
+      final Uint8List imageBytes = await imageFile.readAsBytes();
+
+      // 이미지 에디터 열기
+      final Uint8List? editedImage = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ImageEditor(
+            image: imageBytes,
+          ),
+        ),
+      );
+
+      if (editedImage != null) {
+        // 편집된 이미지를 임시 파일로 저장
+        final tempDir = await getTemporaryDirectory();
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final editedFile = File('${tempDir.path}/edited_$timestamp.jpg');
+        await editedFile.writeAsBytes(editedImage);
+
+        // 이미지 경로 업데이트
+        setState(() {
+          _images[index] = editedFile.path;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('사진이 편집되었습니다'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print("Error editing image: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('사진 편집에 실패했습니다'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -194,11 +257,29 @@ class _PhotoEditorScreenState extends State<PhotoEditorScreen> {
                           top: 10,
                           right: 25,
                           child: IconButton(
-                            icon: const Icon(
-                              Icons.more_vert,
-                              color: Colors.white,
+                            icon: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: Colors.black45,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.more_vert,
+                                color: Colors.white,
+                                size: 20,
+                              ),
                             ),
                             onPressed: () => _showMenu(index),
+                          ),
+                        ),
+                        Positioned(
+                          bottom: 10,
+                          right: 25,
+                          child: FloatingActionButton.small(
+                            heroTag: 'edit_$index',
+                            backgroundColor: Colors.blue,
+                            child: const Icon(Icons.edit, size: 20),
+                            onPressed: () => _editImage(index),
                           ),
                         ),
                       ],

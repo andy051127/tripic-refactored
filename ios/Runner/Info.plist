@@ -66,9 +66,7 @@
     <string>앱이 백그라운드일 때도 위치를 확인하기 위해 권한이 필요합니다.</string>
     <!-- [권한 설정 끝] -->
 
-    <!-- [네이버 지도 설정] -->
-    <key>NMFClientId</key>
-    <string>YOUR_CLIENT_ID_HERE</string> <!-- 본인의 네이버 클라우드 Client ID 입력 -->
+    <!-- [구글 지도 설정] -->
     <key>io.flutter.embedded_views_preview</key>
     <true/>
     <key>NSAllowsArbitraryLoads</key>

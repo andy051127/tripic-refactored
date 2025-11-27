@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_naver_map/flutter_naver_map.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:async';
 
 class MapSearchScreen extends StatefulWidget {
@@ -10,11 +10,12 @@ class MapSearchScreen extends StatefulWidget {
 }
 
 class _MapSearchScreenState extends State<MapSearchScreen> {
-  final Completer<NaverMapController> _controller = Completer();
+  final Completer<GoogleMapController> _controller = Completer();
   final TextEditingController _searchController = TextEditingController();
+  Set<Marker> _markers = {};
 
   // 초기 위치 (서울)
-  static const NLatLng _kDefaultLocation = NLatLng(37.5666, 126.9784);
+  static const LatLng _kDefaultLocation = LatLng(37.5666, 126.9784);
 
   // [데이터] 친구들의 게시물 위치 (검색 대상 1)
   final List<Map<String, dynamic>> _friendPosts = [
@@ -26,22 +27,44 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
   ];
 
   // [데이터] 주요 지역 위치 (검색 대상 2 - 실제 앱에선 Geocoding API 필요)
-  final Map<String, NLatLng> _cityLocations = {
-    "서울": const NLatLng(37.5665, 126.9780),
-    "부산": const NLatLng(35.1796, 129.0756),
-    "제주": const NLatLng(33.4996, 126.5312),
-    "인천": const NLatLng(37.4563, 126.7052),
-    "대구": const NLatLng(35.8714, 128.6014),
-    "대전": const NLatLng(36.3504, 127.3845),
-    "광주": const NLatLng(35.1595, 126.8526),
+  final Map<String, LatLng> _cityLocations = {
+    "서울": const LatLng(37.5665, 126.9780),
+    "부산": const LatLng(35.1796, 129.0756),
+    "제주": const LatLng(33.4996, 126.5312),
+    "인천": const LatLng(37.4563, 126.7052),
+    "대구": const LatLng(35.8714, 128.6014),
+    "대전": const LatLng(36.3504, 127.3845),
+    "광주": const LatLng(35.1595, 126.8526),
   };
+
+  @override
+  void initState() {
+    super.initState();
+    _createMarkers();
+  }
+
+  // 마커 생성
+  void _createMarkers() {
+    setState(() {
+      _markers = _friendPosts.map((post) {
+        return Marker(
+          markerId: MarkerId(post['name']),
+          position: LatLng(post['lat'], post['lng']),
+          infoWindow: InfoWindow(
+            title: post['name'],
+            snippet: post['location'],
+          ),
+        );
+      }).toSet();
+    });
+  }
 
   // 검색 실행 함수
   Future<void> _performSearch(String query) async {
     if (query.isEmpty) return;
 
     final controller = await _controller.future;
-    NLatLng? targetLocation;
+    LatLng? targetLocation;
     String? foundName;
 
     // 1. 친구 이름 검색
@@ -51,7 +74,7 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
     );
 
     if (friend.isNotEmpty) {
-      targetLocation = NLatLng(friend['lat'], friend['lng']);
+      targetLocation = LatLng(friend['lat'], friend['lng']);
       foundName = "${friend['name']}님의 게시물";
     }
     // 2. 지역명 검색
@@ -62,22 +85,25 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
 
     // 이동
     if (targetLocation != null) {
-      final cameraUpdate = NCameraUpdate.withParams(
-        target: targetLocation,
-        zoom: 15, // 확대 레벨
+      await controller.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: targetLocation,
+            zoom: 15,
+          ),
+        ),
       );
-      await controller.updateCamera(cameraUpdate);
 
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("📍 '$foundName'(으)로 이동합니다.")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("📍 '$foundName'(으)로 이동합니다.")),
+        );
       }
     } else {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("검색 결과를 찾을 수 없습니다.")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("검색 결과를 찾을 수 없습니다.")),
+        );
       }
     }
   }
@@ -88,34 +114,24 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
       body: Stack(
         children: [
           // 1. 전체 화면 지도
-          NaverMap(
-            options: const NaverMapViewOptions(
-              initialCameraPosition: NCameraPosition(
-                target: _kDefaultLocation,
-                zoom: 10,
-              ),
-              consumeSymbolTapEvents: false,
+          GoogleMap(
+            initialCameraPosition: const CameraPosition(
+              target: _kDefaultLocation,
+              zoom: 10,
             ),
-            onMapReady: (controller) {
+            markers: _markers,
+            myLocationEnabled: true,
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+            onMapCreated: (GoogleMapController controller) {
               _controller.complete(controller);
-
-              // 친구 마커 찍기
-              for (var post in _friendPosts) {
-                final marker = NMarker(
-                  id: post['name'], // ID는 유니크해야 함
-                  position: NLatLng(post['lat'], post['lng']),
-                  caption: NOverlayCaption(
-                    text: "${post['name']} (${post['location']})",
-                  ),
-                );
-                controller.addOverlay(marker);
-              }
             },
           ),
 
           // 2. 상단 검색창 (떠있는 UI)
           Positioned(
-            top: 50, // 상태바 아래
+            top: 50,
             left: 16,
             right: 16,
             child: Container(
@@ -140,7 +156,7 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
                     child: TextField(
                       controller: _searchController,
                       textInputAction: TextInputAction.search,
-                      onSubmitted: _performSearch, // 엔터 누르면 검색
+                      onSubmitted: _performSearch,
                       decoration: const InputDecoration(
                         hintText: "친구 이름 또는 지역 검색 (예: 김찬희, 부산)",
                         border: InputBorder.none,

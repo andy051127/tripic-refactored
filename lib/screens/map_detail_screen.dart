@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_naver_map/flutter_naver_map.dart'; // 네이버 지도 패키지
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:async';
@@ -12,10 +12,11 @@ class MapDetailScreen extends StatefulWidget {
 }
 
 class _MapDetailScreenState extends State<MapDetailScreen> {
-  final Completer<NaverMapController> _controller = Completer();
+  final Completer<GoogleMapController> _controller = Completer();
+  Set<Marker> _markers = {};
 
   // 초기 위치 (서울 시청)
-  static const NLatLng _kSeoulCityHall = NLatLng(37.5666805, 126.9784147);
+  static const LatLng _kSeoulCityHall = LatLng(37.5666805, 126.9784147);
 
   // 친구들의 게시물 데이터 (더미 데이터)
   final List<Map<String, dynamic>> _friendPosts = [
@@ -49,11 +50,29 @@ class _MapDetailScreenState extends State<MapDetailScreen> {
   void initState() {
     super.initState();
     _checkPermissions();
+    _createMarkers();
   }
 
   // 위치 권한 확인
   Future<void> _checkPermissions() async {
     await Permission.location.request();
+  }
+
+  // 마커 생성
+  void _createMarkers() {
+    setState(() {
+      _markers = _friendPosts.map((post) {
+        return Marker(
+          markerId: MarkerId(post['id']),
+          position: LatLng(post['lat'], post['lng']),
+          infoWindow: InfoWindow(
+            title: post['name'],
+            snippet: post['title'],
+          ),
+          onTap: () => _showPostPreview(post),
+        );
+      }).toSet();
+    });
   }
 
   // 현재 위치로 이동
@@ -63,14 +82,22 @@ class _MapDetailScreenState extends State<MapDetailScreen> {
         desiredAccuracy: LocationAccuracy.high,
       );
 
-      final NaverMapController controller = await _controller.future;
-      final cameraUpdate = NCameraUpdate.withParams(
-        target: NLatLng(position.latitude, position.longitude),
-        zoom: 15,
+      final GoogleMapController controller = await _controller.future;
+      controller.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: LatLng(position.latitude, position.longitude),
+            zoom: 15,
+          ),
+        ),
       );
-      controller.updateCamera(cameraUpdate);
     } catch (e) {
       print("위치 가져오기 실패: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('위치를 가져올 수 없습니다')),
+        );
+      }
     }
   }
 
@@ -106,12 +133,8 @@ class _MapDetailScreenState extends State<MapDetailScreen> {
                     bottomLeft: Radius.circular(20),
                   ),
                   color: Colors.grey[200],
-                  image: const DecorationImage(
-                    image: AssetImage('assets/logo.png'),
-                    fit: BoxFit.cover,
-                  ),
                 ),
-                child: const Icon(Icons.image, color: Colors.grey),
+                child: const Icon(Icons.image, color: Colors.grey, size: 50),
               ),
               // 정보 영역
               Expanded(
@@ -180,32 +203,18 @@ class _MapDetailScreenState extends State<MapDetailScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          NaverMap(
-            options: const NaverMapViewOptions(
-              initialCameraPosition: NCameraPosition(
-                target: _kSeoulCityHall,
-                zoom: 15,
-              ),
-              locationButtonEnable: false, // 기본 버튼 숨김
-              consumeSymbolTapEvents: false,
+          GoogleMap(
+            initialCameraPosition: const CameraPosition(
+              target: _kSeoulCityHall,
+              zoom: 15,
             ),
-            onMapReady: (controller) {
+            markers: _markers,
+            myLocationEnabled: true,
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+            onMapCreated: (GoogleMapController controller) {
               _controller.complete(controller);
-
-              // 마커 추가
-              for (var post in _friendPosts) {
-                final marker = NMarker(
-                  id: post['id'],
-                  position: NLatLng(post['lat'], post['lng']),
-                  caption: NOverlayCaption(text: post['name']),
-                );
-
-                marker.setOnTapListener((overlay) {
-                  _showPostPreview(post);
-                });
-
-                controller.addOverlay(marker);
-              }
             },
           ),
 
@@ -229,7 +238,7 @@ class _MapDetailScreenState extends State<MapDetailScreen> {
             child: FloatingActionButton(
               backgroundColor: Colors.white,
               onPressed: _moveToCurrentLocation,
-              child: const Icon(Icons.my_location, color: Colors.black),
+              child: const Icon(Icons.my_location, color: Colors.blue),
             ),
           ),
         ],
