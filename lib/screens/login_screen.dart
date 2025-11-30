@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/custom_textfield.dart';
 import '../widgets/gradient_button.dart';
 import '../services/auth_service.dart'; // 인증 서비스 import
@@ -45,6 +46,10 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = false);
 
     if (error == null) {
+      // 로그인 성공: "로그인 상태 유지" 체크박스 상태를 SharedPreferences에 저장
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('keepLoggedIn', _isChecked);
+      
       // 성공: 홈 화면으로 이동 (뒤로가기 불가하도록 pushReplacement 사용)
       if (!mounted) return;
       Navigator.pushReplacement(
@@ -52,11 +57,11 @@ class _LoginScreenState extends State<LoginScreen> {
         MaterialPageRoute(builder: (context) => const HomeScreen()),
       );
     } else {
-      // 실패
+      // 실패: 구체적인 에러 메시지 표시
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text("로그인 실패: $error")));
+      ).showSnackBar(SnackBar(content: Text(error)));
     }
   }
 

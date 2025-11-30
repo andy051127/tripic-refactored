@@ -1,254 +1,27 @@
-## 🔄 주요 이동 흐름 요약
 
-```
-[1️⃣ 앱 시작 상세]
-splash_screen (2초 대기) → login_screen ┬→ 회원가입 버튼 → signup_screen → profile_creation_screen → home_screen
-                                        ├→ 이메일 로그인 → home_screen
-                                        ├→ 카카오 로그인 (UI만) → [미구현]
-                                        ├→ 네이버 로그인 (UI만) → [미구현]
-                                        └→ 구글 로그인 (UI만) → [미구현]
+앱 개선점 총 정리
 
-[2️⃣ 메인 네비게이션 상세]
-Bottom Navigation (5개 탭)
-┌─────────────────────────────────────────────────────────────┐
-│ 탭1: home_screen ┬→ 지도 배너 → map_detail_screen → 마커 클릭 → 게시물 미리보기 → 게시물 상세
-│                  ├→ 검색 버튼 → search_screen ┬→ 사용자 검색 → other_user_profile_screen
-│                  │                            └→ 장소 검색 → map_search_screen
-│                  ├→ 메시지 버튼 → message_list_screen → chat_detail_screen
-│                  ├→ + 버튼 → photo_picker_screen (게시물 작성 시작)
-│                  └→ 게시물 클릭 → 게시물 상세 ┬→ 좋아요
-│                                              ├→ 댓글 작성
-│                                              ├→ DM → chat_detail_screen
-│                                              ├→ 사용자명 클릭 → other_user_profile_screen
-│                                              └→ 더보기 → 신고/차단/숨기기/팔로우
-│
-│ 탭2: travel_plan_screen ┬→ + 버튼 → travel_plan_setup_screen ┬→ 날짜 선택 → 달력 모달
-│                          │                                    ├→ 국가 선택 → 지도 모달
-│                          │                                    ├→ 비행편 입력 → 시간 선택 모달
-│                          │                                    ├→ 숙소 입력
-│                          │                                    ├→ 인원 추가 → friend_list_screen (선택모드)
-│                          │                                    └→ 준비물 추가 → 체크박스 모달
-│                          └→ 계획 카드 클릭 → travel_plan_detail_screen → 수정 → travel_plan_setup_screen
-│
-│ 탭3: + 버튼 (중앙) → photo_picker_screen (게시물 작성)
-│
-│ 탭4: community_screen ┬→ + 버튼 → community_write_screen ┬→ 사진 선택 → 갤러리
-│                       │                                  ├→ 장소 선택 → 지도 모달
-│                       │                                  ├→ 날짜 선택 → 달력 모달
-│                       │                                  └→ 인원 선택 → friend_list_screen (선택모드)
-│                       ├→ 게시글 클릭 → community_detail_screen ┬→ 댓글 작성
-│                       │                                        ├→ 좋아요
-│                       │                                        ├→ DM 보내기 → chat_detail_screen
-│                       │                                        └→ 작성자 클릭 → other_user_profile_screen
-│                       └→ 검색 → 필터링 결과
-│
-│ 탭5: profile_screen (상세 흐름은 [11️⃣ 프로필 화면 상세] 참조)
-└─────────────────────────────────────────────────────────────┘
-
-[3️⃣ 게시물 작성 플로우 상세]
-photo_picker_screen ┬→ 갤러리 선택 → 사진 선택 (다중 가능) → photo_editor_screen
-                    └→ 카메라 선택 → 촬영 → photo_editor_screen
-
-photo_editor_screen ┬→ 사진 편집 버튼 → 이미지 에디터 → 편집 완료
-                    ├→ 사진 추가 → photo_picker_screen
-                    ├→ 사진 삭제 → 목록에서 제거
-                    ├→ 친구 태그 → 태그 입력
-                    ├→ 위치 선택 → 전체화면 지도 모달 ┬→ 현재 위치 버튼
-                    │                              ├→ 지도 탭 선택 → 위치 반환
-                    │                              └→ 검색 → 장소 검색
-                    └→ 다음 버튼 → write_post_screen
-
-write_post_screen ┬→ 제목 입력
-                  ├→ 내용 입력
-                  ├→ 공개 범위 설정 → friend_list_screen (특정친구 선택)
-                  └→ 업로드 → home_screen (게시물 추가됨)
-
-[4️⃣ 검색 및 프로필 탐색 상세]
-search_screen ┬→ 사용자 검색 → other_user_profile_screen ┬→ 팔로우/언팔로우
-              │                                          ├→ 게시물 클릭 → 게시물 상세
-              │                                          ├→ 팔로워 클릭 → follow_list_screen
-              │                                          ├→ 팔로잉 클릭 → follow_list_screen
-              │                                          └→ DM 버튼 → chat_detail_screen
-              └→ 장소 검색 → map_search_screen ┬→ 검색창 입력 → 지역명 검색
-                                              ├→ 친구 이름 검색
-                                              └→ 위치 선택 → 이전 화면으로 반환
-
-follow_list_screen ┬→ 팔로워 탭 → 사용자 리스트 → other_user_profile_screen
-                   └→ 팔로잉 탭 → 사용자 리스트 → other_user_profile_screen
-
-[5️⃣ 메시지 상세]
-message_list_screen ┬→ 채팅방 클릭 → chat_detail_screen ┬→ 메시지 입력/전송
-                    │                                   ├→ 사진 첨부
-                    │                                   ├→ 상대방 이름 클릭 → other_user_profile_screen
-                    │                                   └→ 상단 지도 경로 표시
-                    ├→ + 버튼 → friend_list_screen (일반모드) → 친구 선택 → chat_detail_screen
-                    └→ 즐겨찾기 탭 → 즐겨찾기 채팅방 리스트
-
-friend_list_screen ┬→ [일반 모드] 친구 클릭 → chat_detail_screen
-                   ├→ [선택 모드] 여러명 선택 → 확인 → 이전 화면으로 반환
-                   └→ + 버튼 → add_friend_screen ┬→ 검색으로 추가
-                                                  └→ 초대 링크로 추가
-
-[6️⃣ 지도 기능 상세]
-map_detail_screen ┬→ 내 위치 표시 (GPS)
-                  ├→ 친구 게시물 마커 표시
-                  ├→ 마커 클릭 → 게시물 미리보기 팝업 → 클릭 → 게시물 상세 ┬→ 좋아요
-                  │                                                      ├→ 댓글
-                  │                                                      ├→ DM
-                  │                                                      └→ 더보기
-                  ├→ 지도 이동/줌
-                  └→ 뒤로가기 → home_screen
-
-map_search_screen ┬→ 검색창 ┬→ 친구 이름 입력 → 해당 위치로 이동
-                  │         └→ 지역명 입력 → 해당 지역으로 이동
-                  ├→ 지도 탭 선택
-                  └→ 위치 선택 → 이전 화면으로 위치 정보 반환
-
-[7️⃣ 설정 메뉴 상세]
-settings_screen ┬→ 계정 공개 범위 → privacy_settings_screen ┬→ 전체 공개
-                │                                           ├→ 친구만
-                │                                           ├→ 친한친구
-                │                                           └→ 특정친구 선택 → friend_list_screen (선택모드)
-                ├→ 차단된 계정 → blocked_users_screen ┬→ 차단 목록 표시
-                │                                    └→ 차단 해제 → 목록에서 제거
-                ├→ 활동 → activity_screen ┬→ 댓글 탭 → 내 댓글 목록 → 게시물 상세
-                │                        ├→ 좋아요 탭 → 좋아요한 게시물 → 게시물 상세
-                │                        └→ 스크랩 탭 → 스크랩한 게시물 → 게시물 상세
-                ├→ 알림 → notification_settings_screen ┬→ 푸시 알림 ON/OFF
-                │                                      ├→ 댓글 알림 설정
-                │                                      ├→ 좋아요 알림 설정
-                │                                      └→ 팔로우 알림 설정
-                ├→ 보관함 → saved_posts_screen → 게시물 그리드 → 게시물 상세
-                ├→ 언어 번역 → language_translation_screen → 언어 설정 시뮬레이션
-                ├→ 도움말 → help_screen → FAQ 아코디언 리스트
-                └→ 정보 → information_screen → 앱 버전/개발사 정보
-
-[8️⃣ 여행 계획 상세]
-travel_plan_screen ┬→ + 버튼 → travel_plan_setup_screen ┬→ 날짜 선택 → 달력 모달 (시작/종료일)
-                   │                                    ├→ 국가 선택 → 검색 또는 지도 모달
-                   │                                    ├→ 비행편 정보 ┬→ 출발 시간 선택 모달
-                   │                                    │              └→ 도착 시간 선택 모달
-                   │                                    ├→ 숙소 정보 입력
-                   │                                    ├→ 인원 추가 → friend_list_screen (선택모드) → 선택 완료
-                   │                                    ├→ 준비물 추가 → 입력 모달 ┬→ 항목 추가
-                   │                                    │                          └→ 체크박스 표시
-                   │                                    └→ 저장 → travel_plan_screen (계획 추가됨)
-                   └→ 계획 카드 클릭 → travel_plan_detail_screen ┬→ 계획 정보 조회
-                                                                ├→ 수정 버튼 → travel_plan_setup_screen (편집모드)
-                                                                ├→ 준비물 체크
-                                                                └→ 삭제 → travel_plan_screen
-
-[9️⃣ 커뮤니티 상세]
-community_screen ┬→ 게시글 탭 ┬→ 게시글 리스트
-                 │            ├→ + 버튼 → community_write_screen ┬→ 사진 선택 → 갤러리
-                 │            │                                  ├→ 제목/내용 입력
-                 │            │                                  ├→ 장소 선택 → 지도 모달
-                 │            │                                  ├→ 날짜 선택 → 달력 모달
-                 │            │                                  ├→ 인원 선택 → friend_list_screen (선택모드)
-                 │            │                                  └→ 게시 → community_screen
-                 │            ├→ 게시글 클릭 → community_detail_screen ┬→ 댓글 작성
-                 │            │                                        ├→ 좋아요
-                 │            │                                        ├→ DM 보내기 → chat_detail_screen
-                 │            │                                        ├→ 작성자 클릭 → other_user_profile_screen
-                 │            │                                        └→ 더보기 (신고/삭제)
-                 │            └→ 검색 → 필터링
-                 └→ 동행 탭 ┬→ 동행 찾기 게시글 리스트
-                           ├→ + 버튼 → community_write_screen (동행모드)
-                           └→ 게시글 클릭 → community_detail_screen
-
-[🔟 로그인 화면 상세]
-login_screen ┬→ 회원가입 버튼 → signup_screen ┬→ 이메일 입력
-             │                               ├→ 비밀번호 입력
-             │                               ├→ 이름 입력
-             │                               ├→ 생년월일 입력
-             │                               └→ 가입 완료 → profile_creation_screen ┬→ 프로필 사진 선택
-             │                                                                      ├→ 소개 입력
-             │                                                                      └→ 완료 → home_screen
-             ├→ 이메일 로그인 ┬→ 이메일 입력
-             │                ├→ 비밀번호 입력
-             │                └→ 로그인 → Firebase Auth → home_screen
-             ├→ 카카오 로그인 버튼 (UI만) → [미구현]
-             ├→ 네이버 로그인 버튼 (UI만) → [미구현]
-             └→ 구글 로그인 버튼 (UI만) → [미구현]
-
-[11. 프로필 화면 상세]
-profile_screen ┬→ 프로필 사진 클릭 → 갤러리/카메라 선택 → 사진 선택 → Firebase Storage 업로드 → 프로필 업데이트
-               ├→ 프로필 정보 표시 ┬→ 이름
-               │                  ├→ 소개
-               │                  ├→ 국기
-               │                  └→ 통계 (게시물 수/팔로워/팔로잉)
-               ├→ + 버튼 → photo_picker_screen → photo_editor_screen → write_post_screen → home_screen
-               ├→ 햄버거 버튼 → member_info_screen ┬→ 이메일 수정 → 입력 모달 → 저장
-               │                                   ├→ 전화번호 수정 → 입력 모달 → 저장
-               │                                   ├→ 생년월일 수정 → 날짜 선택 → 저장
-               │                                   ├→ 성별 수정
-               │                                   ├→ 국적 수정
-               │                                   └→ 기타 정보 수정
-               ├→ 설정 버튼 → settings_screen (상세 흐름은 [7️⃣ 설정 메뉴 상세] 참조)
-               ├→ 팔로워 숫자 클릭 → follow_list_screen (팔로워 탭) ┬→ 사용자 클릭 → other_user_profile_screen
-               │                                                   └→ 팔로우/언팔로우 버튼
-               ├→ 팔로잉 숫자 클릭 → follow_list_screen (팔로잉 탭) ┬→ 사용자 클릭 → other_user_profile_screen
-               │                                                   └→ 언팔로우 버튼
-               ├→ 게시물 그리드 클릭 → 게시물 상세 ┬→ 좋아요 ┬→ 좋아요 추가
-               │                                  │          └→ 좋아요 취소
-               │                                  ├→ 댓글 작성 → 댓글 입력 → 전송
-               │                                  ├→ DM 버튼 → chat_detail_screen
-               │                                  ├→ 스크랩 (보관함 저장)
-               │                                  └→ 더보기 ┬→ 수정 → write_post_screen (편집모드)
-               │                                            ├→ 삭제 → 확인 → profile_screen
-               │                                            └→ 공유
-               └→ 로그아웃 버튼 → Firebase Auth.signOut() → login_screen
-
-
-1130 앱 개선점 총 정리
-
-1130에 확인한 현재 개선해야하는 점들입니다.
+현재 개선해야하는 점들입니다.(아직 다 완성 못함)
 전체적인 기능 별로 정리해놓았습니다
-화면 흐름 순으로 나열해 놓았으니 위쪽의 파일 흐름 보시고 파일 찾을 때 참고해주세요.
+최대한 화면 흐름 순으로 나열해 놓았으니 "주요 이동 흐름 요약.md" 보시고 파일 찾을 때 참고해주세요.
 업데이트 하시게 되면 날짜 게속 업데이트 해주시고 해결 완료하신 사항은
 옆에 주석 표시(//) 달아놓으시죠.
 
-1. 홈화면(home_screen): 
-    - 중앙 상단의 지도영역에서 지도가 보이도록 수정
-    - 프로필 클릭시 해당 프로필로 이동하도록 수정
-    - 하트, 댓글, 게시물 공유 DB 연결
-    - 보관함 저장 UI DB에 맞게 작동하도록 수정
-    - 게시물 우측 상단 ... 버튼:
-        -- UI가 안드로이드 네비게이션바에 가려지지 않도록 수정
-        -- 팔로우 버튼 구현
-        -- 숨기기 버튼 구현
-        -- 차단 버튼 구현(+ 차단 시 한번 더 물어보기)
-        -- 신고 기능 구현
-2. 게시물 작성
-    - photo_picker_screen: 문제 없음
-    - photo_editor_screen:
-        -- 지도 위치 지정시 지역 검색 기능 추가
-        -- 지도 확대 후 위치 지정시 지도 화면이 다시 작아지지 않도록 구현
-        -- 지도 위치 정보 DB에 연결
-    - write_post_screen:
-        -- photo_editor_screen에서 선택한 위치가 뜨도록 설정
-3. 검색 및 프로필
-    - search_screen: 
-        -- 계정검색 DB 연결 
-    - other_user_profile_screen: 
-        -- DB 연결
-        -- 페이지 국가 선택 기능 및 지도 보기 기능 추가
-    - map_search_screen: 
-        -- 지도 검색 잘되게 수정 
-        -- 지도에서 뒤로가기 누를시 다시 해당페이지로 리턴
-4. 메세지
-    - message_list_screen: DB 연결, 현재 활동 중 기능 구현(구현 어려우면 걍 뺴시죠)
-    - chat_detail_screen: 
-        -- UI Figma 버전으로 수정
-        -- 사진 보내기, 지도 보내기, 사진 찍어 보내기 기능 구현 및 DB 연결
-        -- 채팅 DB 연결
-        -- 지도 API 연결
-    - friend_list_screen: DB 연결
-5. 지도
-    - map_detail_screen: 
-        -- 지도 검색기능 추가 및 기능 구현
-        -- ps. 이 페이지는 그냥 빼고 map_search_screen(검색 및 프로필)과 통합하여
-        "map.dart"로 만드는게 좋을 것 같습니다. 두 페이지에 필요한 기능이
-        똑같습니다.
-6. 프로필 화면(profile)
-    - 회원 정보 DB 연결
+
+0. 스플래쉬 화면 및 아이콘 로고
+    - 앱 아이콘 tripic 로고로 바꾸기
+    - 앱 처음 실행시 스플래시 화면 뜨게 만들기
+
+1. 앱 시작 및 로그인
+    - login_screen:
+        -- 비밀번호 찾기 페이지 구현
+        -- 소셜미디어 로그인 구현
+    - signup_screen: 문제 없음
+    - profile_creation_screen: 문제 없음
+
+2. 메인 네비게이션
+    - 문제 없음
+
+3. 홈화면
+    - 문제 존나 많음 시발
+

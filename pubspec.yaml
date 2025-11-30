@@ -46,6 +46,7 @@ dependencies:
   firebase_storage: ^13.0.4
   image_editor_plus: ^1.0.8
   path_provider: ^2.1.5
+  shared_preferences: ^2.3.3
 
 dev_dependencies:
   flutter_test:
