@@ -73,7 +73,24 @@
 
 8. 설정
     - settings_screen: 문제 없음, 만약 다크 모드 추가할거면 아래 탭 하나 추가
-    -
+    - privacy_settings_screen: 계정 공개 범위 기능 적용/ 선택한 친구에게만 공개 --> 친한친구 기능으로 전환
+    - blocked_users_screen: 차단 기능 구현
+    - activity_screen: 기능 구현
+    - notification_settings_screen: 기능 구현해야되긴 하는데 알림 오는거 못만들겠으면 걍 하지 마시죠
+    - saved_posts_screen: 기능 구현
+    - language_translation_screen: Google Translate API 활용해서 기능 구현
+    - help_screen: 안드로이드 네비게이션 바에 버튼 가려지는 문제 해결
+    - information_screen: 문제 없음
+
+9. 여행 계획
+    - travel_plan_screen: 문제 없음
+    - travel_plan_setup_screen: 
+        -- 안드로이드 네비게이션 바에 버튼 가려지는 문제 해결
+        -- 국가설정: 국가 검색 기능과 빠른 지역 찾기에 주요 나라들 올리기
+        -- 비행편 설정: 비행기 오는편, 가는편, 경유 비행기 추가 기능 구현
+    - travel_plan_detail_screen: 문제 없음
+
+
             
         
     
