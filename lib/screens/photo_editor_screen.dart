@@ -9,6 +9,7 @@ import 'package:geolocator/geolocator.dart';
 import 'dart:async';
 import 'add_friend_screen.dart';
 import 'write_post_screen.dart';
+import 'map_screen.dart';
 
 class PhotoEditorScreen extends StatefulWidget {
   final List<String> initialImages;
@@ -207,6 +208,7 @@ class _PhotoEditorScreenState extends State<PhotoEditorScreen> {
                         builder: (context) => WritePostScreen(
                           images: _images,
                           taggedFriend: _taggedFriend,
+                          selectedLocation: _selectedLocation, // 선택된 위치 전달
                         ),
                       ),
                     );
@@ -316,177 +318,156 @@ class _PhotoEditorScreenState extends State<PhotoEditorScreen> {
                 },
               ),
 
-            // 지도 영역
-            Container(
-              height: 250,
-              margin: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue[100]!),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: Stack(
-                children: [
-                  GoogleMap(
-                    initialCameraPosition: CameraPosition(
-                      target: _currentPosition,
-                      zoom: 15,
-                    ),
-                    myLocationEnabled: true,
-                    myLocationButtonEnabled: false,
-                    zoomControlsEnabled: false,
-                    mapToolbarEnabled: false,
-                    onMapCreated: (GoogleMapController controller) {
-                      _mapController.complete(controller);
-                    },
-                    onTap: (LatLng location) {
-                      setState(() {
-                        _selectedLocation = location;
-                      });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            '위치 선택됨: ${location.latitude.toStringAsFixed(4)}, ${location.longitude.toStringAsFixed(4)}',
-                          ),
-                          duration: const Duration(seconds: 2),
+            // 지도 영역 (클릭하면 map_screen으로 이동)
+            GestureDetector(
+              onTap: () async {
+                // map_screen으로 이동하여 위치 선택 (선택 모드로 전환)
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const MapScreen(isSelectionMode: true),
+                  ),
+                );
+                
+                // map_screen에서 위치를 선택하고 돌아온 경우
+                if (result != null && result is LatLng) {
+                  setState(() {
+                    _selectedLocation = result;
+                  });
+                  
+                  // 선택된 위치로 지도 이동
+                  final controller = await _mapController.future;
+                  controller.animateCamera(
+                    CameraUpdate.newLatLng(result),
+                  );
+                  
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          '위치 선택됨: ${result.latitude.toStringAsFixed(4)}, ${result.longitude.toStringAsFixed(4)}',
                         ),
-                      );
-                    },
-                    markers: _selectedLocation != null
-                        ? {
-                            Marker(
-                              markerId: const MarkerId('selected'),
-                              position: _selectedLocation!,
-                              infoWindow: const InfoWindow(title: '선택한 위치'),
-                            ),
-                          }
-                        : {},
-                  ),
-                  Positioned(
-                    top: 10,
-                    left: 10,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
+                        duration: const Duration(seconds: 2),
                       ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 4,
-                          ),
-                        ],
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.location_on, size: 16, color: Colors.blue),
-                          SizedBox(width: 4),
-                          Text(
-                            '지도를 탭하여 위치 선택',
-                            style: TextStyle(fontSize: 12),
-                          ),
-                        ],
+                    );
+                  }
+                }
+              },
+              child: Container(
+                height: 250,
+                margin: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.blue[100]!),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Stack(
+                  children: [
+                    // 지도는 터치 비활성화 (보기만 가능)
+                    AbsorbPointer(
+                      child: GoogleMap(
+                        initialCameraPosition: CameraPosition(
+                          target: _currentPosition,
+                          zoom: 15,
+                        ),
+                        myLocationEnabled: true,
+                        myLocationButtonEnabled: false,
+                        zoomControlsEnabled: false,
+                        mapToolbarEnabled: false,
+                        onMapCreated: (GoogleMapController controller) {
+                          _mapController.complete(controller);
+                        },
+                        markers: _selectedLocation != null
+                            ? {
+                                Marker(
+                                  markerId: const MarkerId('selected'),
+                                  position: _selectedLocation!,
+                                  icon: BitmapDescriptor.defaultMarkerWithHue(
+                                    BitmapDescriptor.hueRed,
+                                  ),
+                                  infoWindow: const InfoWindow(title: '선택한 위치'),
+                                ),
+                              }
+                            : {},
                       ),
                     ),
-                  ),
-                  Positioned(
-                    bottom: 10,
-                    left: 10,
-                    child: FloatingActionButton.small(
-                      backgroundColor: Colors.white,
-                      onPressed: () {
-                        // 지도 전체화면 모달 열기
-                        showModalBottomSheet(
-                          context: context,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (context) => Container(
-                            height: MediaQuery.of(context).size.height * 0.9,
-                            decoration: const BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.vertical(
-                                top: Radius.circular(20),
+                    // 중앙 오버레이 (지도 클릭 유도)
+                    if (_selectedLocation == null)
+                      Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.9),
+                            borderRadius: BorderRadius.circular(25),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
                               ),
-                            ),
-                            child: Column(
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.all(16.0),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      const Text(
-                                        "위치 선택",
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.close),
-                                        onPressed: () => Navigator.pop(context),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Expanded(
-                                  child: GoogleMap(
-                                    initialCameraPosition: CameraPosition(
-                                      target: _selectedLocation ?? _currentPosition,
-                                      zoom: 15,
-                                    ),
-                                    myLocationEnabled: true,
-                                    myLocationButtonEnabled: true,
-                                    zoomControlsEnabled: true,
-                                    onTap: (LatLng location) {
-                                      setState(() {
-                                        _selectedLocation = location;
-                                      });
-                                      Navigator.pop(context);
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            '위치 선택됨: ${location.latitude.toStringAsFixed(4)}, ${location.longitude.toStringAsFixed(4)}',
-                                          ),
-                                          duration: const Duration(seconds: 2),
-                                        ),
-                                      );
-                                    },
-                                    markers: _selectedLocation != null
-                                        ? {
-                                            Marker(
-                                              markerId: const MarkerId('selected'),
-                                              position: _selectedLocation!,
-                                              infoWindow: const InfoWindow(
-                                                title: '선택한 위치',
-                                              ),
-                                            ),
-                                          }
-                                        : {},
-                                  ),
-                                ),
-                              ],
-                            ),
+                            ],
                           ),
-                        );
-                      },
-                      child: const Icon(Icons.fullscreen, color: Colors.blue),
-                    ),
-                  ),
-                  Positioned(
-                    bottom: 10,
-                    right: 10,
-                    child: FloatingActionButton.small(
-                      backgroundColor: Colors.white,
-                      onPressed: _getCurrentLocation,
-                      child: const Icon(Icons.my_location, color: Colors.blue),
-                    ),
-                  ),
-                ],
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.location_on, size: 20, color: Colors.blue),
+                              SizedBox(width: 8),
+                              Text(
+                                '탭하여 위치 선택하기',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              SizedBox(width: 4),
+                              Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+                            ],
+                          ),
+                        ),
+                      ),
+                    // 위치 선택됨 표시
+                    if (_selectedLocation != null)
+                      Positioned(
+                        top: 10,
+                        left: 10,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.green,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 4,
+                              ),
+                            ],
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.check_circle, size: 16, color: Colors.white),
+                              SizedBox(width: 4),
+                              Text(
+                                '위치 선택 완료',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
             ],

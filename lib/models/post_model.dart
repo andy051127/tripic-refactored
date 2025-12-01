@@ -12,8 +12,11 @@ class Post {
   final Timestamp createdAt;
   final String imageUrl;
   final String imagePath;
+  final List<String> imageUrls; // 여러 이미지 URL 리스트
   final bool isFile;
   final String category;
+  final double? latitude;  // 위도 추가
+  final double? longitude; // 경도 추가
 
   Post({
     String? id,
@@ -26,8 +29,11 @@ class Post {
     Timestamp? createdAt,
     this.imageUrl = '',
     this.imagePath = '',
+    this.imageUrls = const [],
     this.isFile = false,
     this.category = 'feed',
+    this.latitude,
+    this.longitude,
   }) : this.id = id ?? DateTime.now().millisecondsSinceEpoch.toString(),
        this.createdAt = createdAt ?? Timestamp.now();
 
@@ -43,8 +49,11 @@ class Post {
       createdAt: data['createdAt'] as Timestamp?,
       imageUrl: data['imageUrl'] ?? '',
       imagePath: data['imageUrl'] ?? '',
+      imageUrls: data['imageUrls'] != null ? List<String>.from(data['imageUrls']) : [],
       isFile: false,
       category: data['category'] ?? 'feed',
+      latitude: data['latitude']?.toDouble(),
+      longitude: data['longitude']?.toDouble(),
     );
   }
 
@@ -58,7 +67,10 @@ class Post {
       'likeCount': likeCount,
       'createdAt': createdAt,
       'imageUrl': imageUrl,
+      'imageUrls': imageUrls,
       'category': category,
+      'latitude': latitude,
+      'longitude': longitude,
     };
   }
 }

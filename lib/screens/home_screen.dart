@@ -352,14 +352,23 @@ class PostItem extends StatefulWidget {
 class _PostItemState extends State<PostItem> {
   bool _isLiked = false;
   bool _isSaved = false;
+  bool _showMap = false;
   int _likeCount = 0;
   String? _profileImageUrl;
+  int _currentImageIndex = 0;
+  final PageController _pageController = PageController();
 
   @override
   void initState() {
     super.initState();
     _likeCount = widget.post.likeCount;
     _loadProfileImage();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadProfileImage() async {
@@ -585,10 +594,11 @@ class _PostItemState extends State<PostItem> {
                             fontSize: 14,
                           ),
                         ),
-                        Text(
-                          widget.post.location,
-                          style: const TextStyle(fontSize: 12, color: Colors.grey),
-                        ),
+                        if (widget.post.location.isNotEmpty)
+                          Text(
+                            widget.post.location,
+                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
                       ],
                     ),
                   ],
@@ -606,25 +616,177 @@ class _PostItemState extends State<PostItem> {
             ],
           ),
         ),
-        Container(
-          width: double.infinity,
-          height: 400,
-          color: Colors.grey[200],
-          child: Image.network(
-            widget.post.imageUrl,
-            fit: BoxFit.cover,
-            errorBuilder: (c, o, s) => const Center(
-              child: Icon(
-                Icons.image_not_supported,
-                size: 50,
-                color: Colors.grey,
-              ),
+        Stack(
+          children: [
+            Container(
+              width: double.infinity,
+              height: 400,
+              color: Colors.grey[200],
+              child: () {
+                // imageUrls가 있으면 사용, 없으면 imageUrl 사용
+                final images = widget.post.imageUrls.isNotEmpty 
+                    ? widget.post.imageUrls 
+                    : (widget.post.imageUrl.isNotEmpty ? [widget.post.imageUrl] : []);
+                
+                // 이미지가 없는 경우 처리
+                if (images.isEmpty) {
+                  return const Center(
+                    child: Icon(
+                      Icons.image_not_supported,
+                      size: 50,
+                      color: Colors.grey,
+                    ),
+                  );
+                }
+                
+                // 단일 이미지 처리
+                if (images.length == 1) {
+                  final imagePath = images[0];
+                  // 로컬 파일인 경우
+                  if (widget.post.isFile && File(imagePath).existsSync()) {
+                    return Image.file(
+                      File(imagePath),
+                      fit: BoxFit.cover,
+                      errorBuilder: (c, o, s) => const Center(
+                        child: Icon(
+                          Icons.image_not_supported,
+                          size: 50,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    );
+                  }
+                  // 네트워크 이미지인 경우
+                  return Image.network(
+                    imagePath,
+                    fit: BoxFit.cover,
+                    errorBuilder: (c, o, s) => const Center(
+                      child: Icon(
+                        Icons.image_not_supported,
+                        size: 50,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return const Center(child: CircularProgressIndicator());
+                    },
+                  );
+                }
+                
+                // 여러 이미지 처리
+                return PageView.builder(
+                  controller: _pageController,
+                  itemCount: images.length,
+                  onPageChanged: (index) {
+                    setState(() {
+                      _currentImageIndex = index;
+                    });
+                  },
+                  itemBuilder: (context, index) {
+                    final imagePath = images[index];
+                    // 로컬 파일인 경우
+                    if (widget.post.isFile && File(imagePath).existsSync()) {
+                      return Image.file(
+                        File(imagePath),
+                        fit: BoxFit.cover,
+                        errorBuilder: (c, o, s) => const Center(
+                          child: Icon(
+                            Icons.image_not_supported,
+                            size: 50,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      );
+                    }
+                    // 네트워크 이미지인 경우
+                    return Image.network(
+                      imagePath,
+                      fit: BoxFit.cover,
+                      errorBuilder: (c, o, s) => const Center(
+                        child: Icon(
+                          Icons.image_not_supported,
+                          size: 50,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return const Center(child: CircularProgressIndicator());
+                      },
+                    );
+                  },
+                );
+              }(),
             ),
-            loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              return const Center(child: CircularProgressIndicator());
-            },
-          ),
+            // 이미지 인디케이터 (여러 이미지가 있을 때만 표시)
+            if (widget.post.imageUrls.isNotEmpty && widget.post.imageUrls.length > 1)
+              Positioned(
+                top: 10,
+                right: 10,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${_currentImageIndex + 1}/${widget.post.imageUrls.length}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            if (_showMap && widget.post.latitude != null && widget.post.longitude != null)
+              Container(
+                width: double.infinity,
+                height: 400,
+                color: Colors.black.withOpacity(0.8),
+                child: Stack(
+                  children: [
+                    GoogleMap(
+                      initialCameraPosition: CameraPosition(
+                        target: LatLng(
+                          widget.post.latitude!,
+                          widget.post.longitude!,
+                        ),
+                        zoom: 15,
+                      ),
+                      markers: {
+                        Marker(
+                          markerId: MarkerId(widget.post.id),
+                          position: LatLng(
+                            widget.post.latitude!,
+                            widget.post.longitude!,
+                          ),
+                          infoWindow: InfoWindow(
+                            title: widget.post.userName,
+                            snippet: widget.post.title,
+                          ),
+                        ),
+                      },
+                      myLocationButtonEnabled: false,
+                      zoomControlsEnabled: false,
+                    ),
+                    Positioned(
+                      top: 10,
+                      right: 10,
+                      child: IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                        onPressed: () {
+                          setState(() {
+                            _showMap = false;
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
@@ -683,6 +845,21 @@ class _PostItemState extends State<PostItem> {
                 child: const Icon(Icons.near_me_outlined, size: 28),
               ),
               const Spacer(),
+              GestureDetector(
+                onTap: () {
+                  if (widget.post.latitude != null && widget.post.longitude != null) {
+                    setState(() {
+                      _showMap = !_showMap;
+                    });
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('위치가 선택되지 않았습니다')),
+                    );
+                  }
+                },
+                child: const Icon(Icons.map_outlined, size: 28),
+              ),
+              const SizedBox(width: 16),
               GestureDetector(
                 onTap: () {
                   setState(() {

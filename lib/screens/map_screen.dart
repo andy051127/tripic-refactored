@@ -5,9 +5,18 @@ import 'package:permission_handler/permission_handler.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/post_model.dart';
 
 class MapScreen extends StatefulWidget {
-  const MapScreen({super.key});
+  final bool isSelectionMode; // 위치 선택 모드인지 여부
+  final LatLng? initialLocation; // 초기 위치 (게시물 위치 등)
+  
+  const MapScreen({
+    super.key, 
+    this.isSelectionMode = false,
+    this.initialLocation,
+  });
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -19,6 +28,7 @@ class _MapScreenState extends State<MapScreen> {
   Set<Marker> _markers = {};
   bool _isSearching = false;
   List<Map<String, dynamic>> _searchResults = [];
+  LatLng? _selectedLocationForReturn; // 선택된 위치 (반환용)
   
   // ⚠️ 중요: Google Cloud Console에서 발급받은 실제 API 키로 교체하세요
   static const String _googleApiKey = 'AIzaSyBZt7UnBDxY-D6jrsuj_Y7Q5JSolghwwjg';
@@ -112,7 +122,11 @@ class _MapScreenState extends State<MapScreen> {
   void initState() {
     super.initState();
     _checkPermissions();
-    _createMarkers();
+    
+    // 선택 모드가 아닐 때만 친구 게시물 마커 생성
+    if (!widget.isSelectionMode) {
+      _loadPostMarkers();
+    }
   }
 
   @override
@@ -126,21 +140,60 @@ class _MapScreenState extends State<MapScreen> {
     await Permission.location.request();
   }
 
-  // 마커 생성
-  void _createMarkers() {
-    setState(() {
-      _markers = _friendPosts.map((post) {
-        return Marker(
-          markerId: MarkerId(post['id']),
-          position: LatLng(post['lat'], post['lng']),
-          infoWindow: InfoWindow(
-            title: post['name'],
-            snippet: post['title'],
-          ),
-          onTap: () => _showPostPreview(post),
+  // Firestore에서 게시물 불러와서 마커 생성
+  Future<void> _loadPostMarkers() async {
+    try {
+      // Firestore에서 위치 정보가 있는 게시물만 가져오기
+      final QuerySnapshot snapshot = await FirebaseFirestore.instance
+          .collection('posts')
+          .get();
+
+      Set<Marker> markers = {};
+      
+      for (var doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        
+        // latitude와 longitude가 모두 존재하는지 확인
+        if (data['latitude'] != null && data['longitude'] != null) {
+          final post = Post.fromMap(data, doc.id);
+          
+          markers.add(
+            Marker(
+              markerId: MarkerId(post.id),
+              position: LatLng(post.latitude!, post.longitude!),
+              infoWindow: InfoWindow(
+                title: post.userName,
+                snippet: post.title,
+              ),
+              onTap: () => _showPostPreview({
+                'id': post.id,
+                'name': post.userName,
+                'title': post.title,
+                'location': post.location,
+                'lat': post.latitude,
+                'lng': post.longitude,
+                'image': post.imageUrl.isNotEmpty ? post.imageUrl : 'assets/logo.png',
+              }),
+            ),
+          );
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _markers = markers;
+        });
+        
+        print('✅ 마커 로드 성공: ${markers.length}개의 마커 생성됨');
+      }
+    } catch (e) {
+      print('❌ 게시물 마커 로드 실패: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('게시물을 불러오는데 실패했습니다: $e')),
         );
-      }).toSet();
-    });
+      }
+    }
   }
 
   // 현재 위치로 이동
@@ -182,34 +235,50 @@ class _MapScreenState extends State<MapScreen> {
     LatLng? targetLocation;
     String? foundName;
 
-    // 1. 친구 이름으로 검색
-    final friend = _friendPosts.firstWhere(
-      (post) => post['name'].toString().toLowerCase().contains(query.toLowerCase()),
-      orElse: () => {},
-    );
+    // 1. Firestore에서 게시물 검색 (사용자 이름으로)
+    try {
+      final QuerySnapshot snapshot = await FirebaseFirestore.instance
+          .collection('posts')
+          .get();
 
-    if (friend.isNotEmpty) {
-      targetLocation = LatLng(friend['lat'], friend['lng']);
-      foundName = "${friend['name']}님의 게시물";
-      
-      await controller.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(
-            target: targetLocation,
-            zoom: 15,
-          ),
-        ),
-      );
-
-      if (mounted) {
-        setState(() {
-          _isSearching = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("📍 '$foundName'(으)로 이동합니다.")),
-        );
+      for (var doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final userName = data['userName'] ?? '';
+        
+        if (userName.toLowerCase().contains(query.toLowerCase()) &&
+            data['latitude'] != null &&
+            data['longitude'] != null) {
+          targetLocation = LatLng(
+            data['latitude'].toDouble(),
+            data['longitude'].toDouble(),
+          );
+          foundName = "$userName님의 게시물";
+          break;
+        }
       }
-      return;
+
+      if (targetLocation != null) {
+        await controller.animateCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(
+              target: targetLocation,
+              zoom: 15,
+            ),
+          ),
+        );
+
+        if (mounted) {
+          setState(() {
+            _isSearching = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("📍 '$foundName'(으)로 이동합니다.")),
+          );
+        }
+        return;
+      }
+    } catch (e) {
+      print('게시물 검색 오류: $e');
     }
 
     // 2. 로컬 위치명으로 검색
@@ -329,28 +398,77 @@ class _MapScreenState extends State<MapScreen> {
       ),
     );
 
-    // 검색된 위치에 임시 마커 추가
-    setState(() {
-      _markers.add(
-        Marker(
-          markerId: MarkerId('search_result_${result['placeId']}'),
-          position: targetLocation,
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
-          infoWindow: InfoWindow(
-            title: result['name'],
-            snippet: result['address'],
+    // 선택 모드일 경우 선택된 위치로 설정
+    if (widget.isSelectionMode) {
+      setState(() {
+        _selectedLocationForReturn = targetLocation;
+        _markers.clear(); // 기존 마커 제거
+        _markers.add(
+          Marker(
+            markerId: const MarkerId('selected_location'),
+            position: targetLocation,
+            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+            infoWindow: InfoWindow(
+              title: '선택한 위치',
+              snippet: result['name'],
+            ),
           ),
-        ),
-      );
-      _isSearching = false;
-      _searchResults = [];
-    });
+        );
+        _isSearching = false;
+        _searchResults = [];
+      });
+    } else {
+      // 검색된 위치에 임시 마커 추가 (일반 모드)
+      setState(() {
+        _markers.add(
+          Marker(
+            markerId: MarkerId('search_result_${result['placeId']}'),
+            position: targetLocation,
+            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+            infoWindow: InfoWindow(
+              title: result['name'],
+              snippet: result['address'],
+            ),
+          ),
+        );
+        _isSearching = false;
+        _searchResults = [];
+      });
+    }
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("📍 '${result['name']}'(으)로 이동합니다.")),
       );
     }
+  }
+
+  // 지도 탭했을 때 마커 추가 (선택 모드 전용)
+  void _onMapTapped(LatLng location) {
+    setState(() {
+      _selectedLocationForReturn = location;
+      _markers.clear(); // 기존 마커 제거
+      _markers.add(
+        Marker(
+          markerId: const MarkerId('selected_location'),
+          position: location,
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+          infoWindow: InfoWindow(
+            title: '선택한 위치',
+            snippet: '${location.latitude.toStringAsFixed(4)}, ${location.longitude.toStringAsFixed(4)}',
+          ),
+        ),
+      );
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '위치 선택됨: ${location.latitude.toStringAsFixed(4)}, ${location.longitude.toStringAsFixed(4)}',
+        ),
+        duration: const Duration(seconds: 1),
+      ),
+    );
   }
 
   // 마커 클릭 시 미리보기 창 표시
@@ -453,12 +571,14 @@ class _MapScreenState extends State<MapScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
+      body: SafeArea(
+        bottom: true, // 하단 안전 영역 확보
+        child: Stack(
+          children: [
           // 전체 화면 지도
           GoogleMap(
-            initialCameraPosition: const CameraPosition(
-              target: _kSeoulCityHall,
+            initialCameraPosition: CameraPosition(
+              target: widget.initialLocation ?? _kSeoulCityHall,
               zoom: 15,
             ),
             markers: _markers,
@@ -469,6 +589,8 @@ class _MapScreenState extends State<MapScreen> {
             onMapCreated: (GoogleMapController controller) {
               _controller.complete(controller);
             },
+            // 선택 모드일 때만 지도 탭으로 마커 추가 가능
+            onTap: widget.isSelectionMode ? _onMapTapped : null,
           ),
 
           // 상단 검색창
@@ -494,7 +616,14 @@ class _MapScreenState extends State<MapScreen> {
                     children: [
                       IconButton(
                         icon: const Icon(Icons.arrow_back),
-                        onPressed: () => Navigator.pop(context),
+                        onPressed: () {
+                          // 선택 모드일 경우 선택된 위치 반환
+                          if (widget.isSelectionMode && _selectedLocationForReturn != null) {
+                            Navigator.pop(context, _selectedLocationForReturn);
+                          } else {
+                            Navigator.pop(context);
+                          }
+                        },
                       ),
                       Expanded(
                         child: TextField(
@@ -585,15 +714,53 @@ class _MapScreenState extends State<MapScreen> {
 
           // 내 위치로 이동 버튼
           Positioned(
-            bottom: 30,
+            bottom: 20, // 안전 영역 고려하여 간격 조정
             right: 20,
             child: FloatingActionButton(
               backgroundColor: Colors.white,
+              elevation: 4,
               onPressed: _moveToCurrentLocation,
               child: const Icon(Icons.my_location, color: Colors.blue),
             ),
           ),
-        ],
+
+          // 선택 모드일 때 하단에 확인 버튼 표시
+          if (widget.isSelectionMode && _selectedLocationForReturn != null)
+            Positioned(
+              bottom: 20, // 안전 영역 고려하여 간격 조정
+              left: 20,
+              right: 90,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context, _selectedLocationForReturn);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 4,
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.check, color: Colors.white),
+                    SizedBox(width: 8),
+                    Text(
+                      '이 위치로 선택',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

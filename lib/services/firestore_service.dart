@@ -14,27 +14,37 @@ class FirestoreService {
     required String title,
     required String content,
     required String location,
-    required String localImagePath,
+    String? localImagePath, // 단일 이미지 (하위 호환성)
+    List<String>? localImagePaths, // 여러 이미지
     String? taggedFriend,
     String category = 'feed',
     String? dateRange,
     int? memberCount,
     bool isAnonymous = false,
+    double? latitude,
+    double? longitude,
   }) async {
     User? user = _auth.currentUser;
     if (user == null) throw Exception("로그인이 필요합니다.");
 
     try {
-      String downloadUrl = '';
-      if (localImagePath.isNotEmpty) {
-        File file = File(localImagePath);
-        if (file.existsSync()) {
-          String fileName =
-              "${DateTime.now().millisecondsSinceEpoch}_${user.uid}.jpg";
-          Reference ref = _storage.ref().child('post_images/$fileName');
-          UploadTask uploadTask = ref.putFile(file);
-          TaskSnapshot snapshot = await uploadTask;
-          downloadUrl = await snapshot.ref.getDownloadURL();
+      List<String> downloadUrls = [];
+      
+      // 여러 이미지 처리
+      final imagePaths = localImagePaths ?? (localImagePath != null ? [localImagePath] : []);
+      
+      for (String imagePath in imagePaths) {
+        if (imagePath.isNotEmpty) {
+          File file = File(imagePath);
+          if (file.existsSync()) {
+            String fileName =
+                "${DateTime.now().millisecondsSinceEpoch}_${user.uid}_${downloadUrls.length}.jpg";
+            Reference ref = _storage.ref().child('post_images/$fileName');
+            UploadTask uploadTask = ref.putFile(file);
+            TaskSnapshot snapshot = await uploadTask;
+            String url = await snapshot.ref.getDownloadURL();
+            downloadUrls.add(url);
+          }
         }
       }
 
@@ -45,7 +55,8 @@ class FirestoreService {
         'title': title,
         'content': content,
         'location': location,
-        'imageUrl': downloadUrl,
+        'imageUrl': downloadUrls.isNotEmpty ? downloadUrls[0] : '', // 첫 번째 이미지를 기본 이미지로
+        'imageUrls': downloadUrls, // 모든 이미지 URL
         'taggedFriend': taggedFriend ?? '',
         'likeCount': 0,
         'createdAt': FieldValue.serverTimestamp(),
@@ -55,6 +66,8 @@ class FirestoreService {
       if (dateRange != null) postData['dateRange'] = dateRange;
       if (memberCount != null) postData['memberCount'] = memberCount;
       postData['isAnonymous'] = isAnonymous;
+      if (latitude != null) postData['latitude'] = latitude;
+      if (longitude != null) postData['longitude'] = longitude;
 
       await _db.collection('posts').add(postData);
     } catch (e) {
