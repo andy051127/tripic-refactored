@@ -8,9 +8,40 @@ import 'follow_list_screen.dart';
 import 'photo_picker_screen.dart';
 import 'member_info_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../services/firestore_service.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  final FirestoreService _firestoreService = FirestoreService();
+  int _followerCount = 0;
+  int _followingCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFollowCounts();
+  }
+
+  Future<void> _loadFollowCounts() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final counts = await _firestoreService.getFollowCounts(user.uid);
+      if (mounted) {
+        setState(() {
+          _followerCount = counts['followers'] ?? 0;
+          _followingCount = counts['following'] ?? 0;
+          globalFollowerCount.value = _followerCount;
+          globalFollowingCount.value = _followingCount;
+        });
+      }
+    }
+  }
 
   Future<void> _showImageSourceSelection(BuildContext context) async {
     final ImagePicker picker = ImagePicker();

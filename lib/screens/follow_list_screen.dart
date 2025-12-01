@@ -1,20 +1,68 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../services/firestore_service.dart';
+import 'other_user_profile_screen.dart';
 
-class FollowListScreen extends StatelessWidget {
+class FollowListScreen extends StatefulWidget {
   final String userName;
   final int initialIndex; // 0: 팔로워, 1: 팔로잉
+  final String? userId; // 추가: Firebase UID
 
   const FollowListScreen({
     super.key,
     required this.userName,
     required this.initialIndex,
+    this.userId,
   });
+
+  @override
+  State<FollowListScreen> createState() => _FollowListScreenState();
+}
+
+class _FollowListScreenState extends State<FollowListScreen> {
+  final FirestoreService _firestoreService = FirestoreService();
+  String? _targetUserId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserId();
+  }
+
+  Future<void> _loadUserId() async {
+    String targetId = widget.userId ?? '';
+
+    // userId가 없으면 현재 로그인한 사용자 또는 userName으로 검색
+    if (targetId.isEmpty) {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null && widget.userName == currentUser.displayName) {
+        targetId = currentUser.uid;
+      } else {
+        final usersSnapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .where('userName', isEqualTo: widget.userName)
+            .limit(1)
+            .get();
+
+        if (usersSnapshot.docs.isNotEmpty) {
+          targetId = usersSnapshot.docs.first.id;
+        }
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _targetUserId = targetId;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 2,
-      initialIndex: initialIndex,
+      initialIndex: widget.initialIndex,
       child: Scaffold(
         backgroundColor: Colors.white,
         appBar: AppBar(
@@ -26,7 +74,7 @@ class FollowListScreen extends StatelessWidget {
           ),
           centerTitle: true,
           title: Text(
-            userName,
+            widget.userName,
             style: const TextStyle(
               color: Colors.black,
               fontWeight: FontWeight.bold,
@@ -42,50 +90,149 @@ class FollowListScreen extends StatelessWidget {
             ],
           ),
         ),
-        body: TabBarView(
-          children: [
-            _buildUserList(isFollower: true),
-            _buildUserList(isFollower: false),
-          ],
-        ),
+        body: _targetUserId == null
+            ? const Center(child: CircularProgressIndicator())
+            : TabBarView(
+                children: [
+                  _buildUserList(isFollower: true),
+                  _buildUserList(isFollower: false),
+                ],
+              ),
       ),
     );
   }
 
   Widget _buildUserList({required bool isFollower}) {
-    // 더미 데이터 생성
-    final List<String> users = isFollower
-        ? ["김찬희", "이경환", "박지성", "손흥민", "아이유", "유재석", "강호동"]
-        : ["이경환", "안해진", "박지성", "손흥민"];
+    if (_targetUserId == null) {
+      return const Center(child: Text("사용자 정보를 찾을 수 없습니다."));
+    }
 
-    return ListView.builder(
-      itemCount: users.length,
-      itemBuilder: (context, index) {
-        return ListTile(
-          leading: const CircleAvatar(
-            backgroundColor: Colors.grey,
-            child: Icon(Icons.person, color: Colors.white),
-          ),
-          title: Text(
-            users[index],
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          subtitle: const Text(
-            "여행을 좋아하는 사람입니다.",
-            style: TextStyle(fontSize: 12, color: Colors.grey),
-          ),
-          trailing: Container(
+    return StreamBuilder<QuerySnapshot>(
+      stream: isFollower
+          ? _firestoreService.getFollowersStream(_targetUserId!)
+          : _firestoreService.getFollowingStream(_targetUserId!),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return const Center(child: Text("오류가 발생했습니다."));
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final userIds = snapshot.data?.docs.map((doc) => doc.id).toList() ?? [];
+
+        if (userIds.isEmpty) {
+          return Center(
+            child: Text(isFollower ? "팔로워가 없습니다." : "팔로잉이 없습니다."),
+          );
+        }
+
+        return ListView.builder(
+          itemCount: userIds.length,
+          itemBuilder: (context, index) {
+            final userId = userIds[index];
+
+            return FutureBuilder<Map<String, dynamic>?>(
+              future: _firestoreService.getUserInfo(userId),
+              builder: (context, userSnapshot) {
+                if (userSnapshot.connectionState == ConnectionState.waiting) {
+                  return const ListTile(
+                    leading: CircleAvatar(backgroundColor: Colors.grey),
+                    title: Text("로딩 중..."),
+                  );
+                }
+
+                final userInfo = userSnapshot.data;
+                final userName = userInfo?['userName'] ?? '알 수 없음';
+                final profileImage = userInfo?['profileImage'] ?? '';
+                final bio = userInfo?['bio'] ?? '여행을 좋아하는 사람입니다.';
+
+                return ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.grey,
+                    backgroundImage: profileImage.isNotEmpty
+                        ? NetworkImage(profileImage)
+                        : null,
+                    child: profileImage.isEmpty
+                        ? const Icon(Icons.person, color: Colors.white)
+                        : null,
+                  ),
+                  title: Text(
+                    userName,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(
+                    bio,
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: _buildFollowButton(userId, isFollower),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => OtherUserProfileScreen(
+                          userName: userName,
+                          profileImage: profileImage,
+                          userId: userId,
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildFollowButton(String userId, bool isFollower) {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    
+    // 자신의 프로필이면 버튼을 표시하지 않음
+    if (currentUser?.uid == userId) {
+      return const SizedBox.shrink();
+    }
+
+    return FutureBuilder<bool>(
+      future: _firestoreService.isFollowing(userId),
+      builder: (context, snapshot) {
+        final isFollowing = snapshot.data ?? false;
+
+        return GestureDetector(
+          onTap: () async {
+            try {
+              if (isFollowing) {
+                await _firestoreService.unfollowUser(userId);
+              } else {
+                await _firestoreService.followUser(userId);
+              }
+              // UI 업데이트를 위해 setState 호출
+              if (mounted) {
+                setState(() {});
+              }
+            } catch (e) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('오류가 발생했습니다: $e')),
+                );
+              }
+            }
+          },
+          child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             decoration: BoxDecoration(
-              color: isFollower
-                  ? Colors.blue
-                  : Colors.grey[200], // 팔로워면 맞팔 버튼(파랑), 팔로잉이면 삭제 버튼(회색)
+              color: isFollowing ? Colors.grey[200] : Colors.blue,
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
-              isFollower ? "팔로우" : "삭제",
+              isFollowing ? "팔로잉" : "팔로우",
               style: TextStyle(
-                color: isFollower ? Colors.white : Colors.black,
+                color: isFollowing ? Colors.black : Colors.white,
                 fontWeight: FontWeight.bold,
                 fontSize: 12,
               ),

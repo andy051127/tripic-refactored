@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'other_user_profile_screen.dart'; // 타인 프로필 화면
 import 'map_screen.dart'; // 지도 검색 화면
 
@@ -11,28 +12,65 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   String _searchQuery = "";
+  List<Map<String, dynamic>> _searchResults = [];
+  bool _isSearching = false;
 
-  // 가상의 사용자 데이터베이스
-  final List<Map<String, String>> _allUsers = [
-    {"username": "leeeee_kh", "name": "이경환", "image": ""},
-    {"username": "chanhui_kk", "name": "김찬희", "image": ""},
-    {"username": "happy_traveler", "name": "행복한 여행자", "image": ""},
-    {"username": "world_walker", "name": "세계일주", "image": ""},
-    {"username": "seoul_lover", "name": "서울사람", "image": ""},
-  ];
-
-  // 검색된 사용자 리스트
-  List<Map<String, String>> get _filteredUsers {
-    if (_searchQuery.isEmpty) {
-      return []; // 검색어 없으면 빈 리스트 (또는 추천 사용자)
+  Future<void> _performSearch(String query) async {
+    if (query.isEmpty) {
+      setState(() {
+        _searchResults = [];
+        _isSearching = false;
+      });
+      return;
     }
-    return _allUsers.where((user) {
-      return user['username']!.toLowerCase().contains(
-            _searchQuery.toLowerCase(),
-          ) ||
-          user['name']!.contains(_searchQuery);
-    }).toList();
+
+    setState(() {
+      _isSearching = true;
+    });
+
+    try {
+      // Firestore에서 사용자 검색
+      final snapshot = await _firestore.collection('users').get();
+      
+      final results = <Map<String, dynamic>>[];
+      
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        final userName = (data['userName'] ?? '').toString().toLowerCase();
+        final email = (data['email'] ?? '').toString().toLowerCase();
+        final searchLower = query.toLowerCase();
+        
+        // 사용자 이름이나 이메일에 검색어가 포함되면 결과에 추가
+        if (userName.contains(searchLower) || email.contains(searchLower)) {
+          results.add({
+            'userId': doc.id,
+            'userName': data['userName'] ?? '알 수 없음',
+            'email': data['email'] ?? '',
+            'profileImage': data['profileImage'] ?? '',
+            'bio': data['bio'] ?? '',
+          });
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _searchResults = results;
+          _isSearching = false;
+        });
+      }
+    } catch (e) {
+      print('검색 오류: $e');
+      if (mounted) {
+        setState(() {
+          _isSearching = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('검색 중 오류가 발생했습니다: $e')),
+        );
+      }
+    }
   }
 
   @override
@@ -56,7 +94,7 @@ class _SearchScreenState extends State<SearchScreen> {
             controller: _searchController,
             autofocus: true,
             decoration: const InputDecoration(
-              hintText: "검색",
+              hintText: "사용자 이름 검색",
               border: InputBorder.none,
               prefixIcon: Icon(Icons.search, color: Colors.grey),
               contentPadding: EdgeInsets.symmetric(vertical: 10),
@@ -65,6 +103,7 @@ class _SearchScreenState extends State<SearchScreen> {
               setState(() {
                 _searchQuery = val;
               });
+              _performSearch(val);
             },
           ),
         ),
@@ -72,78 +111,95 @@ class _SearchScreenState extends State<SearchScreen> {
       body: SafeArea(
         child: Column(
           children: [
-          // 상단 탭 (계정 / 장소) - 간단히 버튼으로 구현
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildTabButton("계정", true), // 현재는 계정 검색이 메인
-                const SizedBox(width: 20),
-                GestureDetector(
-                  onTap: () {
-                    // 장소 탭을 누르면 지도 검색 화면으로 이동
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const MapScreen(),
-                      ),
-                    );
-                  },
-                  child: _buildTabButton("장소", false),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-
-          // 검색 결과 리스트
-          Expanded(
-            child: _searchQuery.isEmpty
-                ? const Center(
-                    child: Text(
-                      "검색어를 입력하세요",
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                  )
-                : _filteredUsers.isEmpty
-                ? const Center(
-                    child: Text(
-                      "검색 결과가 없습니다.",
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                  )
-                : ListView.builder(
-                    itemCount: _filteredUsers.length,
-                    itemBuilder: (context, index) {
-                      final user = _filteredUsers[index];
-                      return ListTile(
-                        leading: const CircleAvatar(
-                          backgroundColor: Colors.grey,
-                          child: Icon(Icons.person, color: Colors.white),
+            // 상단 탭 (계정 / 장소) - 간단히 버튼으로 구현
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildTabButton("계정", true), // 현재는 계정 검색이 메인
+                  const SizedBox(width: 20),
+                  GestureDetector(
+                    onTap: () {
+                      // 장소 탭을 누르면 지도 검색 화면으로 이동
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const MapScreen(),
                         ),
-                        title: Text(
-                          user['username']!,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: Text(user['name']!),
-                        onTap: () {
-                          // 사용자 클릭 시 타인 프로필 화면으로 이동
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => OtherUserProfileScreen(
-                                userName: user['username']!,
-                                profileImage: user['image']!,
-                              ),
-                            ),
-                          );
-                        },
                       );
                     },
+                    child: _buildTabButton("장소", false),
                   ),
-          ),
-        ],
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+
+            // 검색 결과 리스트
+            Expanded(
+              child: _isSearching
+                  ? const Center(child: CircularProgressIndicator())
+                  : _searchQuery.isEmpty
+                      ? const Center(
+                          child: Text(
+                            "사용자 이름을 입력하세요",
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        )
+                      : _searchResults.isEmpty
+                          ? const Center(
+                              child: Text(
+                                "검색 결과가 없습니다.",
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                            )
+                          : ListView.builder(
+                              itemCount: _searchResults.length,
+                              itemBuilder: (context, index) {
+                                final user = _searchResults[index];
+                                return ListTile(
+                                  leading: CircleAvatar(
+                                    backgroundColor: Colors.grey,
+                                    backgroundImage: user['profileImage'] != null &&
+                                            user['profileImage'].isNotEmpty
+                                        ? NetworkImage(user['profileImage'])
+                                        : null,
+                                    child: user['profileImage'] == null ||
+                                            user['profileImage'].isEmpty
+                                        ? const Icon(Icons.person,
+                                            color: Colors.white)
+                                        : null,
+                                  ),
+                                  title: Text(
+                                    user['userName'] ?? '알 수 없음',
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                  subtitle: Text(
+                                    user['bio'] ?? user['email'] ?? '',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  onTap: () {
+                                    // 사용자 클릭 시 타인 프로필 화면으로 이동
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            OtherUserProfileScreen(
+                                          userName: user['userName'] ?? '알 수 없음',
+                                          profileImage: user['profileImage'] ?? '',
+                                          userId: user['userId'],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
+                            ),
+            ),
+          ],
         ),
       ),
     );

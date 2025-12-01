@@ -73,11 +73,12 @@ class _LanguageTranslationScreenState extends State<LanguageTranslationScreen> {
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             // 1. 언어 선택 영역
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -195,6 +196,7 @@ class _LanguageTranslationScreenState extends State<LanguageTranslationScreen> {
               ),
             ),
           ],
+        ),
         ),
       ),
     );

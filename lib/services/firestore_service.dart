@@ -132,4 +132,170 @@ class FirestoreService {
         .where('uid', isEqualTo: user.uid)
         .snapshots();
   }
+
+  // --- [팔로우/팔로잉 기능] ---
+
+  // 1. 팔로우하기
+  Future<void> followUser(String targetUserId) async {
+    User? user = _auth.currentUser;
+    if (user == null) throw Exception("로그인이 필요합니다.");
+
+    try {
+      // 내 following 컬렉션에 추가
+      await _db
+          .collection('users')
+          .doc(user.uid)
+          .collection('following')
+          .doc(targetUserId)
+          .set({
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      // 상대방의 followers 컬렉션에 추가
+      await _db
+          .collection('users')
+          .doc(targetUserId)
+          .collection('followers')
+          .doc(user.uid)
+          .set({
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print("팔로우 실패: $e");
+      rethrow;
+    }
+  }
+
+  // 2. 언팔로우하기
+  Future<void> unfollowUser(String targetUserId) async {
+    User? user = _auth.currentUser;
+    if (user == null) throw Exception("로그인이 필요합니다.");
+
+    try {
+      // 내 following 컬렉션에서 제거
+      await _db
+          .collection('users')
+          .doc(user.uid)
+          .collection('following')
+          .doc(targetUserId)
+          .delete();
+
+      // 상대방의 followers 컬렉션에서 제거
+      await _db
+          .collection('users')
+          .doc(targetUserId)
+          .collection('followers')
+          .doc(user.uid)
+          .delete();
+    } catch (e) {
+      print("언팔로우 실패: $e");
+      rethrow;
+    }
+  }
+
+  // 3. 팔로우 여부 확인
+  Future<bool> isFollowing(String targetUserId) async {
+    User? user = _auth.currentUser;
+    if (user == null) return false;
+
+    try {
+      final doc = await _db
+          .collection('users')
+          .doc(user.uid)
+          .collection('following')
+          .doc(targetUserId)
+          .get();
+
+      return doc.exists;
+    } catch (e) {
+      print("팔로우 확인 실패: $e");
+      return false;
+    }
+  }
+
+  // 4. 팔로워 목록 가져오기 (스트림)
+  Stream<QuerySnapshot> getFollowersStream(String userId) {
+    return _db
+        .collection('users')
+        .doc(userId)
+        .collection('followers')
+        .snapshots();
+  }
+
+  // 5. 팔로잉 목록 가져오기 (스트림)
+  Stream<QuerySnapshot> getFollowingStream(String userId) {
+    return _db
+        .collection('users')
+        .doc(userId)
+        .collection('following')
+        .snapshots();
+  }
+
+  // 6. 팔로워/팔로잉 수 가져오기
+  Future<Map<String, int>> getFollowCounts(String userId) async {
+    try {
+      final followersSnapshot = await _db
+          .collection('users')
+          .doc(userId)
+          .collection('followers')
+          .get();
+
+      final followingSnapshot = await _db
+          .collection('users')
+          .doc(userId)
+          .collection('following')
+          .get();
+
+      return {
+        'followers': followersSnapshot.docs.length,
+        'following': followingSnapshot.docs.length,
+      };
+    } catch (e) {
+      print("팔로우 수 가져오기 실패: $e");
+      return {'followers': 0, 'following': 0};
+    }
+  }
+
+  // 7. 사용자 정보 가져오기 (userName, profileImage 등)
+  Future<Map<String, dynamic>?> getUserInfo(String userId) async {
+    try {
+      final doc = await _db.collection('users').doc(userId).get();
+      if (doc.exists) {
+        return doc.data();
+      }
+      return null;
+    } catch (e) {
+      print("사용자 정보 가져오기 실패: $e");
+      return null;
+    }
+  }
+
+  // 8. 프로필 이미지 업로드
+  Future<String> uploadProfileImage(String localImagePath) async {
+    User? user = _auth.currentUser;
+    if (user == null) throw Exception("로그인이 필요합니다.");
+
+    try {
+      File file = File(localImagePath);
+      if (!file.existsSync()) throw Exception("파일이 존재하지 않습니다.");
+
+      String fileName = "profile_${user.uid}_${DateTime.now().millisecondsSinceEpoch}.jpg";
+      Reference ref = _storage.ref().child('profile_images/$fileName');
+      UploadTask uploadTask = ref.putFile(file);
+      TaskSnapshot snapshot = await uploadTask;
+      String downloadUrl = await snapshot.ref.getDownloadURL();
+
+      // Firestore에 프로필 이미지 URL 저장
+      await _db.collection('users').doc(user.uid).set({
+        'profileImage': downloadUrl,
+        'userName': user.displayName ?? '알 수 없음',
+        'email': user.email,
+      }, SetOptions(merge: true));
+
+      return downloadUrl;
+    } catch (e) {
+      print("프로필 이미지 업로드 실패: $e");
+      rethrow;
+    }
+  }
 }

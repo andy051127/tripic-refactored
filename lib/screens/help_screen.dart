@@ -48,10 +48,11 @@ class HelpScreen extends StatelessWidget {
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
       ),
-      body: Column(
-        children: [
-          // 상단 안내 문구
-          Container(
+      body: SafeArea(
+        child: Column(
+          children: [
+            // 상단 안내 문구
+            Container(
             width: double.infinity,
             padding: const EdgeInsets.all(20),
             color: Colors.grey[100],
@@ -134,6 +135,7 @@ class HelpScreen extends StatelessWidget {
             ),
           ),
         ],
+        ),
       ),
     );
   }

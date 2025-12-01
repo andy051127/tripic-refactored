@@ -413,24 +413,42 @@ class _PostItemState extends State<PostItem> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        margin: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          bottom: MediaQuery.of(context).viewInsets.bottom + MediaQuery.of(context).padding.bottom + 20,
+          top: 20,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             _buildOptionItem(
               Icons.person_add_outlined,
               "팔로우",
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(context);
-                globalFollowingCount.value++;
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(const SnackBar(content: Text("팔로우 했습니다!")));
+                try {
+                  final firestoreService = FirestoreService();
+                  await firestoreService.followUser(widget.post.uid);
+                  globalFollowingCount.value++;
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("팔로우 했습니다!")),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("팔로우 실패: $e")),
+                    );
+                  }
+                }
               },
             ),
             const Divider(height: 1),
@@ -470,6 +488,7 @@ class _PostItemState extends State<PostItem> {
               },
             ),
           ],
+        ),
         ),
       ),
     );
