@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart' hide ActivityType;
+import 'package:firebase_auth/firebase_auth.dart';
 import 'community_screen.dart';
 import 'travel_plan_screen.dart';
 import 'photo_picker_screen.dart';
@@ -9,6 +12,7 @@ import 'chat_detail_screen.dart';
 import 'map_detail_screen.dart';
 import 'map_search_screen.dart';
 import 'profile_screen.dart';
+import 'other_user_profile_screen.dart';
 import 'search_screen.dart';
 import '../models/post_model.dart';
 import '../widgets/comment_modal.dart';
@@ -83,8 +87,53 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class HomeFeedPage extends StatelessWidget {
+class HomeFeedPage extends StatefulWidget {
   const HomeFeedPage({super.key});
+
+  @override
+  State<HomeFeedPage> createState() => _HomeFeedPageState();
+}
+
+class _HomeFeedPageState extends State<HomeFeedPage> {
+  Position? _currentPosition;
+  GoogleMapController? _mapController;
+
+  @override
+  void initState() {
+    super.initState();
+    _getCurrentLocation();
+  }
+
+  Future<void> _getCurrentLocation() async {
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      if (mounted) {
+        setState(() {
+          _currentPosition = position;
+        });
+      }
+    } catch (e) {
+      // 위치 권한이 없거나 실패한 경우 기본 위치 (서울) 사용
+      if (mounted) {
+        setState(() {
+          _currentPosition = Position(
+            latitude: 37.5665,
+            longitude: 126.9780,
+            timestamp: DateTime.now(),
+            accuracy: 0,
+            altitude: 0,
+            heading: 0,
+            speed: 0,
+            speedAccuracy: 0,
+            altitudeAccuracy: 0,
+            headingAccuracy: 0,
+          );
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -183,44 +232,72 @@ class HomeFeedPage extends StatelessWidget {
                         height: 120,
                         decoration: BoxDecoration(
                           color: Colors.blue[50],
-                          image: const DecorationImage(
-                            image: NetworkImage(
-                              "https://via.placeholder.com/600x200.png?text=Map+View",
-                            ),
-                            fit: BoxFit.cover,
-                          ),
                         ),
-                        child: Stack(
-                          children: [
-                            Container(color: Colors.black12),
-                            const Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
+                        child: _currentPosition == null
+                            ? const Center(
+                                child: CircularProgressIndicator(),
+                              )
+                            : Stack(
                                 children: [
-                                  Icon(
-                                    Icons.map,
-                                    color: Colors.white,
-                                    size: 30,
+                                  GoogleMap(
+                                    initialCameraPosition: CameraPosition(
+                                      target: LatLng(
+                                        _currentPosition!.latitude,
+                                        _currentPosition!.longitude,
+                                      ),
+                                      zoom: 14,
+                                    ),
+                                    onMapCreated: (controller) {
+                                      _mapController = controller;
+                                    },
+                                    myLocationEnabled: true,
+                                    myLocationButtonEnabled: false,
+                                    zoomControlsEnabled: false,
+                                    mapToolbarEnabled: false,
+                                    compassEnabled: false,
                                   ),
-                                  SizedBox(height: 8),
-                                  Text(
-                                    "내 주변 친구들의 여행 기록 보기",
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      shadows: [
-                                        Shadow(
-                                          blurRadius: 2,
-                                          color: Colors.black,
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                        colors: [
+                                          Colors.black.withOpacity(0.3),
+                                          Colors.transparent,
+                                          Colors.black.withOpacity(0.3),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const Center(
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.map,
+                                          color: Colors.white,
+                                          size: 30,
+                                        ),
+                                        SizedBox(height: 8),
+                                        Text(
+                                          "내 주변 친구들의 여행 기록 보기",
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            shadows: [
+                                              Shadow(
+                                                blurRadius: 4,
+                                                color: Colors.black,
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       ],
                                     ),
                                   ),
                                 ],
                               ),
-                            ),
-                          ],
-                        ),
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -232,6 +309,7 @@ class HomeFeedPage extends StatelessWidget {
 
               return PostItem(
                 post: post,
+                currentUserId: FirebaseAuth.instance.currentUser?.uid ?? '',
                 onDelete: () {
                   // 삭제 로직 (로컬 state만 갱신하는 것이 아니라 Firestore 삭제가 필요하지만, 일단 UI 갱신용)
                 },
@@ -256,12 +334,14 @@ class HomeFeedPage extends StatelessWidget {
 
 class PostItem extends StatefulWidget {
   final Post post;
+  final String currentUserId;
   final VoidCallback onDelete;
   final VoidCallback onBlock;
 
   const PostItem({
     super.key,
     required this.post,
+    required this.currentUserId,
     required this.onDelete,
     required this.onBlock,
   });
@@ -274,11 +354,51 @@ class _PostItemState extends State<PostItem> {
   bool _isLiked = false;
   bool _isSaved = false;
   int _likeCount = 0;
+  String? _profileImageUrl;
 
   @override
   void initState() {
     super.initState();
     _likeCount = widget.post.likeCount;
+    _loadProfileImage();
+  }
+
+  Future<void> _loadProfileImage() async {
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.post.uid)
+          .get();
+      if (userDoc.exists && mounted) {
+        setState(() {
+          _profileImageUrl = userDoc.data()?['profileImage'];
+        });
+      }
+    } catch (e) {
+      // 프로필 이미지 로드 실패 시 기본 아이콘 사용
+    }
+  }
+
+  void _navigateToProfile() {
+    final isOwnPost = widget.post.uid == widget.currentUserId;
+    if (isOwnPost) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const ProfileScreen(),
+        ),
+      );
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => OtherUserProfileScreen(
+            userName: widget.post.userName,
+            profileImage: _profileImageUrl ?? '',
+          ),
+        ),
+      );
+    }
   }
 
   void _showMoreOptions() {
@@ -441,27 +561,39 @@ class _PostItemState extends State<PostItem> {
           padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
           child: Row(
             children: [
-              const CircleAvatar(
-                radius: 18,
-                backgroundColor: Colors.grey,
-                child: Icon(Icons.person, color: Colors.white),
-              ),
-              const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.post.userName,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
+              GestureDetector(
+                onTap: _navigateToProfile,
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 18,
+                      backgroundColor: Colors.grey,
+                      backgroundImage: _profileImageUrl != null && _profileImageUrl!.isNotEmpty
+                          ? NetworkImage(_profileImageUrl!)
+                          : null,
+                      child: _profileImageUrl == null || _profileImageUrl!.isEmpty
+                          ? const Icon(Icons.person, color: Colors.white, size: 20)
+                          : null,
                     ),
-                  ),
-                  Text(
-                    widget.post.location,
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                ],
+                    const SizedBox(width: 10),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.post.userName,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        Text(
+                          widget.post.location,
+                          style: const TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
               const Spacer(),
               GestureDetector(
