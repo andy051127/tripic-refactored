@@ -9,8 +9,7 @@ import 'travel_plan_screen.dart';
 import 'photo_picker_screen.dart';
 import 'message_list_screen.dart';
 import 'chat_detail_screen.dart';
-import 'map_detail_screen.dart';
-import 'map_search_screen.dart';
+import 'map_screen.dart';
 import 'profile_screen.dart';
 import 'other_user_profile_screen.dart';
 import 'search_screen.dart';
@@ -224,7 +223,7 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const MapDetailScreen(),
+                          builder: (context) => const MapScreen(),
                         ),
                       ),
                       child: Container(

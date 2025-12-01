@@ -66,8 +66,8 @@
             선택 후 확인 누르면 즐겨찾기에 해당 인물들 추가 및 DB에 전송되도록 수정
 
 7. 지도
-    - map_detail_screen, map_search_screen:
-        -- ps. 생각해봤는데 얘네 둘 다 기능이 같아서 걍 하나로 묶고(map.dart) 작업합시다.
+    - // map_detail_screen, map_search_screen:
+        -- // ps. 생각해봤는데 얘네 둘 다 기능이 같아서 걍 하나로 묶고(map_screen.dart) 작업했습니다.
         -- 게시물 올릴때 등록된 위치 이름으로 찾는 기능 구현
         -- 지명으로 위치 찾는 기능 구현
 

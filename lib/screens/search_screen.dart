@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'other_user_profile_screen.dart'; // 타인 프로필 화면
-import 'map_search_screen.dart'; // 지도 검색 화면
+import 'map_screen.dart'; // 지도 검색 화면
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -86,7 +86,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const MapSearchScreen(),
+                        builder: (context) => const MapScreen(),
                       ),
                     );
                   },
