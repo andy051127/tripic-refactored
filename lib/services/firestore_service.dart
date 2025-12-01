@@ -28,6 +28,21 @@ class FirestoreService {
     if (user == null) throw Exception("로그인이 필요합니다.");
 
     try {
+      // [수정] Firestore에서 사용자 정보 가져오기
+      String userName = '알 수 없음';
+      String userProfileImage = '';
+      
+      if (!isAnonymous) {
+        final userDoc = await _db.collection('users').doc(user.uid).get();
+        if (userDoc.exists) {
+          final userData = userDoc.data();
+          userName = userData?['userName'] ?? userData?['username'] ?? userData?['name'] ?? '알 수 없음';
+          userProfileImage = userData?['profileImage'] ?? '';
+        }
+      } else {
+        userName = '익명';
+      }
+
       List<String> downloadUrls = [];
       
       // 여러 이미지 처리
@@ -50,8 +65,8 @@ class FirestoreService {
 
       Map<String, dynamic> postData = {
         'uid': user.uid,
-        'userName': isAnonymous ? '익명' : (user.displayName ?? '알 수 없음'),
-        'userProfileImage': isAnonymous ? '' : (user.photoURL ?? ''),
+        'userName': userName,
+        'userProfileImage': userProfileImage,
         'title': title,
         'content': content,
         'location': location,
