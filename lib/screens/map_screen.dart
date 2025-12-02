@@ -31,6 +31,9 @@ class _MapScreenState extends State<MapScreen> {
   bool _isSearching = false;
   List<Map<String, dynamic>> _searchResults = [];
   LatLng? _selectedLocationForReturn; // 선택된 위치 (반환용)
+  List<Post> _userPosts = []; // 검색된 사용자의 게시물 목록
+  int _currentPostIndex = 0; // 현재 보고 있는 게시물 인덱스
+  String? _searchedUserName; // 검색된 사용자 이름
   
   // ⚠️ 중요: Google Cloud Console에서 발급받은 실제 API 키로 교체하세요
   static const String _googleApiKey = 'AIzaSyBZt7UnBDxY-D6jrsuj_Y7Q5JSolghwwjg';
@@ -172,15 +175,7 @@ class _MapScreenState extends State<MapScreen> {
                 title: post.userName,
                 snippet: post.title,
               ),
-              onTap: () => _showPostPreview({
-                'id': post.id,
-                'name': post.userName,
-                'title': post.title,
-                'location': post.location,
-                'lat': post.latitude,
-                'lng': post.longitude,
-                'image': post.imageUrl.isNotEmpty ? post.imageUrl : 'assets/logo.png',
-              }),
+              onTap: () => _showPostPreview(post),
             ),
           );
         }
@@ -248,6 +243,9 @@ class _MapScreenState extends State<MapScreen> {
           .collection('posts')
           .get();
 
+      List<Post> matchedPosts = [];
+      String? matchedUserName;
+
       for (var doc in snapshot.docs) {
         final data = doc.data() as Map<String, dynamic>;
         final userName = data['userName'] ?? '';
@@ -255,16 +253,18 @@ class _MapScreenState extends State<MapScreen> {
         if (userName.toLowerCase().contains(query.toLowerCase()) &&
             data['latitude'] != null &&
             data['longitude'] != null) {
-          targetLocation = LatLng(
-            data['latitude'].toDouble(),
-            data['longitude'].toDouble(),
-          );
-          foundName = "$userName님의 게시물";
-          break;
+          matchedPosts.add(Post.fromMap(data, doc.id));
+          matchedUserName = userName;
         }
       }
 
-      if (targetLocation != null) {
+      if (matchedPosts.isNotEmpty) {
+        final firstPost = matchedPosts[0];
+        targetLocation = LatLng(
+          firstPost.latitude!,
+          firstPost.longitude!,
+        );
+        
         await controller.animateCamera(
           CameraUpdate.newCameraPosition(
             CameraPosition(
@@ -277,9 +277,17 @@ class _MapScreenState extends State<MapScreen> {
         if (mounted) {
           setState(() {
             _isSearching = false;
+            _userPosts = matchedPosts;
+            _currentPostIndex = 0;
+            _searchedUserName = matchedUserName;
           });
+          
+          final postCount = matchedPosts.length;
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("📍 '$foundName'(으)로 이동합니다.")),
+            SnackBar(
+              content: Text("📍 '$matchedUserName'님의 게시물 $postCount개를 찾았습니다. (1/$postCount)"),
+              duration: const Duration(seconds: 2),
+            ),
           );
         }
         return;
@@ -450,6 +458,70 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
+  // 다음 게시물로 이동
+  Future<void> _navigateToNextPost() async {
+    if (_userPosts.isEmpty) return;
+    
+    setState(() {
+      _currentPostIndex = (_currentPostIndex + 1) % _userPosts.length;
+    });
+    
+    final post = _userPosts[_currentPostIndex];
+    final controller = await _controller.future;
+    
+    await controller.animateCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(
+          target: LatLng(post.latitude!, post.longitude!),
+          zoom: 15,
+        ),
+      ),
+    );
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "📍 $_searchedUserName님의 게시물 (${_currentPostIndex + 1}/${_userPosts.length})",
+          ),
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    }
+  }
+  
+  // 이전 게시물로 이동
+  Future<void> _navigateToPreviousPost() async {
+    if (_userPosts.isEmpty) return;
+    
+    setState(() {
+      _currentPostIndex = (_currentPostIndex - 1 + _userPosts.length) % _userPosts.length;
+    });
+    
+    final post = _userPosts[_currentPostIndex];
+    final controller = await _controller.future;
+    
+    await controller.animateCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(
+          target: LatLng(post.latitude!, post.longitude!),
+          zoom: 15,
+        ),
+      ),
+    );
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "📍 $_searchedUserName님의 게시물 (${_currentPostIndex + 1}/${_userPosts.length})",
+          ),
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    }
+  }
+
   // 지도 탭했을 때 마커 추가 (선택 모드 전용)
   void _onMapTapped(LatLng location) {
     setState(() {
@@ -479,12 +551,29 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   // 마커 클릭 시 미리보기 창 표시
-  void _showPostPreview(Map<String, dynamic> post) {
+  void _showPostPreview(Post post) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        return Padding(
+        // 첫 번째 이미지 가져오기
+        final String imageUrl = post.imageUrls.isNotEmpty 
+            ? post.imageUrls[0] 
+            : (post.imageUrl.isNotEmpty ? post.imageUrl : '');
+        
+        return FutureBuilder<DocumentSnapshot>(
+          future: FirebaseFirestore.instance
+              .collection('users')
+              .doc(post.uid)
+              .get(),
+          builder: (context, userSnapshot) {
+            String? profileImageUrl;
+            if (userSnapshot.hasData && userSnapshot.data!.exists) {
+              final userData = userSnapshot.data!.data() as Map<String, dynamic>?;
+              profileImageUrl = userData?['profileImage'];
+            }
+            
+            return Padding(
           padding: EdgeInsets.only(
             left: 20,
             right: 20,
@@ -517,7 +606,25 @@ class _MapScreenState extends State<MapScreen> {
                   ),
                   color: Colors.grey[200],
                 ),
-                child: const Icon(Icons.image, color: Colors.grey, size: 50),
+                child: imageUrl.isNotEmpty
+                    ? ClipRRect(
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(20),
+                          bottomLeft: Radius.circular(20),
+                        ),
+                        child: Image.network(
+                          imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Icon(Icons.image, color: Colors.grey, size: 50);
+                          },
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return const Center(child: CircularProgressIndicator());
+                          },
+                        ),
+                      )
+                    : const Icon(Icons.image, color: Colors.grey, size: 50),
               ),
               // 정보 영역
               Expanded(
@@ -529,46 +636,71 @@ class _MapScreenState extends State<MapScreen> {
                     children: [
                       Row(
                         children: [
-                          const CircleAvatar(
+                          CircleAvatar(
                             radius: 12,
                             backgroundColor: Colors.grey,
-                            child: Icon(
-                              Icons.person,
-                              size: 16,
-                              color: Colors.white,
-                            ),
+                            backgroundImage: profileImageUrl != null && profileImageUrl.isNotEmpty
+                                ? NetworkImage(profileImageUrl)
+                                : const AssetImage('assets/basic_profile.png') as ImageProvider,
                           ),
                           const SizedBox(width: 8),
-                          Text(
-                            post['name'],
-                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          Expanded(
+                            child: Text(
+                              post.userName,
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        post['title'],
+                        post.title,
                         style: const TextStyle(fontSize: 16),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
                       const Spacer(),
-                      const Row(
-                        children: [
-                          Icon(Icons.favorite, size: 16, color: Colors.red),
-                          SizedBox(width: 4),
-                          Text(
-                            "12",
-                            style: TextStyle(fontSize: 12, color: Colors.grey),
-                          ),
-                          SizedBox(width: 10),
-                          Icon(Icons.comment, size: 16, color: Colors.grey),
-                          SizedBox(width: 4),
-                          Text(
-                            "5",
-                            style: TextStyle(fontSize: 12, color: Colors.grey),
-                          ),
-                        ],
+                      StreamBuilder<int>(
+                        stream: FirebaseFirestore.instance
+                            .collection('posts')
+                            .doc(post.id)
+                            .collection('likes')
+                            .snapshots()
+                            .map((snapshot) => snapshot.docs.length),
+                        builder: (context, likeSnapshot) {
+                          final likeCount = likeSnapshot.data ?? post.likeCount;
+                          
+                          return StreamBuilder<int>(
+                            stream: FirebaseFirestore.instance
+                                .collection('posts')
+                                .doc(post.id)
+                                .collection('comments')
+                                .snapshots()
+                                .map((snapshot) => snapshot.docs.length),
+                            builder: (context, commentSnapshot) {
+                              final commentCount = commentSnapshot.data ?? 0;
+                              
+                              return Row(
+                                children: [
+                                  const Icon(Icons.favorite, size: 16, color: Colors.red),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    "$likeCount",
+                                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  const Icon(Icons.comment, size: 16, color: Colors.grey),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    "$commentCount",
+                                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                  ),
+                                ],
+                              );
+                            },
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -577,6 +709,8 @@ class _MapScreenState extends State<MapScreen> {
             ],
           ),
         ),
+            );
+          },
         );
       },
     );
@@ -725,6 +859,60 @@ class _MapScreenState extends State<MapScreen> {
               ],
             ),
           ),
+
+          // 사용자 게시물 탐색 버튼 (검색된 경우에만 표시)
+          if (_userPosts.length > 1)
+            Positioned(
+              top: 150,
+              right: 20,
+              child: Column(
+                children: [
+                  // 이전 게시물 버튼
+                  FloatingActionButton(
+                    heroTag: 'prev',
+                    mini: true,
+                    backgroundColor: Colors.white,
+                    elevation: 4,
+                    onPressed: _navigateToPreviousPost,
+                    child: const Icon(Icons.arrow_upward, color: Colors.blue),
+                  ),
+                  const SizedBox(height: 8),
+                  // 게시물 카운터
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      '${_currentPostIndex + 1}/${_userPosts.length}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // 다음 게시물 버튼
+                  FloatingActionButton(
+                    heroTag: 'next',
+                    mini: true,
+                    backgroundColor: Colors.white,
+                    elevation: 4,
+                    onPressed: _navigateToNextPost,
+                    child: const Icon(Icons.arrow_downward, color: Colors.blue),
+                  ),
+                ],
+              ),
+            ),
 
           // 내 위치로 이동 버튼
           Positioned(
