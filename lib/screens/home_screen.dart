@@ -673,10 +673,7 @@ class _PostItemState extends State<PostItem> {
                       backgroundColor: Colors.grey,
                       backgroundImage: _profileImageUrl != null && _profileImageUrl!.isNotEmpty
                           ? NetworkImage(_profileImageUrl!)
-                          : null,
-                      child: _profileImageUrl == null || _profileImageUrl!.isEmpty
-                          ? const Icon(Icons.person, color: Colors.white, size: 20)
-                          : null,
+                          : const AssetImage('assets/basic_profile.png') as ImageProvider,
                     ),
                     const SizedBox(width: 10),
                     Column(

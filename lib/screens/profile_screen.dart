@@ -315,11 +315,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ValueListenableBuilder<String>(
                       valueListenable: globalProfileImage,
                       builder: (context, path, child) {
-                        ImageProvider? imageProvider;
+                        ImageProvider imageProvider;
                         
                         if (path.isEmpty || path == "assets/logo.png") {
-                          // 기본 이미지 (로고)
-                          imageProvider = const AssetImage("assets/logo.png");
+                          // 기본 이미지
+                          imageProvider = const AssetImage("assets/basic_profile.png");
                         } else if (isProfileImageFile.value) {
                           // 로컬 파일
                           imageProvider = FileImage(File(path));
@@ -335,9 +335,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           radius: 40,
                           backgroundColor: Colors.grey,
                           backgroundImage: imageProvider,
-                          child: path.isEmpty 
-                              ? const Icon(Icons.person, size: 40, color: Colors.white)
-                              : null,
+                          child: null,
                         );
                       },
                     ),

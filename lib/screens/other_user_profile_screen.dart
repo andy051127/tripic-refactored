@@ -204,14 +204,8 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
                             backgroundColor: Colors.grey,
                             backgroundImage: widget.profileImage.isNotEmpty
                                 ? NetworkImage(widget.profileImage)
-                                : null,
-                            child: widget.profileImage.isEmpty
-                                ? const Icon(
-                                    Icons.person,
-                                    size: 50,
-                                    color: Colors.white,
-                                  )
-                                : null,
+                                : const AssetImage('assets/basic_profile.png'),
+                            child: null,
                           ),
                           const SizedBox(width: 20),
                           Expanded(
