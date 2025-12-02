@@ -11,11 +11,13 @@ import '../models/post_model.dart';
 class MapScreen extends StatefulWidget {
   final bool isSelectionMode; // 위치 선택 모드인지 여부
   final LatLng? initialLocation; // 초기 위치 (게시물 위치 등)
+  final String? userId; // 특정 사용자의 게시물만 표시할 경우 사용
   
   const MapScreen({
     super.key, 
     this.isSelectionMode = false,
     this.initialLocation,
+    this.userId,
   });
 
   @override
@@ -144,9 +146,14 @@ class _MapScreenState extends State<MapScreen> {
   Future<void> _loadPostMarkers() async {
     try {
       // Firestore에서 위치 정보가 있는 게시물만 가져오기
-      final QuerySnapshot snapshot = await FirebaseFirestore.instance
-          .collection('posts')
-          .get();
+      Query query = FirebaseFirestore.instance.collection('posts');
+      
+      // userId가 지정되어 있으면 해당 사용자의 게시물만 필터링
+      if (widget.userId != null) {
+        query = query.where('uid', isEqualTo: widget.userId);
+      }
+      
+      final QuerySnapshot snapshot = await query.get();
 
       Set<Marker> markers = {};
       

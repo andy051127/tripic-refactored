@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import '../models/post_model.dart';
-import '../services/firestore_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import '../models/post_model.dart';
+import '../services/firestore_service.dart';
+import 'map_screen.dart';
 
 class OtherUserProfileScreen extends StatefulWidget {
   final String userName;
@@ -40,21 +42,56 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
       // userId를 이용하여 팔로우 상태 확인
       String targetId = widget.userId ?? '';
       
+      print('🔍 OtherUserProfile - 초기 userId: $targetId');
+      print('🔍 OtherUserProfile - userName: ${widget.userName}');
+      
       // userId가 없으면 userName으로 검색
       if (targetId.isEmpty) {
-        final usersSnapshot = await FirebaseFirestore.instance
+        // userName 필드로 먼저 검색
+        var usersSnapshot = await FirebaseFirestore.instance
             .collection('users')
             .where('userName', isEqualTo: widget.userName)
             .limit(1)
             .get();
         
+        print('🔍 userName 검색 결과: ${usersSnapshot.docs.length}개');
+        
+        // 찾지 못했다면 username 필드로 검색
+        if (usersSnapshot.docs.isEmpty) {
+          usersSnapshot = await FirebaseFirestore.instance
+              .collection('users')
+              .where('username', isEqualTo: widget.userName)
+              .limit(1)
+              .get();
+          print('🔍 username 검색 결과: ${usersSnapshot.docs.length}개');
+        }
+        
+        // 그래도 찾지 못했다면 name 필드로 검색
+        if (usersSnapshot.docs.isEmpty) {
+          usersSnapshot = await FirebaseFirestore.instance
+              .collection('users')
+              .where('name', isEqualTo: widget.userName)
+              .limit(1)
+              .get();
+          print('🔍 name 검색 결과: ${usersSnapshot.docs.length}개');
+        }
+        
         if (usersSnapshot.docs.isNotEmpty) {
           targetId = usersSnapshot.docs.first.id;
+          print('✅ 사용자 찾음: $targetId');
+        } else {
+          print('❌ 사용자를 찾을 수 없음');
         }
       }
 
       if (targetId.isNotEmpty) {
-        _targetUserId = targetId;
+        if (mounted) {
+          setState(() {
+            _targetUserId = targetId;
+          });
+        }
+        
+        print('✅ _targetUserId 설정됨: $_targetUserId');
         
         // 팔로우 상태 확인
         final isFollowing = await _firestoreService.isFollowing(targetId);
@@ -68,6 +105,8 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
             .where('uid', isEqualTo: targetId)
             .get();
 
+        print('📊 게시물 수: ${postsSnapshot.docs.length}개');
+
         if (mounted) {
           setState(() {
             _isFollowing = isFollowing;
@@ -78,6 +117,7 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
           });
         }
       } else {
+        print('❌ targetId가 비어있음');
         if (mounted) {
           setState(() {
             _isLoading = false;
@@ -85,7 +125,7 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
         }
       }
     } catch (e) {
-      print('사용자 데이터 로드 실패: $e');
+      print('❌ 사용자 데이터 로드 실패: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -250,26 +290,53 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
                   ),
                 ),
                 const Divider(),
-                Expanded(child: _buildUserPostsGrid()),
+                Expanded(
+                  child: DefaultTabController(
+                    length: 2,
+                    child: Column(
+                      children: [
+                        const TabBar(
+                          indicatorColor: Colors.black,
+                          labelColor: Colors.black,
+                          unselectedLabelColor: Colors.grey,
+                          tabs: [
+                            Tab(icon: Icon(Icons.grid_on)),
+                            Tab(icon: Icon(Icons.map_outlined)),
+                          ],
+                        ),
+                        Expanded(
+                          child: TabBarView(
+                            children: [
+                              _buildUserPostsGrid(),
+                              _buildUserPostsMap(),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
     );
   }
 
   Widget _buildUserPostsGrid() {
-    if (_targetUserId == null) {
+    if (_targetUserId == null || _targetUserId!.isEmpty) {
       return const Center(child: Text("사용자 정보를 찾을 수 없습니다."));
     }
+
+    print('📱 _buildUserPostsGrid - _targetUserId: $_targetUserId');
 
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('posts')
           .where('uid', isEqualTo: _targetUserId)
-          .orderBy('createdAt', descending: true)
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return const Center(child: Text("오류가 발생했습니다."));
+          print('❌ 게시물 로드 에러: ${snapshot.error}');
+          return Center(child: Text("오류가 발생했습니다: ${snapshot.error}"));
         }
 
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -277,6 +344,8 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
         }
 
         final posts = snapshot.data?.docs ?? [];
+        
+        print('📊 로드된 게시물 수: ${posts.length}개');
 
         if (posts.isEmpty) {
           return const Center(child: Text("게시물이 없습니다."));
@@ -293,6 +362,13 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
           itemBuilder: (context, index) {
             final postData = posts[index].data() as Map<String, dynamic>;
             final imageUrl = postData['imageUrl'] ?? '';
+            final imageUrls = postData['imageUrls'] as List<dynamic>?;
+            
+            // 첫 번째 이미지 URL 가져오기
+            String displayImage = imageUrl;
+            if (imageUrls != null && imageUrls.isNotEmpty) {
+              displayImage = imageUrls[0].toString();
+            }
 
             return GestureDetector(
               onTap: () {
@@ -300,13 +376,19 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
               },
               child: Container(
                 color: Colors.grey[300],
-                child: imageUrl.isNotEmpty
+                child: displayImage.isNotEmpty
                     ? Image.network(
-                        imageUrl,
+                        displayImage,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) {
                           return const Center(
                             child: Icon(Icons.error, color: Colors.grey),
+                          );
+                        },
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return const Center(
+                            child: CircularProgressIndicator(),
                           );
                         },
                       )
@@ -318,6 +400,95 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
           },
         );
       },
+    );
+  }
+
+  Widget _buildUserPostsMap() {
+    if (_targetUserId == null || _targetUserId!.isEmpty) {
+      return const Center(child: Text("사용자 정보를 찾을 수 없습니다."));
+    }
+
+    return GestureDetector(
+      onTap: () {
+        // 전체 화면 지도로 이동 (해당 사용자의 게시물만 표시)
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MapScreen(
+              userId: _targetUserId,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        height: 300,
+        margin: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Stack(
+            children: [
+              // 간단한 지도 (현재 위치만 표시)
+              GoogleMap(
+                initialCameraPosition: const CameraPosition(
+                  target: LatLng(37.5665, 126.9780), // 서울 기본 위치
+                  zoom: 12,
+                ),
+                myLocationEnabled: true,
+                myLocationButtonEnabled: false,
+                zoomControlsEnabled: false,
+                scrollGesturesEnabled: false,
+                zoomGesturesEnabled: false,
+                rotateGesturesEnabled: false,
+                tiltGesturesEnabled: false,
+                mapToolbarEnabled: false,
+              ),
+              // 반투명 오버레이와 안내 문구
+              Container(
+                color: Colors.black.withOpacity(0.3),
+                child: const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.map,
+                        size: 60,
+                        color: Colors.white,
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        '탭하여 전체 지도 보기',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        '이 사용자의 게시물 위치를 확인하세요',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

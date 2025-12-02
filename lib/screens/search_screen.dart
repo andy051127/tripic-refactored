@@ -38,7 +38,7 @@ class _SearchScreenState extends State<SearchScreen> {
       
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        final userName = (data['userName'] ?? '').toString().toLowerCase();
+        final userName = (data['userName'] ?? data['username'] ?? data['name'] ?? '').toString().toLowerCase();
         final email = (data['email'] ?? '').toString().toLowerCase();
         final searchLower = query.toLowerCase();
         
@@ -46,7 +46,7 @@ class _SearchScreenState extends State<SearchScreen> {
         if (userName.contains(searchLower) || email.contains(searchLower)) {
           results.add({
             'userId': doc.id,
-            'userName': data['userName'] ?? '알 수 없음',
+            'userName': data['userName'] ?? data['username'] ?? data['name'] ?? '알 수 없음',
             'email': data['email'] ?? '',
             'profileImage': data['profileImage'] ?? '',
             'bio': data['bio'] ?? '',
@@ -172,7 +172,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                         : null,
                                   ),
                                   title: Text(
-                                    user['userName'] ?? '알 수 없음',
+                                    user['userName']?.toString() ?? '알 수 없음',
                                     style: const TextStyle(
                                         fontWeight: FontWeight.bold),
                                   ),

@@ -276,7 +276,14 @@ class FirestoreService {
     try {
       final doc = await _db.collection('users').doc(userId).get();
       if (doc.exists) {
-        return doc.data();
+        final data = doc.data();
+        if (data != null) {
+          // userName 필드가 없으면 다른 필드들도 확인
+          return {
+            ...data,
+            'userName': data['userName'] ?? data['username'] ?? data['name'] ?? '알 수 없음',
+          };
+        }
       }
       return null;
     } catch (e) {
@@ -300,17 +307,176 @@ class FirestoreService {
       TaskSnapshot snapshot = await uploadTask;
       String downloadUrl = await snapshot.ref.getDownloadURL();
 
-      // Firestore에 프로필 이미지 URL 저장
-      await _db.collection('users').doc(user.uid).set({
+      // Firestore에 프로필 이미지 URL만 업데이트 (기존 사용자 정보는 유지)
+      await _db.collection('users').doc(user.uid).update({
         'profileImage': downloadUrl,
-        'userName': user.displayName ?? '알 수 없음',
-        'email': user.email,
-      }, SetOptions(merge: true));
+      });
 
       return downloadUrl;
     } catch (e) {
       print("프로필 이미지 업로드 실패: $e");
       rethrow;
     }
+  }
+
+  // --- [좋아요 기능] ---
+
+  // 1. 좋아요 추가
+  Future<void> likePost(String postId) async {
+    User? user = _auth.currentUser;
+    if (user == null) throw Exception("로그인이 필요합니다.");
+
+    try {
+      final likeRef = _db
+          .collection('posts')
+          .doc(postId)
+          .collection('likes')
+          .doc(user.uid);
+
+      final likeDoc = await likeRef.get();
+
+      if (!likeDoc.exists) {
+        // 좋아요 추가
+        await likeRef.set({
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+
+        // 게시물의 likeCount 증가
+        await _db.collection('posts').doc(postId).update({
+          'likeCount': FieldValue.increment(1),
+        });
+      }
+    } catch (e) {
+      print("좋아요 추가 실패: $e");
+      rethrow;
+    }
+  }
+
+  // 2. 좋아요 취소
+  Future<void> unlikePost(String postId) async {
+    User? user = _auth.currentUser;
+    if (user == null) throw Exception("로그인이 필요합니다.");
+
+    try {
+      final likeRef = _db
+          .collection('posts')
+          .doc(postId)
+          .collection('likes')
+          .doc(user.uid);
+
+      final likeDoc = await likeRef.get();
+
+      if (likeDoc.exists) {
+        // 좋아요 제거
+        await likeRef.delete();
+
+        // 게시물의 likeCount 감소
+        await _db.collection('posts').doc(postId).update({
+          'likeCount': FieldValue.increment(-1),
+        });
+      }
+    } catch (e) {
+      print("좋아요 취소 실패: $e");
+      rethrow;
+    }
+  }
+
+  // 3. 좋아요 여부 확인
+  Future<bool> isPostLiked(String postId) async {
+    User? user = _auth.currentUser;
+    if (user == null) return false;
+
+    try {
+      final doc = await _db
+          .collection('posts')
+          .doc(postId)
+          .collection('likes')
+          .doc(user.uid)
+          .get();
+
+      return doc.exists;
+    } catch (e) {
+      print("좋아요 확인 실패: $e");
+      return false;
+    }
+  }
+
+  // 4. 좋아요 수 실시간 스트림
+  Stream<int> getLikeCountStream(String postId) {
+    return _db
+        .collection('posts')
+        .doc(postId)
+        .snapshots()
+        .map((snapshot) => snapshot.data()?['likeCount'] ?? 0);
+  }
+
+  // --- [댓글 기능] ---
+
+  // 1. 댓글 추가
+  Future<void> addComment({
+    required String postId,
+    required String content,
+  }) async {
+    User? user = _auth.currentUser;
+    if (user == null) throw Exception("로그인이 필요합니다.");
+
+    try {
+      // 사용자 정보 가져오기
+      final userDoc = await _db.collection('users').doc(user.uid).get();
+      final userData = userDoc.data();
+      final userName = userData?['userName'] ?? userData?['username'] ?? userData?['name'] ?? '알 수 없음';
+      final userProfileImage = userData?['profileImage'] ?? '';
+
+      // 댓글 추가
+      await _db
+          .collection('posts')
+          .doc(postId)
+          .collection('comments')
+          .add({
+        'uid': user.uid,
+        'userName': userName,
+        'userProfileImage': userProfileImage,
+        'content': content,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print("댓글 추가 실패: $e");
+      rethrow;
+    }
+  }
+
+  // 2. 댓글 삭제
+  Future<void> deleteComment(String postId, String commentId) async {
+    try {
+      await _db
+          .collection('posts')
+          .doc(postId)
+          .collection('comments')
+          .doc(commentId)
+          .delete();
+    } catch (e) {
+      print("댓글 삭제 실패: $e");
+      rethrow;
+    }
+  }
+
+  // 3. 댓글 목록 스트림
+  Stream<QuerySnapshot> getCommentsStream(String postId) {
+    return _db
+        .collection('posts')
+        .doc(postId)
+        .collection('comments')
+        .orderBy('timestamp', descending: false)
+        .snapshots();
+  }
+
+  // 4. 댓글 수 가져오기
+  Stream<int> getCommentCountStream(String postId) {
+    return _db
+        .collection('posts')
+        .doc(postId)
+        .collection('comments')
+        .snapshots()
+        .map((snapshot) => snapshot.docs.length);
   }
 }

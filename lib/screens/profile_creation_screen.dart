@@ -42,22 +42,27 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-        // 1. Firestore에 사용자 정보 저장
+        // 1. Firestore에 사용자 정보 저장 (set with merge를 사용하여 기존 데이터 유지)
         await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
-            .update({
+            .set({
+              'uid': user.uid,
+              'email': user.email ?? '',
               'userName': _nameController.text,
               'phoneNumber': _phoneController.text,
               'birthDate': _birthController.text, // 가입일 또는 생년월일
               'bio': _bioController.text,
+              'profileImage': '',
               'isProfileSetup': true, // 설정 완료 표시
-            });
+              'createdAt': FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true));
 
         // 2. 앱 내 전역 변수 업데이트 (즉시 반영)
         globalUserName.value = _nameController.text;
         globalUserPhone.value = _phoneController.text;
         globalUserBio.value = _bioController.text;
+        globalUserEmail.value = user.email ?? '';
 
         if (!mounted) return;
 

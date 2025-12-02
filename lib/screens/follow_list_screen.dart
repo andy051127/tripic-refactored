@@ -144,7 +144,10 @@ class _FollowListScreenState extends State<FollowListScreen> {
                 }
 
                 final userInfo = userSnapshot.data;
-                final userName = userInfo?['userName'] ?? '알 수 없음';
+                final userName = userInfo?['userName'] ?? 
+                                 userInfo?['username'] ?? 
+                                 userInfo?['name'] ?? 
+                                 '알 수 없음';
                 final profileImage = userInfo?['profileImage'] ?? '';
                 final bio = userInfo?['bio'] ?? '여행을 좋아하는 사람입니다.';
 

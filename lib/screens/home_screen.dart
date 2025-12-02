@@ -36,6 +36,44 @@ class _HomeScreenState extends State<HomeScreen> {
     const ProfileScreen(),
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  // Firestore에서 사용자 데이터 불러오기
+  Future<void> _loadUserData() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        
+        if (userDoc.exists) {
+          final data = userDoc.data();
+          if (data != null) {
+            // 전역 변수 업데이트
+            globalUserName.value = data['userName'] ?? data['username'] ?? data['name'] ?? 'Unknown';
+            globalUserBio.value = data['bio'] ?? 'Traveler ✈️';
+            globalUserEmail.value = data['email'] ?? user.email ?? '';
+            globalUserPhone.value = data['phoneNumber'] ?? '';
+            
+            // 프로필 이미지가 있으면 업데이트
+            if (data['profileImage'] != null && data['profileImage'].toString().isNotEmpty) {
+              globalProfileImage.value = data['profileImage'];
+              isProfileImageFile.value = false; // 네트워크 이미지
+            }
+          }
+        }
+      } catch (e) {
+        print('사용자 데이터 로드 실패: $e');
+      }
+    }
+  }
+
   void _onItemTapped(int index) {
     if (index == 2) {
       Navigator.push(
@@ -353,16 +391,16 @@ class _PostItemState extends State<PostItem> {
   bool _isLiked = false;
   bool _isSaved = false;
   bool _showMap = false;
-  int _likeCount = 0;
   String? _profileImageUrl;
   int _currentImageIndex = 0;
   final PageController _pageController = PageController();
+  final FirestoreService _firestoreService = FirestoreService();
 
   @override
   void initState() {
     super.initState();
-    _likeCount = widget.post.likeCount;
     _loadProfileImage();
+    _checkIfLiked();
   }
 
   @override
@@ -384,6 +422,44 @@ class _PostItemState extends State<PostItem> {
       }
     } catch (e) {
       // 프로필 이미지 로드 실패 시 기본 아이콘 사용
+    }
+  }
+
+  Future<void> _checkIfLiked() async {
+    try {
+      final isLiked = await _firestoreService.isPostLiked(widget.post.id);
+      if (mounted) {
+        setState(() {
+          _isLiked = isLiked;
+        });
+      }
+    } catch (e) {
+      print('좋아요 확인 실패: $e');
+    }
+  }
+
+  Future<void> _toggleLike() async {
+    // UI 즉시 업데이트
+    setState(() {
+      _isLiked = !_isLiked;
+    });
+
+    try {
+      if (_isLiked) {
+        await _firestoreService.likePost(widget.post.id);
+      } else {
+        await _firestoreService.unlikePost(widget.post.id);
+      }
+    } catch (e) {
+      // 오류 발생 시 상태 되돌리기
+      if (mounted) {
+        setState(() {
+          _isLiked = !_isLiked;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('오류가 발생했습니다: $e')),
+        );
+      }
     }
   }
 
@@ -811,43 +887,67 @@ class _PostItemState extends State<PostItem> {
           padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
           child: Row(
             children: [
-              GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _isLiked = !_isLiked;
-                    _isLiked ? _likeCount++ : _likeCount--;
-                  });
-                },
-                child: Icon(
-                  _isLiked ? Icons.favorite : Icons.favorite_border,
-                  size: 28,
-                  color: _isLiked ? Colors.red : Colors.black,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                "$_likeCount",
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(width: 16),
-              GestureDetector(
-                onTap: () {
-                  showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    backgroundColor: Colors.transparent,
-                    builder: (context) => const CommentModal(),
+              // 좋아요 StreamBuilder
+              StreamBuilder<int>(
+                stream: _firestoreService.getLikeCountStream(widget.post.id),
+                builder: (context, snapshot) {
+                  final likeCount = snapshot.data ?? widget.post.likeCount;
+                  
+                  return Row(
+                    children: [
+                      GestureDetector(
+                        onTap: _toggleLike,
+                        child: Icon(
+                          _isLiked ? Icons.favorite : Icons.favorite_border,
+                          size: 28,
+                          color: _isLiked ? Colors.red : Colors.black,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        "$likeCount",
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
                   );
                 },
-                child: const Icon(Icons.chat_bubble_outline, size: 28),
               ),
-              const SizedBox(width: 6),
-              const Text(
-                "21",
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+              const SizedBox(width: 16),
+              // 댓글 StreamBuilder
+              StreamBuilder<int>(
+                stream: _firestoreService.getCommentCountStream(widget.post.id),
+                builder: (context, snapshot) {
+                  final commentCount = snapshot.data ?? 0;
+                  
+                  return Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            useSafeArea: true,
+                            builder: (context) => CommentModal(
+                              postId: widget.post.id,
+                              postTitle: widget.post.title,
+                              postImage: widget.post.imageUrl,
+                            ),
+                          );
+                        },
+                        child: const Icon(Icons.chat_bubble_outline, size: 28),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        "$commentCount",
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(width: 16),
               GestureDetector(
