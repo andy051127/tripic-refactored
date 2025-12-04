@@ -251,7 +251,16 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
               .where((post) => post.category == 'feed')
               .toList();
 
-          return ListView.builder(
+          return FutureBuilder<List<Post>>(
+            future: _filterBlockedAndHiddenPosts(feedPosts, firestoreService),
+            builder: (context, filterSnapshot) {
+              if (filterSnapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              final visiblePosts = filterSnapshot.data ?? feedPosts;
+
+              return ListView.builder(
             itemCount: feedPosts.length + 1,
             itemBuilder: (context, index) {
               if (index == 0) {
@@ -337,28 +346,23 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
                               ),
                       ),
                     ),
-                    const SizedBox(height: 10),
-                  ],
-                );
-              }
-
-              final post = feedPosts[index - 1]; // 필터링된 리스트 사용
-
-              return PostItem(
-                post: post,
-                currentUserId: FirebaseAuth.instance.currentUser?.uid ?? '',
-                onDelete: () {
-                  // 삭제 로직 (로컬 state만 갱신하는 것이 아니라 Firestore 삭제가 필요하지만, 일단 UI 갱신용)
-                },
-                onBlock: () {
-                  // 차단 로직
-                  final currentBlocked = List<String>.from(
-                    blockedUsersNotifier.value,
-                  );
-                  if (!currentBlocked.contains(post.userName)) {
-                    currentBlocked.add(post.userName);
-                    blockedUsersNotifier.value = currentBlocked;
+                        const SizedBox(height: 10),
+                      ],
+                    );
                   }
+
+                  final post = visiblePosts[index - 1]; // 필터링된 리스트 사용
+
+                  return PostItem(
+                    post: post,
+                    currentUserId: FirebaseAuth.instance.currentUser?.uid ?? '',
+                    onDelete: () {
+                      setState(() {}); // UI 새로고침
+                    },
+                    onBlock: () {
+                      setState(() {}); // UI 새로고침
+                    },
+                  );
                 },
               );
             },
@@ -366,6 +370,27 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
         },
       ),
     );
+  }
+
+  Future<List<Post>> _filterBlockedAndHiddenPosts(
+    List<Post> posts,
+    FirestoreService firestoreService,
+  ) async {
+    try {
+      final hiddenPostIds = await firestoreService.getHiddenPostIds();
+      final blockedUserIds = await firestoreService.getBlockedUserIds();
+
+      return posts.where((post) {
+        // 숨긴 게시물 제외
+        if (hiddenPostIds.contains(post.id)) return false;
+        // 차단한 사용자의 게시물 제외
+        if (blockedUserIds.contains(post.uid)) return false;
+        return true;
+      }).toList();
+    } catch (e) {
+      print('게시물 필터링 실패: $e');
+      return posts;
+    }
   }
 }
 
@@ -547,12 +572,23 @@ class _PostItemState extends State<PostItem> {
             _buildOptionItem(
               Icons.visibility_off_outlined,
               "숨기기",
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(context);
-                widget.onDelete();
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(const SnackBar(content: Text("게시물을 숨겼습니다.")));
+                try {
+                  await _firestoreService.hidePost(widget.post.id);
+                  widget.onDelete();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("게시물을 숨겼습니다.")),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("오류가 발생했습니다: $e")),
+                    );
+                  }
+                }
               },
             ),
             const Divider(height: 1),
@@ -560,13 +596,23 @@ class _PostItemState extends State<PostItem> {
               Icons.block,
               "차단",
               isDestructive: true,
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(context);
-                widget.onBlock();
-                widget.onDelete();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text("${widget.post.userName}님을 차단했습니다.")),
-                );
+                try {
+                  await _firestoreService.blockUser(widget.post.uid);
+                  widget.onBlock();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("${widget.post.userName}님을 차단했습니다.")),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("오류가 발생했습니다: $e")),
+                    );
+                  }
+                }
               },
             ),
             const Divider(height: 1),
@@ -641,12 +687,26 @@ class _PostItemState extends State<PostItem> {
   Widget _buildReportItem(String reason) {
     return ListTile(
       title: Text(reason),
-      onTap: () {
+      onTap: () async {
+        if (!mounted) return;
         Navigator.pop(context);
-        widget.onDelete();
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("신고가 완료되었습니다.")));
+        
+        try {
+          // 신고 시 자동으로 차단 처리
+          await _firestoreService.blockUser(widget.post.uid);
+          widget.onBlock();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("신고가 완료되었으며, 해당 사용자를 차단했습니다.")),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text("오류가 발생했습니다: $e")),
+            );
+          }
+        }
       },
     );
   }

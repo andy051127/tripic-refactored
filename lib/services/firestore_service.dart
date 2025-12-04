@@ -763,4 +763,221 @@ class FirestoreService {
     }
     return null;
   }
+
+  // --- [프라이버시 설정 관련] ---
+
+  // 1. 게시물이 현재 사용자에게 공개되는지 확인
+  Future<bool> isPostVisibleToUser(
+    String postOwnerId,
+    String currentUserId,
+  ) async {
+    if (postOwnerId == currentUserId) return true; // 본인 게시물은 항상 보임
+
+    try {
+      // 게시물 소유자의 프라이버시 설정 가져오기
+      final userDoc = await _db.collection('users').doc(postOwnerId).get();
+      if (!userDoc.exists) return false;
+
+      final privacySettings = userDoc.data()?['privacySettings'];
+      if (privacySettings == null) {
+        // 설정이 없으면 기본값으로 팔로워에게 공개
+        return await _isFollowing(currentUserId, postOwnerId);
+      }
+
+      final isPublicToFollowers = privacySettings['isPublicToFollowers'] ?? false;
+      final isPublicToMutuals = privacySettings['isPublicToMutuals'] ?? false;
+      final selectedFollowingFriends = 
+          List<String>.from(privacySettings['selectedFollowingFriends'] ?? []);
+
+      // 1. 특정 사람에게만 공개되는 경우
+      if (selectedFollowingFriends.isNotEmpty) {
+        return selectedFollowingFriends.contains(currentUserId);
+      }
+
+      // 2. 맞팔로우한 사람에게만 공개
+      if (isPublicToMutuals) {
+        return await _isMutualFollowing(postOwnerId, currentUserId);
+      }
+
+      // 3. 팔로워에게 공개
+      if (isPublicToFollowers) {
+        return await _isFollowing(currentUserId, postOwnerId);
+      }
+
+      return false;
+    } catch (e) {
+      print('게시물 공개 범위 확인 실패: $e');
+      return false;
+    }
+  }
+
+  // 2. 팔로잉 여부 확인 (내부 메서드)
+  Future<bool> _isFollowing(String followerId, String followeeId) async {
+    try {
+      final doc = await _db
+          .collection('users')
+          .doc(followerId)
+          .collection('following')
+          .doc(followeeId)
+          .get();
+      return doc.exists;
+    } catch (e) {
+      print('팔로잉 확인 실패: $e');
+      return false;
+    }
+  }
+
+  // 3. 맞팔로우 여부 확인 (서로 팔로잉하는지)
+  Future<bool> _isMutualFollowing(String userId1, String userId2) async {
+    try {
+      // userId1이 userId2를 팔로잉하는지 확인
+      final doc1 = await _db
+          .collection('users')
+          .doc(userId1)
+          .collection('following')
+          .doc(userId2)
+          .get();
+
+      // userId2가 userId1을 팔로잉하는지 확인
+      final doc2 = await _db
+          .collection('users')
+          .doc(userId2)
+          .collection('following')
+          .doc(userId1)
+          .get();
+
+      return doc1.exists && doc2.exists;
+    } catch (e) {
+      print('맞팔로우 확인 실패: $e');
+      return false;
+    }
+  }
+
+  // 게시물 숨기기
+  Future<void> hidePost(String postId) async {
+    User? user = _auth.currentUser;
+    if (user == null) throw Exception("로그인이 필요합니다.");
+
+    try {
+      await _db
+          .collection('users')
+          .doc(user.uid)
+          .collection('hiddenPosts')
+          .doc(postId)
+          .set({
+        'hiddenAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print('게시물 숨기기 실패: $e');
+      rethrow;
+    }
+  }
+
+  // 사용자 차단
+  Future<void> blockUser(String targetUserId) async {
+    User? user = _auth.currentUser;
+    if (user == null) throw Exception("로그인이 필요합니다.");
+
+    try {
+      await _db
+          .collection('users')
+          .doc(user.uid)
+          .collection('blockedUsers')
+          .doc(targetUserId)
+          .set({
+        'blockedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print('사용자 차단 실패: $e');
+      rethrow;
+    }
+  }
+
+  // 숨긴 게시물 목록 가져오기
+  Future<List<String>> getHiddenPostIds() async {
+    User? user = _auth.currentUser;
+    if (user == null) return [];
+
+    try {
+      final snapshot = await _db
+          .collection('users')
+          .doc(user.uid)
+          .collection('hiddenPosts')
+          .get();
+      return snapshot.docs.map((doc) => doc.id).toList();
+    } catch (e) {
+      print('숨긴 게시물 목록 가져오기 실패: $e');
+      return [];
+    }
+  }
+
+  // 차단한 사용자 목록 가져오기
+  Future<List<String>> getBlockedUserIds() async {
+    User? user = _auth.currentUser;
+    if (user == null) return [];
+
+    try {
+      final snapshot = await _db
+          .collection('users')
+          .doc(user.uid)
+          .collection('blockedUsers')
+          .get();
+      return snapshot.docs.map((doc) => doc.id).toList();
+    } catch (e) {
+      print('차단한 사용자 목록 가져오기 실패: $e');
+      return [];
+    }
+  }
+
+  // 차단 해제
+  Future<void> unblockUser(String targetUserId) async {
+    User? user = _auth.currentUser;
+    if (user == null) throw Exception("로그인이 필요합니다.");
+
+    try {
+      await _db
+          .collection('users')
+          .doc(user.uid)
+          .collection('blockedUsers')
+          .doc(targetUserId)
+          .delete();
+    } catch (e) {
+      print('차단 해제 실패: $e');
+      rethrow;
+    }
+  }
+
+  // 차단된 사용자 상세 정보 가져오기 (스트림)
+  Stream<List<Map<String, dynamic>>> getBlockedUsersStream() {
+    User? user = _auth.currentUser;
+    if (user == null) return Stream.value([]);
+
+    return _db
+        .collection('users')
+        .doc(user.uid)
+        .collection('blockedUsers')
+        .snapshots()
+        .asyncMap((snapshot) async {
+      List<Map<String, dynamic>> blockedUsers = [];
+      
+      for (var doc in snapshot.docs) {
+        try {
+          final userDoc = await _db.collection('users').doc(doc.id).get();
+          if (userDoc.exists) {
+            final userData = userDoc.data() ?? {};
+            blockedUsers.add({
+              'uid': doc.id,
+              'userName': userData['userName'] ?? userData['username'] ?? '알 수 없음',
+              'profileImage': userData['profileImage'] ?? '',
+              'blockedAt': doc.data()['blockedAt'],
+            });
+          }
+        } catch (e) {
+          print('차단된 사용자 정보 가져오기 실패: $e');
+        }
+      }
+      
+      return blockedUsers;
+    });
+  }
 }

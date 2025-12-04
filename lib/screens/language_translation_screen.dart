@@ -79,124 +79,127 @@ class _LanguageTranslationScreenState extends State<LanguageTranslationScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-            // 1. 언어 선택 영역
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    "한국어",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const Icon(Icons.arrow_forward, color: Colors.grey),
-                  DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: _selectedLanguage,
-                      icon: const Icon(Icons.keyboard_arrow_down),
-                      items: _languages.map((String lang) {
-                        return DropdownMenuItem<String>(
-                          value: lang,
-                          child: Text(
-                            lang,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blue,
+              // 1. 언어 선택 영역
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      "한국어",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const Icon(Icons.arrow_forward, color: Colors.grey),
+                    DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _selectedLanguage,
+                        icon: const Icon(Icons.keyboard_arrow_down),
+                        items: _languages.map((String lang) {
+                          return DropdownMenuItem<String>(
+                            value: lang,
+                            child: Text(
+                              lang,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue,
+                              ),
                             ),
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (String? newValue) {
-                        setState(() {
-                          _selectedLanguage = newValue!;
-                        });
-                      },
+                          );
+                        }).toList(),
+                        onChanged: (String? newValue) {
+                          setState(() {
+                            _selectedLanguage = newValue!;
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // 2. 텍스트 입력창
+              Expanded(
+                flex: 2,
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: TextField(
+                    controller: _textController,
+                    maxLines: null, // 여러 줄 입력 가능
+                    decoration: const InputDecoration(
+                      hintText: "번역할 내용을 입력하세요...",
+                      border: InputBorder.none,
                     ),
                   ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // 2. 텍스트 입력창
-            Expanded(
-              flex: 2,
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                child: TextField(
-                  controller: _textController,
-                  maxLines: null, // 여러 줄 입력 가능
-                  decoration: const InputDecoration(
-                    hintText: "번역할 내용을 입력하세요...",
-                    border: InputBorder.none,
-                  ),
                 ),
               ),
-            ),
 
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
 
-            // 3. 번역하기 버튼
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _translate,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4CA1AF),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text(
-                  "번역하기",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // 4. 번역 결과 표시 영역
-            const Text(
-              "번역 결과",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            const SizedBox(height: 10),
-            Expanded(
-              flex: 3,
-              child: Container(
+              // 3. 번역하기 버튼
+              SizedBox(
                 width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.blue[50],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.blue.withOpacity(0.3)),
-                ),
-                child: SingleChildScrollView(
-                  child: Text(
-                    _translatedText,
-                    style: const TextStyle(fontSize: 16, height: 1.5),
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _translate,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4CA1AF),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    "번역하기",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
-        ),
+
+              const SizedBox(height: 20),
+
+              // 4. 번역 결과 표시 영역
+              const Text(
+                "번역 결과",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const SizedBox(height: 10),
+              Expanded(
+                flex: 3,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                  ),
+                  child: SingleChildScrollView(
+                    child: Text(
+                      _translatedText,
+                      style: const TextStyle(fontSize: 16, height: 1.5),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
