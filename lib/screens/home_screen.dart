@@ -139,11 +139,19 @@ class HomeFeedPage extends StatefulWidget {
 class _HomeFeedPageState extends State<HomeFeedPage> {
   Position? _currentPosition;
   GoogleMapController? _mapController;
+  final ScrollController _scrollController = ScrollController();
+  String? _selectedCountry; // 선택된 국가
 
   @override
   void initState() {
     super.initState();
     _getCurrentLocation();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _getCurrentLocation() async {
@@ -189,24 +197,36 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
         titleSpacing: 0,
         title: Padding(
           padding: const EdgeInsets.only(left: 16.0),
-          child: Row(
-            children: [
-              Image.asset(
-                'assets/tripicLogo.png',
-                height: 30,
-                errorBuilder: (c, o, s) =>
-                    const Icon(Icons.waves, color: Color(0xFF4CA1AF)),
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                "Tripic",
-                style: TextStyle(
-                  color: Colors.black,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
+          child: GestureDetector(
+            onTap: () {
+              // 페이지 새로고침 및 맨 위로 스크롤
+              if (_scrollController.hasClients) {
+                _scrollController.animateTo(
+                  0,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeOut,
+                );
+              }
+            },
+            child: Row(
+              children: [
+                Image.asset(
+                  'assets/tripicLogo.png',
+                  height: 30,
+                  errorBuilder: (c, o, s) =>
+                      const Icon(Icons.waves, color: Color(0xFF4CA1AF)),
                 ),
-              ),
-            ],
+                const SizedBox(width: 8),
+                const Text(
+                  "Tripic",
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
         actions: [
@@ -252,10 +272,11 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
 
           // [수정됨] 홈 화면에는 'feed' 카테고리만 보여주도록 필터링
           // (커뮤니티 글은 'general' 또는 'companion' 이므로 제외됨)
-          final feedPosts = allPosts
+          var feedPosts = allPosts
               .where((post) => post.category == 'feed')
               .toList();
 
+          // 차단/숨김 필터링 적용
           return FutureBuilder<List<Post>>(
             future: _filterBlockedAndHiddenPosts(feedPosts, firestoreService),
             builder: (context, filterSnapshot) {
@@ -263,10 +284,11 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
                 return const Center(child: CircularProgressIndicator());
               }
 
-              final visiblePosts = filterSnapshot.data ?? feedPosts;
+              final filteredPosts = filterSnapshot.data ?? feedPosts;
 
               return ListView.builder(
-                itemCount: feedPosts.length + 1,
+                controller: _scrollController,
+                itemCount: filteredPosts.length + 1,
                 itemBuilder: (context, index) {
                   if (index == 0) {
                     return Column(
@@ -349,21 +371,23 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
                                   ),
                           ),
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 8),
                       ],
                     );
                   }
 
-                  final post = visiblePosts[index - 1]; // 필터링된 리스트 사용
-
+                  final post = filteredPosts[index - 1];
                   return PostItem(
+                    key: ValueKey(post.id),
                     post: post,
                     currentUserId: FirebaseAuth.instance.currentUser?.uid ?? '',
                     onDelete: () {
-                      setState(() {}); // UI 새로고침
+                      // 삭제 로직
                     },
                     onBlock: () {
-                      setState(() {}); // UI 새로고침
+                      setState(() {
+                        // UI 갱신을 위해 setState 호출
+                      });
                     },
                   );
                 },
@@ -487,6 +511,71 @@ class _PostItemState extends State<PostItem> {
     '카타르': '🇶🇦',
     '요르단': '🇯🇴',
     '이스라엘': '🇮🇱',
+  };
+
+  // 국가 코드 매핑
+  final Map<String, String> _countryCodeMap = {
+    '대한민국': 'KOR',
+    '일본': 'JPN',
+    '중국': 'CHN',
+    '대만': 'TWN',
+    '홍콩': 'HKG',
+    '마카오': 'MAC',
+    '싱가포르': 'SGP',
+    '태국': 'THA',
+    '베트남': 'VNM',
+    '필리핀': 'PHL',
+    '말레이시아': 'MYS',
+    '인도네시아': 'IDN',
+    '미얀마': 'MMR',
+    '캄보디아': 'KHM',
+    '라오스': 'LAO',
+    '인도': 'IND',
+    '네팔': 'NPL',
+    '몰디브': 'MDV',
+    '스리랑카': 'LKA',
+    '미국': 'USA',
+    '캐나다': 'CAN',
+    '멕시코': 'MEX',
+    '쿠바': 'CUB',
+    '브라질': 'BRA',
+    '아르헨티나': 'ARG',
+    '페루': 'PER',
+    '칠레': 'CHL',
+    '영국': 'GBR',
+    '프랑스': 'FRA',
+    '이탈리아': 'ITA',
+    '스페인': 'ESP',
+    '독일': 'DEU',
+    '네덜란드': 'NLD',
+    '벨기에': 'BEL',
+    '스위스': 'CHE',
+    '오스트리아': 'AUT',
+    '체코': 'CZE',
+    '헝가리': 'HUN',
+    '폴란드': 'POL',
+    '그리스': 'GRC',
+    '터키': 'TUR',
+    '포르투갈': 'PRT',
+    '아일랜드': 'IRL',
+    '노르웨이': 'NOR',
+    '스웨덴': 'SWE',
+    '덴마크': 'DNK',
+    '핀란드': 'FIN',
+    '아이슬란드': 'ISL',
+    '러시아': 'RUS',
+    '호주': 'AUS',
+    '뉴질랜드': 'NZL',
+    '이집트': 'EGY',
+    '모로코': 'MAR',
+    '남아프리카공화국': 'ZAF',
+    '케냐': 'KEN',
+    '탄자니아': 'TZA',
+    '아랍에미리트': 'ARE',
+    '사우디아라비아': 'SAU',
+    '카타르': 'QAT',
+    '요르단': 'JOR',
+    '이스라엘': 'ISR',
   };
 
   @override
@@ -631,9 +720,9 @@ class _PostItemState extends State<PostItem> {
                     await _firestoreService.hidePost(widget.post.id);
                     widget.onDelete();
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("게시물을 숨겼습니다.")),
-                      );
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(const SnackBar(content: Text("게시물을 숨겼습니다.")));
                     }
                   } catch (e) {
                     if (context.mounted) {
@@ -826,9 +915,24 @@ class _PostItemState extends State<PostItem> {
                                 widget.post.country!.isNotEmpty)
                               Padding(
                                 padding: const EdgeInsets.only(left: 6),
-                                child: Text(
-                                  _countryFlags[widget.post.country] ?? '🌍',
-                                  style: const TextStyle(fontSize: 16),
+                                child: Row(
+                                  children: [
+                                    Text(
+                                      _countryFlags[widget.post.country] ??
+                                          '🌍',
+                                      style: const TextStyle(fontSize: 16),
+                                    ),
+                                    const SizedBox(width: 2),
+                                    Text(
+                                      _countryCodeMap[widget.post.country] ??
+                                          '',
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.grey,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                           ],
