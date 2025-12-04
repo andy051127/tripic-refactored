@@ -195,6 +195,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           TextButton(
             onPressed: () async {
+              // 전역 변수 초기화
+              globalProfileImage.value = "assets/logo.png";
+              isProfileImageFile.value = false;
+              globalUserName.value = "null";
+              globalUserBio.value = "null";
+              globalUserEmail.value = "null";
+              globalUserPhone.value = "null";
+              globalFollowerCount.value = 0;
+              globalFollowingCount.value = 0;
+              globalPostsNotifier.value = [];
+              blockedUsersNotifier.value = [];
+              
               await FirebaseAuth.instance.signOut();
               if (context.mounted) {
                 Navigator.pushAndRemoveUntil(
