@@ -10,6 +10,7 @@ import 'dart:async';
 import 'add_friend_screen.dart';
 import 'write_post_screen.dart';
 import 'map_screen.dart';
+import 'friend_list_screen.dart';
 
 class PhotoEditorScreen extends StatefulWidget {
   final List<String> initialImages;
@@ -65,69 +66,81 @@ class _PhotoEditorScreenState extends State<PhotoEditorScreen> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.edit, color: Colors.blue),
-                title: const Text("사진 편집"),
-                onTap: () async {
-                  Navigator.pop(context);
-                  await _editImage(index);
-                },
-              ),
-              const Divider(height: 1),
-              ListTile(
-                leading: const Icon(Icons.delete, color: Colors.red),
-                title: const Text("사진 삭제", style: TextStyle(color: Colors.red)),
-                onTap: () {
-                  setState(() => _images.removeAt(index));
-                  Navigator.pop(context);
-                },
-              ),
-              const Divider(height: 1),
-              ListTile(
-                leading: const Icon(
-                  Icons.add_photo_alternate,
-                  color: Colors.green,
+          child: SafeArea(
+            minimum: EdgeInsets.only(
+              bottom: MediaQuery.of(context).padding.bottom,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.edit, color: Colors.blue),
+                  title: const Text("사진 편집"),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    await _editImage(index);
+                  },
                 ),
-                title: const Text("사진 추가"),
-                onTap: () async {
-                  Navigator.pop(context);
-                  try {
-                    // 갤러리 열기 (줄바꿈 오류 수정됨)
-                    final List<XFile> newImages = await _picker
-                        .pickMultiImage();
-                    if (newImages.isNotEmpty) {
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.delete, color: Colors.red),
+                  title: const Text(
+                    "사진 삭제",
+                    style: TextStyle(color: Colors.red),
+                  ),
+                  onTap: () {
+                    setState(() => _images.removeAt(index));
+                    Navigator.pop(context);
+                  },
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(
+                    Icons.add_photo_alternate,
+                    color: Colors.green,
+                  ),
+                  title: const Text("사진 추가"),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    try {
+                      // 갤러리 열기 (줄바꿈 오류 수정됨)
+                      final List<XFile> newImages =
+                          await _picker.pickMultiImage();
+                      if (newImages.isNotEmpty) {
+                        setState(() {
+                          for (var img in newImages) {
+                            _images.add(img.path);
+                          }
+                        });
+                      }
+                    } catch (e) {
+                      print("Error picking images: $e");
+                    }
+                  },
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.person_add, color: Colors.orange),
+                  title: const Text("함께 있는 사람 +"),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const FriendListScreen(
+                          isSelectionMode: true,
+                        ),
+                      ),
+                    );
+                    if (result != null && result is List<String>) {
                       setState(() {
-                        for (var img in newImages) {
-                          _images.add(img.path);
-                        }
+                        _taggedFriend = result.join(', ');
                       });
                     }
-                  } catch (e) {
-                    print("Error picking images: $e");
-                  }
-                },
-              ),
-              const Divider(height: 1),
-              ListTile(
-                leading: const Icon(Icons.person_add, color: Colors.orange),
-                title: const Text("함께 있는 사람 +"),
-                onTap: () async {
-                  Navigator.pop(context);
-                  final result = await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const AddFriendScreen(),
-                    ),
-                  );
-                  if (result != null) {
-                    setState(() => _taggedFriend = result);
-                  }
-                },
-              ),
-            ],
+                  },
+                ),
+              ],
+            ),
           ),
         );
       },

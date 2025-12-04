@@ -792,6 +792,57 @@ class _PostItemState extends State<PostItem> {
     }
   }
 
+  Future<void> _navigateToTaggedProfile(String taggedNames) async {
+    // 여러 이름이 쉼표로 구분되어 있을 수 있으므로 첫 번째 이름만 사용
+    final names = taggedNames.split(',').map((e) => e.trim()).toList();
+    if (names.isEmpty) return;
+
+    // 첫 번째 태그된 사람의 프로필로 이동
+    final targetName = names[0];
+
+    try {
+      // Firestore에서 userName으로 사용자 정보 조회
+      final userQuery = await FirebaseFirestore.instance
+          .collection('users')
+          .where('userName', isEqualTo: targetName)
+          .limit(1)
+          .get();
+
+      if (userQuery.docs.isNotEmpty) {
+        final userData = userQuery.docs.first.data();
+        final targetUid = userQuery.docs.first.id;
+
+        // 본인 프로필인지 확인
+        if (targetUid == widget.currentUserId) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const ProfileScreen()),
+          );
+        } else {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => OtherUserProfileScreen(
+                userName: userData['userName'] ?? targetName,
+                profileImage: userData['profileImage'] ?? '',
+              ),
+            ),
+          );
+        }
+      } else {
+        // 사용자를 찾을 수 없는 경우
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('사용자를 찾을 수 없습니다.')),
+        );
+      }
+    } catch (e) {
+      print('태그된 사용자 프로필 탐색 오류: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('프로필을 불러올 수 없습니다.')),
+      );
+    }
+  }
+
   void _showMoreOptions() {
     showModalBottomSheet(
       context: context,
@@ -1070,6 +1121,20 @@ class _PostItemState extends State<PostItem> {
                             style: const TextStyle(
                               fontSize: 12,
                               color: Colors.grey,
+                            ),
+                          ),
+                        if (widget.post.taggedFriend != null &&
+                            widget.post.taggedFriend!.isNotEmpty)
+                          GestureDetector(
+                            onTap: () => _navigateToTaggedProfile(
+                                widget.post.taggedFriend!),
+                            child: Text(
+                              "함께: ${widget.post.taggedFriend!}",
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.blue,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ),
                       ],
