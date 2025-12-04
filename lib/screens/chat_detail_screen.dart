@@ -382,50 +382,87 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               );
             }
           },
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.orange.shade50,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.orange.shade200),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.location_on, color: Colors.orange.shade700, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        message.locationName ?? '위치',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.orange.shade900,
-                        ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 지도 미리보기
+              if (message.latitude != null && message.longitude != null)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: SizedBox(
+                    height: 150,
+                    width: 250,
+                    child: GoogleMap(
+                      initialCameraPosition: CameraPosition(
+                        target: LatLng(message.latitude!, message.longitude!),
+                        zoom: 14,
                       ),
+                      markers: {
+                        Marker(
+                          markerId: const MarkerId('location'),
+                          position: LatLng(message.latitude!, message.longitude!),
+                          infoWindow: InfoWindow(
+                            title: message.locationName ?? '위치',
+                          ),
+                        ),
+                      },
+                      myLocationButtonEnabled: false,
+                      zoomControlsEnabled: false,
+                      scrollGesturesEnabled: false,
+                      zoomGesturesEnabled: false,
+                      rotateGesturesEnabled: false,
+                      tiltGesturesEnabled: false,
+                      mapToolbarEnabled: false,
                     ),
-                  ],
+                  ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  "위도: ${message.latitude?.toStringAsFixed(6)}, 경도: ${message.longitude?.toStringAsFixed(6)}",
-                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade200),
                 ),
-                const SizedBox(height: 8),
-                Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.map, size: 14, color: Colors.orange.shade700),
-                    const SizedBox(width: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.location_on, color: Colors.orange.shade700, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            message.locationName ?? '위치',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.orange.shade900,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
                     Text(
-                      "지도에서 보기",
-                      style: TextStyle(fontSize: 12, color: Colors.orange.shade700),
+                      "위도: ${message.latitude?.toStringAsFixed(6)}, 경도: ${message.longitude?.toStringAsFixed(6)}",
+                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(Icons.open_in_new, size: 14, color: Colors.orange.shade700),
+                        const SizedBox(width: 4),
+                        Text(
+                          "탭하여 전체 지도 보기",
+                          style: TextStyle(fontSize: 12, color: Colors.orange.shade700),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
         break;

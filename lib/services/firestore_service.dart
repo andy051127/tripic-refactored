@@ -495,12 +495,15 @@ class FirestoreService {
 
     try {
       String chatRoomId = _getChatRoomId(user.uid, otherUserId);
+      print('🔑 채팅방 ID: $chatRoomId (${user.uid} <-> $otherUserId)');
+      
       DocumentReference chatRoomRef = _db.collection('chatRooms').doc(chatRoomId);
 
       DocumentSnapshot chatRoomDoc = await chatRoomRef.get();
 
       if (!chatRoomDoc.exists) {
         // 채팅방이 없으면 생성
+        print('✨ 새 채팅방 생성 중...');
         await chatRoomRef.set({
           'participants': [user.uid, otherUserId],
           'lastMessage': '',
@@ -511,11 +514,14 @@ class FirestoreService {
             otherUserId: 0,
           },
         });
+        print('✅ 채팅방 생성 완료');
+      } else {
+        print('✅ 기존 채팅방 사용');
       }
 
       return chatRoomId;
     } catch (e) {
-      print("채팅방 생성 실패: $e");
+      print("❌ 채팅방 생성 실패: $e");
       rethrow;
     }
   }
@@ -537,6 +543,7 @@ class FirestoreService {
       final userProfileImage = userData?['profileImage'] ?? '';
 
       // 메시지 추가
+      print('📤 텍스트 메시지 전송 중: "$content"');
       await _db
           .collection('chatRooms')
           .doc(chatRoomId)
@@ -552,14 +559,16 @@ class FirestoreService {
       });
 
       // 채팅방 정보 업데이트
+      print('📝 채팅방 정보 업데이트 중...');
       await _db.collection('chatRooms').doc(chatRoomId).update({
         'lastMessage': content,
         'lastMessageType': 'text',
         'lastMessageTime': FieldValue.serverTimestamp(),
         'unreadCount.$receiverId': FieldValue.increment(1),
       });
+      print('✅ 메시지 전송 완료');
     } catch (e) {
-      print("메시지 전송 실패: $e");
+      print("❌ 메시지 전송 실패: $e");
       rethrow;
     }
   }
@@ -681,12 +690,16 @@ class FirestoreService {
   // 7. 내 채팅방 목록 스트림
   Stream<QuerySnapshot> getMyChatRoomsStream() {
     User? user = _auth.currentUser;
-    if (user == null) return const Stream.empty();
+    if (user == null) {
+      print('❌ getMyChatRoomsStream: 로그인된 사용자 없음');
+      return const Stream.empty();
+    }
 
+    print('🔍 getMyChatRoomsStream: 사용자 ${user.uid}의 채팅방 조회 중...');
+    
     return _db
         .collection('chatRooms')
         .where('participants', arrayContains: user.uid)
-        .orderBy('lastMessageTime', descending: true)
         .snapshots();
   }
 
