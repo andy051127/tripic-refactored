@@ -17,6 +17,7 @@ class Post {
   final String category;
   final double? latitude;  // 위도 추가
   final double? longitude; // 경도 추가
+  final String? locationName; // 위치 이름 추가
 
   Post({
     String? id,
@@ -34,8 +35,12 @@ class Post {
     this.category = 'feed',
     this.latitude,
     this.longitude,
+    this.locationName,
   }) : this.id = id ?? DateTime.now().millisecondsSinceEpoch.toString(),
        this.createdAt = createdAt ?? Timestamp.now();
+
+  // timestamp getter 추가 (createdAt을 DateTime으로 반환)
+  DateTime? get timestamp => createdAt.toDate();
 
   factory Post.fromMap(Map<String, dynamic> data, String documentId) {
     return Post(
@@ -54,6 +59,7 @@ class Post {
       category: data['category'] ?? 'feed',
       latitude: data['latitude']?.toDouble(),
       longitude: data['longitude']?.toDouble(),
+      locationName: data['locationName'] as String?,
     );
   }
 
@@ -71,6 +77,7 @@ class Post {
       'category': category,
       'latitude': latitude,
       'longitude': longitude,
+      'locationName': locationName,
     };
   }
 }

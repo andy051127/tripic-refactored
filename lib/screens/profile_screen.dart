@@ -12,6 +12,7 @@ import 'follow_list_screen.dart';
 import 'photo_picker_screen.dart';
 import 'member_info_screen.dart';
 import 'map_screen.dart';
+import 'my_posts_detail_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -548,7 +549,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
             return GestureDetector(
               onTap: () {
-                // TODO: 게시물 상세 화면으로 이동
+                // 게시물 상세 화면으로 이동 (선택한 인덱스부터 시작)
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => MyPostsDetailScreen(
+                      initialIndex: index,
+                    ),
+                  ),
+                );
               },
               child: Stack(
                 fit: StackFit.expand,
