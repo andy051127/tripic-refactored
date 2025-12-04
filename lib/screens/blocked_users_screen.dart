@@ -16,15 +16,15 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
     try {
       await _firestoreService.unblockUser(userId);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("$userName 님의 차단이 해제되었습니다.")),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("$userName 님의 차단이 해제되었습니다.")));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("오류가 발생했습니다: $e")),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("오류가 발생했습니다: $e")));
       }
     }
   }
@@ -69,11 +69,7 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.block,
-                    size: 80,
-                    color: Colors.grey,
-                  ),
+                  Icon(Icons.block, size: 80, color: Colors.grey),
                   SizedBox(height: 16),
                   Text(
                     "차단된 계정이 없습니다.",
@@ -91,7 +87,7 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
             itemBuilder: (context, index) {
               final user = blockedUsers[index];
               final profileImage = user['profileImage'] as String? ?? '';
-              
+
               return Container(
                 margin: const EdgeInsets.symmetric(vertical: 8),
                 decoration: BoxDecoration(
@@ -130,10 +126,7 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
                   ),
                   subtitle: Text(
                     "차단됨",
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
                   ),
                   trailing: SizedBox(
                     height: 36,
@@ -154,10 +147,7 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
                               TextButton(
                                 onPressed: () {
                                   Navigator.pop(context);
-                                  _unblockUser(
-                                    user['uid'],
-                                    user['userName'],
-                                  );
+                                  _unblockUser(user['uid'], user['userName']);
                                 },
                                 child: const Text(
                                   "해제",

@@ -51,18 +51,23 @@ class _HomeScreenState extends State<HomeScreen> {
             .collection('users')
             .doc(user.uid)
             .get();
-        
+
         if (userDoc.exists) {
           final data = userDoc.data();
           if (data != null) {
             // 전역 변수 업데이트
-            globalUserName.value = data['userName'] ?? data['username'] ?? data['name'] ?? 'Unknown';
+            globalUserName.value =
+                data['userName'] ??
+                data['username'] ??
+                data['name'] ??
+                'Unknown';
             globalUserBio.value = data['bio'] ?? 'Traveler ✈️';
             globalUserEmail.value = data['email'] ?? user.email ?? '';
             globalUserPhone.value = data['phoneNumber'] ?? '';
-            
+
             // 프로필 이미지가 있으면 업데이트
-            if (data['profileImage'] != null && data['profileImage'].toString().isNotEmpty) {
+            if (data['profileImage'] != null &&
+                data['profileImage'].toString().isNotEmpty) {
               globalProfileImage.value = data['profileImage'];
               isProfileImageFile.value = false; // 네트워크 이미지
             }
@@ -261,91 +266,89 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
               final visiblePosts = filterSnapshot.data ?? feedPosts;
 
               return ListView.builder(
-            itemCount: feedPosts.length + 1,
-            itemBuilder: (context, index) {
-              if (index == 0) {
-                return Column(
-                  children: [
-                    GestureDetector(
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const MapScreen(),
-                        ),
-                      ),
-                      child: Container(
-                        width: double.infinity,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          color: Colors.blue[50],
-                        ),
-                        child: _currentPosition == null
-                            ? const Center(
-                                child: CircularProgressIndicator(),
-                              )
-                            : Stack(
-                                children: [
-                                  GoogleMap(
-                                    initialCameraPosition: CameraPosition(
-                                      target: LatLng(
-                                        _currentPosition!.latitude,
-                                        _currentPosition!.longitude,
-                                      ),
-                                      zoom: 14,
-                                    ),
-                                    onMapCreated: (controller) {
-                                      _mapController = controller;
-                                    },
-                                    myLocationEnabled: true,
-                                    myLocationButtonEnabled: false,
-                                    zoomControlsEnabled: false,
-                                    mapToolbarEnabled: false,
-                                    compassEnabled: false,
-                                  ),
-                                  Container(
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topCenter,
-                                        end: Alignment.bottomCenter,
-                                        colors: [
-                                          Colors.black.withOpacity(0.3),
-                                          Colors.transparent,
-                                          Colors.black.withOpacity(0.3),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  const Center(
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.map,
-                                          color: Colors.white,
-                                          size: 30,
+                itemCount: feedPosts.length + 1,
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    return Column(
+                      children: [
+                        GestureDetector(
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const MapScreen(),
+                            ),
+                          ),
+                          child: Container(
+                            width: double.infinity,
+                            height: 120,
+                            decoration: BoxDecoration(color: Colors.blue[50]),
+                            child: _currentPosition == null
+                                ? const Center(
+                                    child: CircularProgressIndicator(),
+                                  )
+                                : Stack(
+                                    children: [
+                                      GoogleMap(
+                                        initialCameraPosition: CameraPosition(
+                                          target: LatLng(
+                                            _currentPosition!.latitude,
+                                            _currentPosition!.longitude,
+                                          ),
+                                          zoom: 14,
                                         ),
-                                        SizedBox(height: 8),
-                                        Text(
-                                          "내 주변 친구들의 여행 기록 보기",
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                            shadows: [
-                                              Shadow(
-                                                blurRadius: 4,
-                                                color: Colors.black,
-                                              ),
+                                        onMapCreated: (controller) {
+                                          _mapController = controller;
+                                        },
+                                        myLocationEnabled: true,
+                                        myLocationButtonEnabled: false,
+                                        zoomControlsEnabled: false,
+                                        mapToolbarEnabled: false,
+                                        compassEnabled: false,
+                                      ),
+                                      Container(
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            begin: Alignment.topCenter,
+                                            end: Alignment.bottomCenter,
+                                            colors: [
+                                              Colors.black.withOpacity(0.3),
+                                              Colors.transparent,
+                                              Colors.black.withOpacity(0.3),
                                             ],
                                           ),
                                         ),
-                                      ],
-                                    ),
+                                      ),
+                                      const Center(
+                                        child: Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.map,
+                                              color: Colors.white,
+                                              size: 30,
+                                            ),
+                                            SizedBox(height: 8),
+                                            Text(
+                                              "내 주변 친구들의 여행 기록 보기",
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                                shadows: [
+                                                  Shadow(
+                                                    blurRadius: 4,
+                                                    color: Colors.black,
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
-                      ),
-                    ),
+                          ),
+                        ),
                         const SizedBox(height: 10),
                       ],
                     );
@@ -423,18 +426,67 @@ class _PostItemState extends State<PostItem> {
 
   // 국기 매핑
   final Map<String, String> _countryFlags = {
-    '대한민국': '🇰🇷', '일본': '🇯🇵', '중국': '🇨🇳', '대만': '🇹🇼', '홍콩': '🇭🇰', '마카오': '🇲🇴',
-    '싱가포르': '🇸🇬', '태국': '🇹🇭', '베트남': '🇻🇳', '필리핀': '🇵🇭', '말레이시아': '🇲🇾',
-    '인도네시아': '🇮🇩', '미얀마': '🇲🇲', '캄보디아': '🇰🇭', '라오스': '🇱🇦', '인도': '🇮🇳',
-    '네팔': '🇳🇵', '몰디브': '🇲🇻', '스리랑카': '🇱🇰', '미국': '🇺🇸', '캐나다': '🇨🇦',
-    '멕시코': '🇲🇽', '쿠바': '🇨🇺', '브라질': '🇧🇷', '아르헨티나': '🇦🇷', '페루': '🇵🇪',
-    '칠레': '🇨🇱', '영국': '🇬🇧', '프랑스': '🇫🇷', '이탈리아': '🇮🇹', '스페인': '🇪🇸',
-    '독일': '🇩🇪', '네덜란드': '🇳🇱', '벨기에': '🇧🇪', '스위스': '🇨🇭', '오스트리아': '🇦🇹',
-    '체코': '🇨🇿', '헝가리': '🇭🇺', '폴란드': '🇵🇱', '그리스': '🇬🇷', '터키': '🇹🇷',
-    '포르투갈': '🇵🇹', '아일랜드': '🇮🇪', '노르웨이': '🇳🇴', '스웨덴': '🇸🇪', '덴마크': '🇩🇰',
-    '핀란드': '🇫🇮', '아이슬란드': '🇮🇸', '러시아': '🇷🇺', '호주': '🇦🇺', '뉴질랜드': '🇳🇿',
-    '이집트': '🇪🇬', '모로코': '🇲🇦', '남아프리카공화국': '🇿🇦', '케냐': '🇰🇪', '탄자니아': '🇹🇿',
-    '아랍에미리트': '🇦🇪', '사우디아라비아': '🇸🇦', '카타르': '🇶🇦', '요르단': '🇯🇴', '이스라엘': '🇮🇱',
+    '대한민국': '🇰🇷',
+    '일본': '🇯🇵',
+    '중국': '🇨🇳',
+    '대만': '🇹🇼',
+    '홍콩': '🇭🇰',
+    '마카오': '🇲🇴',
+    '싱가포르': '🇸🇬',
+    '태국': '🇹🇭',
+    '베트남': '🇻🇳',
+    '필리핀': '🇵🇭',
+    '말레이시아': '🇲🇾',
+    '인도네시아': '🇮🇩',
+    '미얀마': '🇲🇲',
+    '캄보디아': '🇰🇭',
+    '라오스': '🇱🇦',
+    '인도': '🇮🇳',
+    '네팔': '🇳🇵',
+    '몰디브': '🇲🇻',
+    '스리랑카': '🇱🇰',
+    '미국': '🇺🇸',
+    '캐나다': '🇨🇦',
+    '멕시코': '🇲🇽',
+    '쿠바': '🇨🇺',
+    '브라질': '🇧🇷',
+    '아르헨티나': '🇦🇷',
+    '페루': '🇵🇪',
+    '칠레': '🇨🇱',
+    '영국': '🇬🇧',
+    '프랑스': '🇫🇷',
+    '이탈리아': '🇮🇹',
+    '스페인': '🇪🇸',
+    '독일': '🇩🇪',
+    '네덜란드': '🇳🇱',
+    '벨기에': '🇧🇪',
+    '스위스': '🇨🇭',
+    '오스트리아': '🇦🇹',
+    '체코': '🇨🇿',
+    '헝가리': '🇭🇺',
+    '폴란드': '🇵🇱',
+    '그리스': '🇬🇷',
+    '터키': '🇹🇷',
+    '포르투갈': '🇵🇹',
+    '아일랜드': '🇮🇪',
+    '노르웨이': '🇳🇴',
+    '스웨덴': '🇸🇪',
+    '덴마크': '🇩🇰',
+    '핀란드': '🇫🇮',
+    '아이슬란드': '🇮🇸',
+    '러시아': '🇷🇺',
+    '호주': '🇦🇺',
+    '뉴질랜드': '🇳🇿',
+    '이집트': '🇪🇬',
+    '모로코': '🇲🇦',
+    '남아프리카공화국': '🇿🇦',
+    '케냐': '🇰🇪',
+    '탄자니아': '🇹🇿',
+    '아랍에미리트': '🇦🇪',
+    '사우디아라비아': '🇸🇦',
+    '카타르': '🇶🇦',
+    '요르단': '🇯🇴',
+    '이스라엘': '🇮🇱',
   };
 
   @override
@@ -497,9 +549,9 @@ class _PostItemState extends State<PostItem> {
         setState(() {
           _isLiked = !_isLiked;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('오류가 발생했습니다: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('오류가 발생했습니다: $e')));
       }
     }
   }
@@ -509,9 +561,7 @@ class _PostItemState extends State<PostItem> {
     if (isOwnPost) {
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (context) => const ProfileScreen(),
-        ),
+        MaterialPageRoute(builder: (context) => const ProfileScreen()),
       );
     } else {
       Navigator.push(
@@ -534,7 +584,10 @@ class _PostItemState extends State<PostItem> {
         padding: EdgeInsets.only(
           left: 20,
           right: 20,
-          bottom: MediaQuery.of(context).viewInsets.bottom + MediaQuery.of(context).padding.bottom + 20,
+          bottom:
+              MediaQuery.of(context).viewInsets.bottom +
+              MediaQuery.of(context).padding.bottom +
+              20,
           top: 20,
         ),
         child: Container(
@@ -545,88 +598,90 @@ class _PostItemState extends State<PostItem> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-            _buildOptionItem(
-              Icons.person_add_outlined,
-              "팔로우",
-              onTap: () async {
-                Navigator.pop(context);
-                try {
-                  final firestoreService = FirestoreService();
-                  await firestoreService.followUser(widget.post.uid);
-                  globalFollowingCount.value++;
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("팔로우 했습니다!")),
-                    );
+              _buildOptionItem(
+                Icons.person_add_outlined,
+                "팔로우",
+                onTap: () async {
+                  Navigator.pop(context);
+                  try {
+                    final firestoreService = FirestoreService();
+                    await firestoreService.followUser(widget.post.uid);
+                    globalFollowingCount.value++;
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("팔로우 했습니다!")),
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text("팔로우 실패: $e")));
+                    }
                   }
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("팔로우 실패: $e")),
-                    );
+                },
+              ),
+              const Divider(height: 1),
+              _buildOptionItem(
+                Icons.visibility_off_outlined,
+                "숨기기",
+                onTap: () async {
+                  Navigator.pop(context);
+                  try {
+                    await _firestoreService.hidePost(widget.post.id);
+                    widget.onDelete();
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("게시물을 숨겼습니다.")),
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text("오류가 발생했습니다: $e")));
+                    }
                   }
-                }
-              },
-            ),
-            const Divider(height: 1),
-            _buildOptionItem(
-              Icons.visibility_off_outlined,
-              "숨기기",
-              onTap: () async {
-                Navigator.pop(context);
-                try {
-                  await _firestoreService.hidePost(widget.post.id);
-                  widget.onDelete();
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("게시물을 숨겼습니다.")),
-                    );
+                },
+              ),
+              const Divider(height: 1),
+              _buildOptionItem(
+                Icons.block,
+                "차단",
+                isDestructive: true,
+                onTap: () async {
+                  Navigator.pop(context);
+                  try {
+                    await _firestoreService.blockUser(widget.post.uid);
+                    widget.onBlock();
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text("${widget.post.userName}님을 차단했습니다."),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text("오류가 발생했습니다: $e")));
+                    }
                   }
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("오류가 발생했습니다: $e")),
-                    );
-                  }
-                }
-              },
-            ),
-            const Divider(height: 1),
-            _buildOptionItem(
-              Icons.block,
-              "차단",
-              isDestructive: true,
-              onTap: () async {
-                Navigator.pop(context);
-                try {
-                  await _firestoreService.blockUser(widget.post.uid);
-                  widget.onBlock();
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("${widget.post.userName}님을 차단했습니다.")),
-                    );
-                  }
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("오류가 발생했습니다: $e")),
-                    );
-                  }
-                }
-              },
-            ),
-            const Divider(height: 1),
-            _buildOptionItem(
-              Icons.campaign_outlined,
-              "신고",
-              isDestructive: true,
-              onTap: () {
-                Navigator.pop(context);
-                _showReportDialog();
-              },
-            ),
-          ],
-        ),
+                },
+              ),
+              const Divider(height: 1),
+              _buildOptionItem(
+                Icons.campaign_outlined,
+                "신고",
+                isDestructive: true,
+                onTap: () {
+                  Navigator.pop(context);
+                  _showReportDialog();
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -690,7 +745,7 @@ class _PostItemState extends State<PostItem> {
       onTap: () async {
         if (!mounted) return;
         Navigator.pop(context);
-        
+
         try {
           // 신고 시 자동으로 차단 처리
           await _firestoreService.blockUser(widget.post.uid);
@@ -702,9 +757,9 @@ class _PostItemState extends State<PostItem> {
           }
         } catch (e) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text("오류가 발생했습니다: $e")),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text("오류가 발생했습니다: $e")));
           }
         }
       },
@@ -747,9 +802,12 @@ class _PostItemState extends State<PostItem> {
                     CircleAvatar(
                       radius: 18,
                       backgroundColor: Colors.grey,
-                      backgroundImage: _profileImageUrl != null && _profileImageUrl!.isNotEmpty
+                      backgroundImage:
+                          _profileImageUrl != null &&
+                              _profileImageUrl!.isNotEmpty
                           ? NetworkImage(_profileImageUrl!)
-                          : const AssetImage('assets/basic_profile.png') as ImageProvider,
+                          : const AssetImage('assets/basic_profile.png')
+                                as ImageProvider,
                     ),
                     const SizedBox(width: 10),
                     Column(
@@ -764,7 +822,8 @@ class _PostItemState extends State<PostItem> {
                                 fontSize: 14,
                               ),
                             ),
-                            if (widget.post.country != null && widget.post.country!.isNotEmpty)
+                            if (widget.post.country != null &&
+                                widget.post.country!.isNotEmpty)
                               Padding(
                                 padding: const EdgeInsets.only(left: 6),
                                 child: Text(
@@ -777,7 +836,10 @@ class _PostItemState extends State<PostItem> {
                         if (widget.post.location.isNotEmpty)
                           Text(
                             widget.post.location,
-                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
                           ),
                       ],
                     ),
@@ -804,10 +866,12 @@ class _PostItemState extends State<PostItem> {
               color: Colors.grey[200],
               child: () {
                 // imageUrls가 있으면 사용, 없으면 imageUrl 사용
-                final images = widget.post.imageUrls.isNotEmpty 
-                    ? widget.post.imageUrls 
-                    : (widget.post.imageUrl.isNotEmpty ? [widget.post.imageUrl] : []);
-                
+                final images = widget.post.imageUrls.isNotEmpty
+                    ? widget.post.imageUrls
+                    : (widget.post.imageUrl.isNotEmpty
+                          ? [widget.post.imageUrl]
+                          : []);
+
                 // 이미지가 없는 경우 처리
                 if (images.isEmpty) {
                   return const Center(
@@ -818,7 +882,7 @@ class _PostItemState extends State<PostItem> {
                     ),
                   );
                 }
-                
+
                 // 단일 이미지 처리
                 if (images.length == 1) {
                   final imagePath = images[0];
@@ -853,7 +917,7 @@ class _PostItemState extends State<PostItem> {
                     },
                   );
                 }
-                
+
                 // 여러 이미지 처리
                 return PageView.builder(
                   controller: _pageController,
@@ -900,12 +964,16 @@ class _PostItemState extends State<PostItem> {
               }(),
             ),
             // 이미지 인디케이터 (여러 이미지가 있을 때만 표시)
-            if (widget.post.imageUrls.isNotEmpty && widget.post.imageUrls.length > 1)
+            if (widget.post.imageUrls.isNotEmpty &&
+                widget.post.imageUrls.length > 1)
               Positioned(
                 top: 10,
                 right: 10,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.black.withOpacity(0.5),
                     borderRadius: BorderRadius.circular(12),
@@ -920,7 +988,9 @@ class _PostItemState extends State<PostItem> {
                   ),
                 ),
               ),
-            if (_showMap && widget.post.latitude != null && widget.post.longitude != null)
+            if (_showMap &&
+                widget.post.latitude != null &&
+                widget.post.longitude != null)
               Container(
                 width: double.infinity,
                 height: 400,
@@ -955,7 +1025,11 @@ class _PostItemState extends State<PostItem> {
                       top: 10,
                       right: 10,
                       child: IconButton(
-                        icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                        icon: const Icon(
+                          Icons.close,
+                          color: Colors.white,
+                          size: 30,
+                        ),
                         onPressed: () {
                           setState(() {
                             _showMap = false;
@@ -977,7 +1051,7 @@ class _PostItemState extends State<PostItem> {
                 stream: _firestoreService.getLikeCountStream(widget.post.id),
                 builder: (context, snapshot) {
                   final likeCount = snapshot.data ?? widget.post.likeCount;
-                  
+
                   return Row(
                     children: [
                       GestureDetector(
@@ -1006,7 +1080,7 @@ class _PostItemState extends State<PostItem> {
                 stream: _firestoreService.getCommentCountStream(widget.post.id),
                 builder: (context, snapshot) {
                   final commentCount = snapshot.data ?? 0;
-                  
+
                   return Row(
                     children: [
                       GestureDetector(
@@ -1028,7 +1102,10 @@ class _PostItemState extends State<PostItem> {
                       const SizedBox(width: 6),
                       Text(
                         "$commentCount",
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                   );
@@ -1052,7 +1129,8 @@ class _PostItemState extends State<PostItem> {
               const Spacer(),
               GestureDetector(
                 onTap: () {
-                  if (widget.post.latitude != null && widget.post.longitude != null) {
+                  if (widget.post.latitude != null &&
+                      widget.post.longitude != null) {
                     setState(() {
                       _showMap = !_showMap;
                     });

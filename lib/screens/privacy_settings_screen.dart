@@ -14,13 +14,13 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
   final FirestoreService _firestoreService = FirestoreService();
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  
+
   bool _isLoading = true;
 
   // 설정 값 상태 관리
   bool _isPublicToFollowers = true; // 나를 팔로워한 사람들에게 공개
   bool _isPublicToMutuals = false; // 맞팔로우한 사람에게만 공개
-  
+
   List<String> _selectedFollowingFriends = []; // 팔로잉 목록에서 선택한 친구들
 
   @override
@@ -40,8 +40,10 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
           final privacySettings = data?['privacySettings'];
           if (privacySettings != null && mounted) {
             setState(() {
-              _isPublicToFollowers = privacySettings['isPublicToFollowers'] ?? true;
-              _isPublicToMutuals = privacySettings['isPublicToMutuals'] ?? false;
+              _isPublicToFollowers =
+                  privacySettings['isPublicToFollowers'] ?? true;
+              _isPublicToMutuals =
+                  privacySettings['isPublicToMutuals'] ?? false;
               _selectedFollowingFriends = List<String>.from(
                 privacySettings['selectedFollowingFriends'] ?? [],
               );
@@ -75,7 +77,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
             'isPublicToMutuals': _isPublicToMutuals,
             'selectedFollowingFriends': _selectedFollowingFriends,
             'updatedAt': FieldValue.serverTimestamp(),
-          }
+          },
         }, SetOptions(merge: true));
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -110,7 +112,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
             .doc(user.uid)
             .collection('following')
             .get();
-        
+
         List<Map<String, dynamic>> users = [];
         for (var doc in followingSnapshot.docs) {
           final userDoc = await _db.collection('users').doc(doc.id).get();
@@ -203,7 +205,10 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
                         // 3. 특정 팔로잉 사람에게만 공개
                         const Text(
                           "특정 사람에게만 공개",
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         const SizedBox(height: 10),
 
@@ -212,7 +217,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
                             // 팔로잉 목록 가져오기
                             final followingUsers = await _getFollowingList();
                             if (!mounted) return;
-                            
+
                             if (followingUsers.isEmpty) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
@@ -227,7 +232,9 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
                             showDialog(
                               context: context,
                               builder: (context) {
-                                List<String> tempSelected = List.from(_selectedFollowingFriends);
+                                List<String> tempSelected = List.from(
+                                  _selectedFollowingFriends,
+                                );
                                 return StatefulBuilder(
                                   builder: (context, setDialogState) {
                                     return AlertDialog(
@@ -238,16 +245,24 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
                                           width: double.maxFinite,
                                           child: Column(
                                             mainAxisSize: MainAxisSize.min,
-                                            children: followingUsers.map((user) {
+                                            children: followingUsers.map((
+                                              user,
+                                            ) {
                                               return CheckboxListTile(
                                                 title: Text(user['userName']),
-                                                value: tempSelected.contains(user['uid']),
+                                                value: tempSelected.contains(
+                                                  user['uid'],
+                                                ),
                                                 onChanged: (val) {
                                                   setDialogState(() {
                                                     if (val == true) {
-                                                      tempSelected.add(user['uid']);
+                                                      tempSelected.add(
+                                                        user['uid'],
+                                                      );
                                                     } else {
-                                                      tempSelected.remove(user['uid']);
+                                                      tempSelected.remove(
+                                                        user['uid'],
+                                                      );
                                                     }
                                                   });
                                                 },
@@ -258,14 +273,17 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
                                       ),
                                       actions: [
                                         TextButton(
-                                          onPressed: () => Navigator.pop(context),
+                                          onPressed: () =>
+                                              Navigator.pop(context),
                                           child: const Text("취소"),
                                         ),
                                         TextButton(
                                           onPressed: () {
                                             setState(() {
-                                              _selectedFollowingFriends = tempSelected;
-                                              if (_selectedFollowingFriends.isNotEmpty) {
+                                              _selectedFollowingFriends =
+                                                  tempSelected;
+                                              if (_selectedFollowingFriends
+                                                  .isNotEmpty) {
                                                 _isPublicToFollowers = false;
                                                 _isPublicToMutuals = false;
                                               }
@@ -297,7 +315,8 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
                               children: [
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       const Text(
                                         "팔로잉 목록에서 선택",
@@ -308,7 +327,9 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
                                       ),
                                       if (_selectedFollowingFriends.isNotEmpty)
                                         Padding(
-                                          padding: const EdgeInsets.only(top: 4.0),
+                                          padding: const EdgeInsets.only(
+                                            top: 4.0,
+                                          ),
                                           child: Text(
                                             "${_selectedFollowingFriends.length}명 선택됨",
                                             style: const TextStyle(

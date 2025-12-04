@@ -33,12 +33,16 @@ class FirestoreService {
       // [수정] Firestore에서 사용자 정보 가져오기
       String userName = '알 수 없음';
       String userProfileImage = '';
-      
+
       if (!isAnonymous) {
         final userDoc = await _db.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
           final userData = userDoc.data();
-          userName = userData?['userName'] ?? userData?['username'] ?? userData?['name'] ?? '알 수 없음';
+          userName =
+              userData?['userName'] ??
+              userData?['username'] ??
+              userData?['name'] ??
+              '알 수 없음';
           userProfileImage = userData?['profileImage'] ?? '';
         }
       } else {
@@ -46,10 +50,11 @@ class FirestoreService {
       }
 
       List<String> downloadUrls = [];
-      
+
       // 여러 이미지 처리
-      final imagePaths = localImagePaths ?? (localImagePath != null ? [localImagePath] : []);
-      
+      final imagePaths =
+          localImagePaths ?? (localImagePath != null ? [localImagePath] : []);
+
       for (String imagePath in imagePaths) {
         if (imagePath.isNotEmpty) {
           File file = File(imagePath);
@@ -72,7 +77,9 @@ class FirestoreService {
         'title': title,
         'content': content,
         'location': location,
-        'imageUrl': downloadUrls.isNotEmpty ? downloadUrls[0] : '', // 첫 번째 이미지를 기본 이미지로
+        'imageUrl': downloadUrls.isNotEmpty
+            ? downloadUrls[0]
+            : '', // 첫 번째 이미지를 기본 이미지로
         'imageUrls': downloadUrls, // 모든 이미지 URL
         'taggedFriend': taggedFriend ?? '',
         'likeCount': 0,
@@ -85,7 +92,8 @@ class FirestoreService {
       postData['isAnonymous'] = isAnonymous;
       if (latitude != null) postData['latitude'] = latitude;
       if (longitude != null) postData['longitude'] = longitude;
-      if (locationName != null) postData['locationName'] = locationName; // 위치 이름 저장
+      if (locationName != null)
+        postData['locationName'] = locationName; // 위치 이름 저장
       if (country != null) postData['country'] = country; // 국가 정보 저장
 
       await _db.collection('posts').add(postData);
@@ -166,9 +174,7 @@ class FirestoreService {
           .doc(user.uid)
           .collection('following')
           .doc(targetUserId)
-          .set({
-        'timestamp': FieldValue.serverTimestamp(),
-      });
+          .set({'timestamp': FieldValue.serverTimestamp()});
 
       // 상대방의 followers 컬렉션에 추가
       await _db
@@ -176,9 +182,7 @@ class FirestoreService {
           .doc(targetUserId)
           .collection('followers')
           .doc(user.uid)
-          .set({
-        'timestamp': FieldValue.serverTimestamp(),
-      });
+          .set({'timestamp': FieldValue.serverTimestamp()});
     } catch (e) {
       print("팔로우 실패: $e");
       rethrow;
@@ -314,7 +318,11 @@ class FirestoreService {
           // userName 필드가 없으면 다른 필드들도 확인
           return {
             ...data,
-            'userName': data['userName'] ?? data['username'] ?? data['name'] ?? '알 수 없음',
+            'userName':
+                data['userName'] ??
+                data['username'] ??
+                data['name'] ??
+                '알 수 없음',
           };
         }
       }
@@ -334,7 +342,8 @@ class FirestoreService {
       File file = File(localImagePath);
       if (!file.existsSync()) throw Exception("파일이 존재하지 않습니다.");
 
-      String fileName = "profile_${user.uid}_${DateTime.now().millisecondsSinceEpoch}.jpg";
+      String fileName =
+          "profile_${user.uid}_${DateTime.now().millisecondsSinceEpoch}.jpg";
       Reference ref = _storage.ref().child('profile_images/$fileName');
       UploadTask uploadTask = ref.putFile(file);
       TaskSnapshot snapshot = await uploadTask;
@@ -370,9 +379,7 @@ class FirestoreService {
 
       if (!likeDoc.exists) {
         // 좋아요 추가
-        await likeRef.set({
-          'timestamp': FieldValue.serverTimestamp(),
-        });
+        await likeRef.set({'timestamp': FieldValue.serverTimestamp()});
 
         // 게시물의 likeCount 증가
         await _db.collection('posts').doc(postId).update({
@@ -457,15 +464,15 @@ class FirestoreService {
       // 사용자 정보 가져오기
       final userDoc = await _db.collection('users').doc(user.uid).get();
       final userData = userDoc.data();
-      final userName = userData?['userName'] ?? userData?['username'] ?? userData?['name'] ?? '알 수 없음';
+      final userName =
+          userData?['userName'] ??
+          userData?['username'] ??
+          userData?['name'] ??
+          '알 수 없음';
       final userProfileImage = userData?['profileImage'] ?? '';
 
       // 댓글 추가
-      await _db
-          .collection('posts')
-          .doc(postId)
-          .collection('comments')
-          .add({
+      await _db.collection('posts').doc(postId).collection('comments').add({
         'uid': user.uid,
         'userName': userName,
         'userProfileImage': userProfileImage,
@@ -529,8 +536,10 @@ class FirestoreService {
     try {
       String chatRoomId = _getChatRoomId(user.uid, otherUserId);
       print('🔑 채팅방 ID: $chatRoomId (${user.uid} <-> $otherUserId)');
-      
-      DocumentReference chatRoomRef = _db.collection('chatRooms').doc(chatRoomId);
+
+      DocumentReference chatRoomRef = _db
+          .collection('chatRooms')
+          .doc(chatRoomId);
 
       DocumentSnapshot chatRoomDoc = await chatRoomRef.get();
 
@@ -542,10 +551,7 @@ class FirestoreService {
           'lastMessage': '',
           'lastMessageType': 'text',
           'lastMessageTime': FieldValue.serverTimestamp(),
-          'unreadCount': {
-            user.uid: 0,
-            otherUserId: 0,
-          },
+          'unreadCount': {user.uid: 0, otherUserId: 0},
         });
         print('✅ 채팅방 생성 완료');
       } else {
@@ -572,7 +578,11 @@ class FirestoreService {
       // 사용자 정보 가져오기
       final userDoc = await _db.collection('users').doc(user.uid).get();
       final userData = userDoc.data();
-      final userName = userData?['userName'] ?? userData?['username'] ?? userData?['name'] ?? '알 수 없음';
+      final userName =
+          userData?['userName'] ??
+          userData?['username'] ??
+          userData?['name'] ??
+          '알 수 없음';
       final userProfileImage = userData?['profileImage'] ?? '';
 
       // 메시지 추가
@@ -582,14 +592,14 @@ class FirestoreService {
           .doc(chatRoomId)
           .collection('messages')
           .add({
-        'senderId': user.uid,
-        'senderName': userName,
-        'senderProfileImage': userProfileImage,
-        'receiverId': receiverId,
-        'content': content,
-        'type': 'text',
-        'timestamp': FieldValue.serverTimestamp(),
-      });
+            'senderId': user.uid,
+            'senderName': userName,
+            'senderProfileImage': userProfileImage,
+            'receiverId': receiverId,
+            'content': content,
+            'type': 'text',
+            'timestamp': FieldValue.serverTimestamp(),
+          });
 
       // 채팅방 정보 업데이트
       print('📝 채팅방 정보 업데이트 중...');
@@ -620,7 +630,8 @@ class FirestoreService {
       File file = File(localImagePath);
       if (!file.existsSync()) throw Exception("파일이 존재하지 않습니다.");
 
-      String fileName = "chat_${DateTime.now().millisecondsSinceEpoch}_${user.uid}.jpg";
+      String fileName =
+          "chat_${DateTime.now().millisecondsSinceEpoch}_${user.uid}.jpg";
       Reference ref = _storage.ref().child('chat_images/$fileName');
       UploadTask uploadTask = ref.putFile(file);
       TaskSnapshot snapshot = await uploadTask;
@@ -629,7 +640,11 @@ class FirestoreService {
       // 사용자 정보 가져오기
       final userDoc = await _db.collection('users').doc(user.uid).get();
       final userData = userDoc.data();
-      final userName = userData?['userName'] ?? userData?['username'] ?? userData?['name'] ?? '알 수 없음';
+      final userName =
+          userData?['userName'] ??
+          userData?['username'] ??
+          userData?['name'] ??
+          '알 수 없음';
       final userProfileImage = userData?['profileImage'] ?? '';
 
       // 메시지 추가
@@ -638,15 +653,15 @@ class FirestoreService {
           .doc(chatRoomId)
           .collection('messages')
           .add({
-        'senderId': user.uid,
-        'senderName': userName,
-        'senderProfileImage': userProfileImage,
-        'receiverId': receiverId,
-        'content': '사진을 보냈습니다.',
-        'type': 'image',
-        'imageUrl': imageUrl,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
+            'senderId': user.uid,
+            'senderName': userName,
+            'senderProfileImage': userProfileImage,
+            'receiverId': receiverId,
+            'content': '사진을 보냈습니다.',
+            'type': 'image',
+            'imageUrl': imageUrl,
+            'timestamp': FieldValue.serverTimestamp(),
+          });
 
       // 채팅방 정보 업데이트
       await _db.collection('chatRooms').doc(chatRoomId).update({
@@ -676,7 +691,11 @@ class FirestoreService {
       // 사용자 정보 가져오기
       final userDoc = await _db.collection('users').doc(user.uid).get();
       final userData = userDoc.data();
-      final userName = userData?['userName'] ?? userData?['username'] ?? userData?['name'] ?? '알 수 없음';
+      final userName =
+          userData?['userName'] ??
+          userData?['username'] ??
+          userData?['name'] ??
+          '알 수 없음';
       final userProfileImage = userData?['profileImage'] ?? '';
 
       // 메시지 추가
@@ -685,17 +704,17 @@ class FirestoreService {
           .doc(chatRoomId)
           .collection('messages')
           .add({
-        'senderId': user.uid,
-        'senderName': userName,
-        'senderProfileImage': userProfileImage,
-        'receiverId': receiverId,
-        'content': '위치를 보냈습니다.',
-        'type': 'location',
-        'latitude': latitude,
-        'longitude': longitude,
-        'locationName': locationName,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
+            'senderId': user.uid,
+            'senderName': userName,
+            'senderProfileImage': userProfileImage,
+            'receiverId': receiverId,
+            'content': '위치를 보냈습니다.',
+            'type': 'location',
+            'latitude': latitude,
+            'longitude': longitude,
+            'locationName': locationName,
+            'timestamp': FieldValue.serverTimestamp(),
+          });
 
       // 채팅방 정보 업데이트
       await _db.collection('chatRooms').doc(chatRoomId).update({
@@ -729,7 +748,7 @@ class FirestoreService {
     }
 
     print('🔍 getMyChatRoomsStream: 사용자 ${user.uid}의 채팅방 조회 중...');
-    
+
     return _db
         .collection('chatRooms')
         .where('participants', arrayContains: user.uid)
@@ -756,8 +775,11 @@ class FirestoreService {
     if (user == null) return null;
 
     String chatRoomId = _getChatRoomId(user.uid, otherUserId);
-    DocumentSnapshot doc = await _db.collection('chatRooms').doc(chatRoomId).get();
-    
+    DocumentSnapshot doc = await _db
+        .collection('chatRooms')
+        .doc(chatRoomId)
+        .get();
+
     if (doc.exists) {
       return chatRoomId;
     }
@@ -784,10 +806,12 @@ class FirestoreService {
         return await _isFollowing(currentUserId, postOwnerId);
       }
 
-      final isPublicToFollowers = privacySettings['isPublicToFollowers'] ?? false;
+      final isPublicToFollowers =
+          privacySettings['isPublicToFollowers'] ?? false;
       final isPublicToMutuals = privacySettings['isPublicToMutuals'] ?? false;
-      final selectedFollowingFriends = 
-          List<String>.from(privacySettings['selectedFollowingFriends'] ?? []);
+      final selectedFollowingFriends = List<String>.from(
+        privacySettings['selectedFollowingFriends'] ?? [],
+      );
 
       // 1. 특정 사람에게만 공개되는 경우
       if (selectedFollowingFriends.isNotEmpty) {
@@ -864,9 +888,7 @@ class FirestoreService {
           .doc(user.uid)
           .collection('hiddenPosts')
           .doc(postId)
-          .set({
-        'hiddenAt': FieldValue.serverTimestamp(),
-      });
+          .set({'hiddenAt': FieldValue.serverTimestamp()});
     } catch (e) {
       print('게시물 숨기기 실패: $e');
       rethrow;
@@ -884,9 +906,7 @@ class FirestoreService {
           .doc(user.uid)
           .collection('blockedUsers')
           .doc(targetUserId)
-          .set({
-        'blockedAt': FieldValue.serverTimestamp(),
-      });
+          .set({'blockedAt': FieldValue.serverTimestamp()});
     } catch (e) {
       print('사용자 차단 실패: $e');
       rethrow;
@@ -958,26 +978,27 @@ class FirestoreService {
         .collection('blockedUsers')
         .snapshots()
         .asyncMap((snapshot) async {
-      List<Map<String, dynamic>> blockedUsers = [];
-      
-      for (var doc in snapshot.docs) {
-        try {
-          final userDoc = await _db.collection('users').doc(doc.id).get();
-          if (userDoc.exists) {
-            final userData = userDoc.data() ?? {};
-            blockedUsers.add({
-              'uid': doc.id,
-              'userName': userData['userName'] ?? userData['username'] ?? '알 수 없음',
-              'profileImage': userData['profileImage'] ?? '',
-              'blockedAt': doc.data()['blockedAt'],
-            });
+          List<Map<String, dynamic>> blockedUsers = [];
+
+          for (var doc in snapshot.docs) {
+            try {
+              final userDoc = await _db.collection('users').doc(doc.id).get();
+              if (userDoc.exists) {
+                final userData = userDoc.data() ?? {};
+                blockedUsers.add({
+                  'uid': doc.id,
+                  'userName':
+                      userData['userName'] ?? userData['username'] ?? '알 수 없음',
+                  'profileImage': userData['profileImage'] ?? '',
+                  'blockedAt': doc.data()['blockedAt'],
+                });
+              }
+            } catch (e) {
+              print('차단된 사용자 정보 가져오기 실패: $e');
+            }
           }
-        } catch (e) {
-          print('차단된 사용자 정보 가져오기 실패: $e');
-        }
-      }
-      
-      return blockedUsers;
-    });
+
+          return blockedUsers;
+        });
   }
 }
