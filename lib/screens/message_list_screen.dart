@@ -1,9 +1,21 @@
 import 'package:flutter/material.dart';
-import 'friend_list_screen.dart'; // 친구 목록 연결
-import 'chat_detail_screen.dart'; // 채팅방 연결
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
+import '../services/firestore_service.dart';
+import '../models/message_model.dart';
+import 'friend_list_screen.dart';
+import 'chat_detail_screen.dart';
 
-class MessageListScreen extends StatelessWidget {
+class MessageListScreen extends StatefulWidget {
   const MessageListScreen({super.key});
+
+  @override
+  State<MessageListScreen> createState() => _MessageListScreenState();
+}
+
+class _MessageListScreenState extends State<MessageListScreen> {
+  final FirestoreService _firestoreService = FirestoreService();
 
   @override
   Widget build(BuildContext context) {
@@ -14,7 +26,7 @@ class MessageListScreen extends StatelessWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
-          onPressed: () => Navigator.pop(context), // 뒤로가기
+          onPressed: () => Navigator.pop(context),
         ),
         centerTitle: true,
         title: const Text(
@@ -22,7 +34,6 @@ class MessageListScreen extends StatelessWidget {
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
         actions: [
-          // 오른쪽 상단 메뉴 -> 친구 목록으로 이동 (새 친구 찾기)
           IconButton(
             icon: const Icon(Icons.menu, color: Colors.black),
             onPressed: () {
@@ -38,159 +49,111 @@ class MessageListScreen extends StatelessWidget {
         ],
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 1. 즐겨찾기 영역
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16.0,
-                vertical: 10,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: StreamBuilder<QuerySnapshot>(
+          stream: _firestoreService.getMyChatRoomsStream(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.message_outlined, size: 80, color: Colors.grey[300]),
+                    const SizedBox(height: 16),
+                    Text(
+                      "아직 대화 내역이 없습니다",
+                      style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const FriendListScreen(),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.person_add),
+                      label: const Text("친구 목록으로 이동"),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            final chatRooms = snapshot.data!.docs.map((doc) => ChatRoom.fromFirestore(doc)).toList();
+            final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+
+            return SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    "즐겨찾기",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  // 즐겨찾기 추가 버튼 역할 (누르면 친구 목록으로 이동)
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const FriendListScreen(),
-                        ),
+                  // 채팅 리스트
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: chatRooms.length,
+                    itemBuilder: (context, index) {
+                      final chatRoom = chatRooms[index];
+                      final otherUserId = chatRoom.participants.firstWhere(
+                        (id) => id != currentUserId,
+                        orElse: () => '',
+                      );
+
+                      if (otherUserId.isEmpty) return const SizedBox.shrink();
+
+                      return FutureBuilder<Map<String, dynamic>?>(
+                        future: _firestoreService.getUserInfo(otherUserId),
+                        builder: (context, userSnapshot) {
+                          final userName = userSnapshot.data?['userName'] ?? '알 수 없음';
+                          final userProfileImage = userSnapshot.data?['profileImage'] ?? '';
+                          final unreadCount = chatRoom.unreadCount[currentUserId] ?? 0;
+
+                          String lastMessagePreview = chatRoom.lastMessage;
+                          if (chatRoom.lastMessageType == 'image') {
+                            lastMessagePreview = '📷 사진을 보냈습니다.';
+                          } else if (chatRoom.lastMessageType == 'location') {
+                            lastMessagePreview = '📍 위치를 보냈습니다.';
+                          }
+
+                          String timeString = '';
+                          if (chatRoom.lastMessageTime != null) {
+                            final now = DateTime.now();
+                            final diff = now.difference(chatRoom.lastMessageTime!);
+
+                            if (diff.inDays > 0) {
+                              timeString = DateFormat('MM.dd').format(chatRoom.lastMessageTime!);
+                            } else if (diff.inHours > 0) {
+                              timeString = '${diff.inHours}시간 전';
+                            } else if (diff.inMinutes > 0) {
+                              timeString = '${diff.inMinutes}분 전';
+                            } else {
+                              timeString = '방금';
+                            }
+                          }
+
+                          return _buildChatItem(
+                            context,
+                            chatRoom.id,
+                            otherUserId,
+                            userName,
+                            lastMessagePreview,
+                            timeString,
+                            unreadCount,
+                            userProfileImage: userProfileImage,
+                          );
+                        },
                       );
                     },
-                    child: Text(
-                      "추가 +",
-                      style: TextStyle(
-                        color: Colors.blue[600],
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
                   ),
                 ],
               ),
-            ),
-            SizedBox(
-              height: 100,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                children: [
-                  _buildFavoriteItem(context, "김찬희", true),
-                  _buildFavoriteItem(context, "황종현", false),
-                  _buildFavoriteItem(context, "이경환", false),
-                  _buildFavoriteItem(context, "김성진", true),
-                  _buildFavoriteItem(context, "김성우", false),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-
-            // 2. 채팅 리스트
-            _buildChatItem(
-              context,
-              "김찬희",
-              "안녕하세요. 반가워요 혹시 ...",
-              "04:04AM",
-              3,
-              isPhoto: false,
-            ),
-            _buildChatItem(
-              context,
-              "이경환",
-              "사진을 보냈습니다.",
-              "08:58PM",
-              3,
-              isPhoto: true,
-            ),
-            _buildChatItem(
-              context,
-              "문학철",
-              "사진을 보냈습니다.",
-              "11:33PM",
-              0,
-              isPhoto: true,
-            ),
-            _buildChatItem(
-              context,
-              "맹한수",
-              "ㅎㅇㅋㅋ뭐함?",
-              "06:58PM",
-              1,
-              isPhoto: false,
-            ),
-            _buildChatItem(
-              context,
-              "안해리",
-              "사진을 보냈습니다.",
-              "09:43PM",
-              3,
-              isPhoto: true,
-            ),
-            _buildChatItem(
-              context,
-              "강우준",
-              "지도를 보냈습니다.",
-              "09:43PM",
-              0,
-              isPhoto: false,
-            ),
-          ],
-        ),
-        ),
-      ),
-    );
-  }
-
-  // 즐겨찾기 아이템 (클릭 시 채팅방 이동)
-  Widget _buildFavoriteItem(BuildContext context, String name, bool isOnline) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const ChatDetailScreen()),
-        );
-      },
-      child: Padding(
-        padding: const EdgeInsets.only(right: 16.0),
-        child: Column(
-          children: [
-            Stack(
-              children: [
-                const CircleAvatar(
-                  radius: 28,
-                  backgroundColor: Colors.grey,
-                  child: Icon(Icons.person, color: Colors.white, size: 30),
-                ),
-                if (isOnline)
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: Container(
-                      width: 14,
-                      height: 14,
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              name,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
@@ -198,18 +161,25 @@ class MessageListScreen extends StatelessWidget {
 
   Widget _buildChatItem(
     BuildContext context,
+    String chatRoomId,
+    String otherUserId,
     String name,
     String message,
     String time,
     int unread, {
-    required bool isPhoto,
+    String? userProfileImage,
   }) {
     return InkWell(
-      // 리스트 클릭 -> 채팅방으로 이동
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => const ChatDetailScreen()),
+          MaterialPageRoute(
+            builder: (context) => ChatDetailScreen(
+              chatPartnerName: name,
+              chatPartnerId: otherUserId,
+              chatRoomId: chatRoomId,
+            ),
+          ),
         );
       },
       child: Padding(
@@ -218,23 +188,15 @@ class MessageListScreen extends StatelessWidget {
           children: [
             Stack(
               children: [
-                const CircleAvatar(
+                CircleAvatar(
                   radius: 24,
                   backgroundColor: Colors.grey,
-                  child: Icon(Icons.person, color: Colors.white),
-                ),
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: Colors.green,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                  ),
+                  backgroundImage: userProfileImage != null && userProfileImage.isNotEmpty
+                      ? NetworkImage(userProfileImage)
+                      : null,
+                  child: userProfileImage == null || userProfileImage.isEmpty
+                      ? const Icon(Icons.person, color: Colors.white)
+                      : null,
                 ),
               ],
             ),
@@ -269,8 +231,9 @@ class MessageListScreen extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: Colors.grey[700],
+                            color: unread > 0 ? Colors.black87 : Colors.grey[700],
                             fontSize: 14,
+                            fontWeight: unread > 0 ? FontWeight.w600 : FontWeight.normal,
                           ),
                         ),
                       ),

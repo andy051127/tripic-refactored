@@ -479,4 +479,242 @@ class FirestoreService {
         .snapshots()
         .map((snapshot) => snapshot.docs.length);
   }
+
+  // --- [DM/채팅 기능] ---
+
+  // 1. 채팅방 ID 생성 (두 사용자 uid를 정렬하여 일관된 ID 생성)
+  String _getChatRoomId(String uid1, String uid2) {
+    List<String> uids = [uid1, uid2]..sort();
+    return '${uids[0]}_${uids[1]}';
+  }
+
+  // 2. 채팅방 생성 또는 가져오기
+  Future<String> getOrCreateChatRoom(String otherUserId) async {
+    User? user = _auth.currentUser;
+    if (user == null) throw Exception("로그인이 필요합니다.");
+
+    try {
+      String chatRoomId = _getChatRoomId(user.uid, otherUserId);
+      DocumentReference chatRoomRef = _db.collection('chatRooms').doc(chatRoomId);
+
+      DocumentSnapshot chatRoomDoc = await chatRoomRef.get();
+
+      if (!chatRoomDoc.exists) {
+        // 채팅방이 없으면 생성
+        await chatRoomRef.set({
+          'participants': [user.uid, otherUserId],
+          'lastMessage': '',
+          'lastMessageType': 'text',
+          'lastMessageTime': FieldValue.serverTimestamp(),
+          'unreadCount': {
+            user.uid: 0,
+            otherUserId: 0,
+          },
+        });
+      }
+
+      return chatRoomId;
+    } catch (e) {
+      print("채팅방 생성 실패: $e");
+      rethrow;
+    }
+  }
+
+  // 3. 메시지 전송 (텍스트)
+  Future<void> sendTextMessage({
+    required String chatRoomId,
+    required String receiverId,
+    required String content,
+  }) async {
+    User? user = _auth.currentUser;
+    if (user == null) throw Exception("로그인이 필요합니다.");
+
+    try {
+      // 사용자 정보 가져오기
+      final userDoc = await _db.collection('users').doc(user.uid).get();
+      final userData = userDoc.data();
+      final userName = userData?['userName'] ?? userData?['username'] ?? userData?['name'] ?? '알 수 없음';
+      final userProfileImage = userData?['profileImage'] ?? '';
+
+      // 메시지 추가
+      await _db
+          .collection('chatRooms')
+          .doc(chatRoomId)
+          .collection('messages')
+          .add({
+        'senderId': user.uid,
+        'senderName': userName,
+        'senderProfileImage': userProfileImage,
+        'receiverId': receiverId,
+        'content': content,
+        'type': 'text',
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      // 채팅방 정보 업데이트
+      await _db.collection('chatRooms').doc(chatRoomId).update({
+        'lastMessage': content,
+        'lastMessageType': 'text',
+        'lastMessageTime': FieldValue.serverTimestamp(),
+        'unreadCount.$receiverId': FieldValue.increment(1),
+      });
+    } catch (e) {
+      print("메시지 전송 실패: $e");
+      rethrow;
+    }
+  }
+
+  // 4. 메시지 전송 (이미지)
+  Future<void> sendImageMessage({
+    required String chatRoomId,
+    required String receiverId,
+    required String localImagePath,
+  }) async {
+    User? user = _auth.currentUser;
+    if (user == null) throw Exception("로그인이 필요합니다.");
+
+    try {
+      // 이미지 업로드
+      File file = File(localImagePath);
+      if (!file.existsSync()) throw Exception("파일이 존재하지 않습니다.");
+
+      String fileName = "chat_${DateTime.now().millisecondsSinceEpoch}_${user.uid}.jpg";
+      Reference ref = _storage.ref().child('chat_images/$fileName');
+      UploadTask uploadTask = ref.putFile(file);
+      TaskSnapshot snapshot = await uploadTask;
+      String imageUrl = await snapshot.ref.getDownloadURL();
+
+      // 사용자 정보 가져오기
+      final userDoc = await _db.collection('users').doc(user.uid).get();
+      final userData = userDoc.data();
+      final userName = userData?['userName'] ?? userData?['username'] ?? userData?['name'] ?? '알 수 없음';
+      final userProfileImage = userData?['profileImage'] ?? '';
+
+      // 메시지 추가
+      await _db
+          .collection('chatRooms')
+          .doc(chatRoomId)
+          .collection('messages')
+          .add({
+        'senderId': user.uid,
+        'senderName': userName,
+        'senderProfileImage': userProfileImage,
+        'receiverId': receiverId,
+        'content': '사진을 보냈습니다.',
+        'type': 'image',
+        'imageUrl': imageUrl,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      // 채팅방 정보 업데이트
+      await _db.collection('chatRooms').doc(chatRoomId).update({
+        'lastMessage': '사진을 보냈습니다.',
+        'lastMessageType': 'image',
+        'lastMessageTime': FieldValue.serverTimestamp(),
+        'unreadCount.$receiverId': FieldValue.increment(1),
+      });
+    } catch (e) {
+      print("이미지 전송 실패: $e");
+      rethrow;
+    }
+  }
+
+  // 5. 메시지 전송 (위치)
+  Future<void> sendLocationMessage({
+    required String chatRoomId,
+    required String receiverId,
+    required double latitude,
+    required double longitude,
+    required String locationName,
+  }) async {
+    User? user = _auth.currentUser;
+    if (user == null) throw Exception("로그인이 필요합니다.");
+
+    try {
+      // 사용자 정보 가져오기
+      final userDoc = await _db.collection('users').doc(user.uid).get();
+      final userData = userDoc.data();
+      final userName = userData?['userName'] ?? userData?['username'] ?? userData?['name'] ?? '알 수 없음';
+      final userProfileImage = userData?['profileImage'] ?? '';
+
+      // 메시지 추가
+      await _db
+          .collection('chatRooms')
+          .doc(chatRoomId)
+          .collection('messages')
+          .add({
+        'senderId': user.uid,
+        'senderName': userName,
+        'senderProfileImage': userProfileImage,
+        'receiverId': receiverId,
+        'content': '위치를 보냈습니다.',
+        'type': 'location',
+        'latitude': latitude,
+        'longitude': longitude,
+        'locationName': locationName,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      // 채팅방 정보 업데이트
+      await _db.collection('chatRooms').doc(chatRoomId).update({
+        'lastMessage': '위치를 보냈습니다.',
+        'lastMessageType': 'location',
+        'lastMessageTime': FieldValue.serverTimestamp(),
+        'unreadCount.$receiverId': FieldValue.increment(1),
+      });
+    } catch (e) {
+      print("위치 전송 실패: $e");
+      rethrow;
+    }
+  }
+
+  // 6. 메시지 목록 스트림
+  Stream<QuerySnapshot> getMessagesStream(String chatRoomId) {
+    return _db
+        .collection('chatRooms')
+        .doc(chatRoomId)
+        .collection('messages')
+        .orderBy('timestamp', descending: false)
+        .snapshots();
+  }
+
+  // 7. 내 채팅방 목록 스트림
+  Stream<QuerySnapshot> getMyChatRoomsStream() {
+    User? user = _auth.currentUser;
+    if (user == null) return const Stream.empty();
+
+    return _db
+        .collection('chatRooms')
+        .where('participants', arrayContains: user.uid)
+        .orderBy('lastMessageTime', descending: true)
+        .snapshots();
+  }
+
+  // 8. 읽지 않은 메시지 수 초기화
+  Future<void> markMessagesAsRead(String chatRoomId) async {
+    User? user = _auth.currentUser;
+    if (user == null) return;
+
+    try {
+      await _db.collection('chatRooms').doc(chatRoomId).update({
+        'unreadCount.${user.uid}': 0,
+      });
+    } catch (e) {
+      print("읽음 처리 실패: $e");
+    }
+  }
+
+  // 9. 특정 사용자와의 채팅방 ID 가져오기
+  Future<String?> getChatRoomIdWithUser(String otherUserId) async {
+    User? user = _auth.currentUser;
+    if (user == null) return null;
+
+    String chatRoomId = _getChatRoomId(user.uid, otherUserId);
+    DocumentSnapshot doc = await _db.collection('chatRooms').doc(chatRoomId).get();
+    
+    if (doc.exists) {
+      return chatRoomId;
+    }
+    return null;
+  }
 }

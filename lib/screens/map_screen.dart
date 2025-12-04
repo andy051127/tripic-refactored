@@ -31,6 +31,7 @@ class _MapScreenState extends State<MapScreen> {
   bool _isSearching = false;
   List<Map<String, dynamic>> _searchResults = [];
   LatLng? _selectedLocationForReturn; // 선택된 위치 (반환용)
+  String? _selectedLocationName; // 선택된 위치 이름 (반환용)
   List<Post> _userPosts = []; // 검색된 사용자의 게시물 목록
   int _currentPostIndex = 0; // 현재 보고 있는 게시물 인덱스
   String? _searchedUserName; // 검색된 사용자 이름
@@ -417,6 +418,7 @@ class _MapScreenState extends State<MapScreen> {
     if (widget.isSelectionMode) {
       setState(() {
         _selectedLocationForReturn = targetLocation;
+        _selectedLocationName = result['name'];
         _markers.clear(); // 기존 마커 제거
         _markers.add(
           Marker(
@@ -526,6 +528,7 @@ class _MapScreenState extends State<MapScreen> {
   void _onMapTapped(LatLng location) {
     setState(() {
       _selectedLocationForReturn = location;
+      _selectedLocationName = '선택한 위치 (${location.latitude.toStringAsFixed(4)}, ${location.longitude.toStringAsFixed(4)})';
       _markers.clear(); // 기존 마커 제거
       _markers.add(
         Marker(
@@ -767,7 +770,11 @@ class _MapScreenState extends State<MapScreen> {
                         onPressed: () {
                           // 선택 모드일 경우 선택된 위치 반환
                           if (widget.isSelectionMode && _selectedLocationForReturn != null) {
-                            Navigator.pop(context, _selectedLocationForReturn);
+                            Navigator.pop(context, {
+                              'latitude': _selectedLocationForReturn!.latitude,
+                              'longitude': _selectedLocationForReturn!.longitude,
+                              'locationName': _selectedLocationName ?? '선택한 위치',
+                            });
                           } else {
                             Navigator.pop(context);
                           }
@@ -934,7 +941,11 @@ class _MapScreenState extends State<MapScreen> {
               right: 90,
               child: ElevatedButton(
                 onPressed: () {
-                  Navigator.pop(context, _selectedLocationForReturn);
+                  Navigator.pop(context, {
+                    'latitude': _selectedLocationForReturn!.latitude,
+                    'longitude': _selectedLocationForReturn!.longitude,
+                    'locationName': _selectedLocationName ?? '선택한 위치',
+                  });
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blue,

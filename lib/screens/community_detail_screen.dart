@@ -332,11 +332,13 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
 
                         GestureDetector(
                           onTap: () {
+                            // TODO: 작성자 uid를 파라미터로 받아서 전달해야 함
                             Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (context) => ChatDetailScreen(
                                   chatPartnerName: widget.name,
+                                  chatPartnerId: '', // 임시: 빈 문자열 (나중에 uid 추가 필요)
                                 ),
                               ),
                             );
@@ -441,6 +443,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                         color: Colors.grey,
                                       ),
                                       onPressed: () {
+                                        // TODO: 댓글 작성자 uid를 저장하고 전달해야 함
                                         Navigator.push(
                                           context,
                                           MaterialPageRoute(
@@ -448,6 +451,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                                 ChatDetailScreen(
                                                   chatPartnerName:
                                                       comment['name']!,
+                                                  chatPartnerId: '', // 임시: 빈 문자열
                                                 ),
                                           ),
                                         );
