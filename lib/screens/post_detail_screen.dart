@@ -3,7 +3,6 @@ import 'dart:io';
 import '../models/post_model.dart';
 import '../widgets/comment_modal.dart';
 import '../services/firestore_service.dart';
-import 'chat_detail_screen.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final Post post;
@@ -16,12 +15,14 @@ class PostDetailScreen extends StatefulWidget {
 
 class _PostDetailScreenState extends State<PostDetailScreen> {
   bool _isLiked = false;
+  bool _isSaved = false;
   final FirestoreService _firestoreService = FirestoreService();
 
   @override
   void initState() {
     super.initState();
     _checkIfLiked();
+    _checkIfSaved();
   }
 
   Future<void> _checkIfLiked() async {
@@ -34,6 +35,19 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       }
     } catch (e) {
       print('좋아요 확인 실패: $e');
+    }
+  }
+
+  Future<void> _checkIfSaved() async {
+    try {
+      final isSaved = await _firestoreService.isPostSaved(widget.post.id);
+      if (mounted) {
+        setState(() {
+          _isSaved = isSaved;
+        });
+      }
+    } catch (e) {
+      print('보관 상태 확인 실패: $e');
     }
   }
 
@@ -54,6 +68,41 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       if (mounted) {
         setState(() {
           _isLiked = !_isLiked;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('오류가 발생했습니다: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _toggleSave() async {
+    // UI 즉시 업데이트
+    setState(() {
+      _isSaved = !_isSaved;
+    });
+
+    try {
+      if (_isSaved) {
+        await _firestoreService.savePost(widget.post.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("게시물이 보관함에 저장되었습니다.")),
+          );
+        }
+      } else {
+        await _firestoreService.unsavePost(widget.post.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("보관함에서 삭제되었습니다.")),
+          );
+        }
+      }
+    } catch (e) {
+      // 오류 발생 시 상태 되돌리기
+      if (mounted) {
+        setState(() {
+          _isSaved = !_isSaved;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('오류가 발생했습니다: $e')),
@@ -224,23 +273,15 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                             );
                           },
                         ),
-                        const SizedBox(width: 20),
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => ChatDetailScreen(
-                                  chatPartnerName: widget.post.userName,
-                                  chatPartnerId: widget.post.uid,
-                                ),
-                              ),
-                            );
-                          },
-                          child: const Icon(Icons.near_me_outlined, size: 30),
-                        ),
                         const Spacer(),
-                        const Icon(Icons.bookmark_border, size: 30),
+                        GestureDetector(
+                          onTap: _toggleSave,
+                          child: Icon(
+                            _isSaved ? Icons.bookmark : Icons.bookmark_border,
+                            size: 30,
+                            color: Colors.black,
+                          ),
+                        ),
                       ],
                     ),
                   ),

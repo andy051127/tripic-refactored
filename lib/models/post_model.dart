@@ -19,6 +19,7 @@ class Post {
   final double? longitude; // 경도 추가
   final String? locationName; // 위치 이름 추가
   final String? country; // 국가 추가
+  final String? taggedFriend; // 태그된 친구 추가
 
   Post({
     String? id,
@@ -38,6 +39,7 @@ class Post {
     this.longitude,
     this.locationName,
     this.country,
+    this.taggedFriend,
   }) : this.id = id ?? DateTime.now().millisecondsSinceEpoch.toString(),
        this.createdAt = createdAt ?? Timestamp.now();
 
@@ -63,6 +65,7 @@ class Post {
       longitude: data['longitude']?.toDouble(),
       locationName: data['locationName'] as String?,
       country: data['country'] as String?,
+      taggedFriend: data['taggedFriend'] as String?,
     );
   }
 
@@ -82,6 +85,7 @@ class Post {
       'longitude': longitude,
       'locationName': locationName,
       'country': country,
+      'taggedFriend': taggedFriend,
     };
   }
 }
