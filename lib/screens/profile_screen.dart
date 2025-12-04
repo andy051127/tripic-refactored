@@ -12,6 +12,7 @@ import 'follow_list_screen.dart';
 import 'photo_picker_screen.dart';
 import 'member_info_screen.dart';
 import 'map_screen.dart';
+import 'travel_record_map_screen.dart'; // 추가
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -605,13 +606,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return GestureDetector(
       onTap: () {
-        // 전체 화면 지도로 이동 (내 게시물만 표시)
+        // 여행 기록 지도로 이동
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => MapScreen(
-              userId: currentUser.uid,
-            ),
+            builder: (context) => const TravelRecordMapScreen(),
           ),
         );
       },
@@ -670,7 +669,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       SizedBox(height: 8),
                       Text(
-                        '내 게시물 위치를 확인하세요',
+                        '여행 기록을 확인하세요',
                         style: TextStyle(
                           color: Colors.white70,
                           fontSize: 14,
