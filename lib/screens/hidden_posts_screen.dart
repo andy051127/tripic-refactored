@@ -206,10 +206,7 @@ class _HiddenPostsScreenState extends State<HiddenPostsScreen> {
                           ),
                           child: const Text(
                             "해제",
-                            style: TextStyle(
-                              color: Colors.blue,
-                              fontSize: 12,
-                            ),
+                            style: TextStyle(color: Colors.blue, fontSize: 12),
                           ),
                         ),
                       ),

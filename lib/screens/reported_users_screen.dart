@@ -167,10 +167,7 @@ class _ReportedUsersScreenState extends State<ReportedUsersScreen> {
                       ),
                       child: const Text(
                         "취소",
-                        style: TextStyle(
-                          color: Colors.red,
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: Colors.red, fontSize: 12),
                       ),
                     ),
                   ),

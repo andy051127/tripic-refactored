@@ -11,7 +11,7 @@ class TranslatorScreen extends StatefulWidget {
 class _TranslatorScreenState extends State<TranslatorScreen> {
   final TextEditingController _inputController = TextEditingController();
   final GoogleTranslator _translator = GoogleTranslator();
-  
+
   String _translatedText = '';
   bool _isLoading = false;
   bool _isKoreanToEnglish = true; // true: 한→영, false: 영→한
@@ -180,10 +180,7 @@ class _TranslatorScreenState extends State<TranslatorScreen> {
                   child: SingleChildScrollView(
                     child: Text(
                       _translatedText,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        height: 1.5,
-                      ),
+                      style: const TextStyle(fontSize: 16, height: 1.5),
                     ),
                   ),
                 ),
