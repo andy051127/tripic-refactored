@@ -248,6 +248,35 @@ class FirestoreService {
         .snapshots();
   }
 
+  // 6. 팔로워 삭제 (내 팔로워 목록에서 특정 사용자 제거)
+  Future<void> removeFollower(String followerUserId) async {
+    User? user = _auth.currentUser;
+    if (user == null) throw Exception("로그인이 필요합니다.");
+
+    try {
+      // 내 followers 컬렉션에서 해당 사용자 제거
+      await _db
+          .collection('users')
+          .doc(user.uid)
+          .collection('followers')
+          .doc(followerUserId)
+          .delete();
+
+      // 상대방의 following 컬렉션에서 나를 제거
+      await _db
+          .collection('users')
+          .doc(followerUserId)
+          .collection('following')
+          .doc(user.uid)
+          .delete();
+
+      print('✅ 팔로워 삭제 완료: $followerUserId');
+    } catch (e) {
+      print("팔로워 삭제 실패: $e");
+      rethrow;
+    }
+  }
+
   // 6. 팔로워/팔로잉 수 가져오기
   Future<Map<String, int>> getFollowCounts(String userId) async {
     try {

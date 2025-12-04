@@ -520,6 +520,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         final posts = snapshot.data?.docs ?? [];
         
+        // 클라이언트 측에서 최신순 정렬
+        posts.sort((a, b) {
+          final aData = a.data() as Map<String, dynamic>;
+          final bData = b.data() as Map<String, dynamic>;
+          final aTime = aData['createdAt'] as Timestamp?;
+          final bTime = bData['createdAt'] as Timestamp?;
+          if (aTime == null || bTime == null) return 0;
+          return bTime.compareTo(aTime); // 내림차순 (최신순)
+        });
+        
         print('📊 내 게시물 수: ${posts.length}개');
 
         if (posts.isEmpty) {
