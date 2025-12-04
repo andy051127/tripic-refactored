@@ -140,10 +140,7 @@ class _CommentTabView extends StatelessWidget {
                 const SizedBox(width: 8),
                 const Text(
                   'Tripic',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -166,10 +163,7 @@ class _CommentTabView extends StatelessWidget {
                 const SizedBox(width: 8),
                 const Text(
                   '커뮤니티',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -207,10 +201,7 @@ class _LikeTabView extends StatelessWidget {
                 const SizedBox(width: 8),
                 const Text(
                   'Tripic',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -233,10 +224,7 @@ class _LikeTabView extends StatelessWidget {
                 const SizedBox(width: 8),
                 const Text(
                   '커뮤니티',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -392,10 +380,7 @@ class _ActivityItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 20,
-        vertical: 10,
-      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       leading: Container(
         width: 50,
         height: 50,
@@ -418,10 +403,7 @@ class _ActivityItem extends StatelessWidget {
       ),
       title: Text(
         activity.content,
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-        ),
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
       ),
