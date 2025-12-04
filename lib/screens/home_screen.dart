@@ -396,6 +396,22 @@ class _PostItemState extends State<PostItem> {
   final PageController _pageController = PageController();
   final FirestoreService _firestoreService = FirestoreService();
 
+  // 국기 매핑
+  final Map<String, String> _countryFlags = {
+    '대한민국': '🇰🇷', '일본': '🇯🇵', '중국': '🇨🇳', '대만': '🇹🇼', '홍콩': '🇭🇰', '마카오': '🇲🇴',
+    '싱가포르': '🇸🇬', '태국': '🇹🇭', '베트남': '🇻🇳', '필리핀': '🇵🇭', '말레이시아': '🇲🇾',
+    '인도네시아': '🇮🇩', '미얀마': '🇲🇲', '캄보디아': '🇰🇭', '라오스': '🇱🇦', '인도': '🇮🇳',
+    '네팔': '🇳🇵', '몰디브': '🇲🇻', '스리랑카': '🇱🇰', '미국': '🇺🇸', '캐나다': '🇨🇦',
+    '멕시코': '🇲🇽', '쿠바': '🇨🇺', '브라질': '🇧🇷', '아르헨티나': '🇦🇷', '페루': '🇵🇪',
+    '칠레': '🇨🇱', '영국': '🇬🇧', '프랑스': '🇫🇷', '이탈리아': '🇮🇹', '스페인': '🇪🇸',
+    '독일': '🇩🇪', '네덜란드': '🇳🇱', '벨기에': '🇧🇪', '스위스': '🇨🇭', '오스트리아': '🇦🇹',
+    '체코': '🇨🇿', '헝가리': '🇭🇺', '폴란드': '🇵🇱', '그리스': '🇬🇷', '터키': '🇹🇷',
+    '포르투갈': '🇵🇹', '아일랜드': '🇮🇪', '노르웨이': '🇳🇴', '스웨덴': '🇸🇪', '덴마크': '🇩🇰',
+    '핀란드': '🇫🇮', '아이슬란드': '🇮🇸', '러시아': '🇷🇺', '호주': '🇦🇺', '뉴질랜드': '🇳🇿',
+    '이집트': '🇪🇬', '모로코': '🇲🇦', '남아프리카공화국': '🇿🇦', '케냐': '🇰🇪', '탄자니아': '🇹🇿',
+    '아랍에미리트': '🇦🇪', '사우디아라비아': '🇸🇦', '카타르': '🇶🇦', '요르단': '🇯🇴', '이스라엘': '🇮🇱',
+  };
+
   @override
   void initState() {
     super.initState();
@@ -679,12 +695,24 @@ class _PostItemState extends State<PostItem> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          widget.post.userName,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
+                        Row(
+                          children: [
+                            Text(
+                              widget.post.userName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                            if (widget.post.country != null && widget.post.country!.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(left: 6),
+                                child: Text(
+                                  _countryFlags[widget.post.country] ?? '🌍',
+                                  style: const TextStyle(fontSize: 16),
+                                ),
+                              ),
+                          ],
                         ),
                         if (widget.post.location.isNotEmpty)
                           Text(

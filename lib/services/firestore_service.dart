@@ -24,6 +24,7 @@ class FirestoreService {
     double? latitude,
     double? longitude,
     String? locationName, // 위치 이름 추가
+    String? country, // 국가 정보 추가
   }) async {
     User? user = _auth.currentUser;
     if (user == null) throw Exception("로그인이 필요합니다.");
@@ -85,6 +86,7 @@ class FirestoreService {
       if (latitude != null) postData['latitude'] = latitude;
       if (longitude != null) postData['longitude'] = longitude;
       if (locationName != null) postData['locationName'] = locationName; // 위치 이름 저장
+      if (country != null) postData['country'] = country; // 국가 정보 저장
 
       await _db.collection('posts').add(postData);
     } catch (e) {

@@ -18,6 +18,7 @@ class Post {
   final double? latitude;  // 위도 추가
   final double? longitude; // 경도 추가
   final String? locationName; // 위치 이름 추가
+  final String? country; // 국가 추가
 
   Post({
     String? id,
@@ -36,6 +37,7 @@ class Post {
     this.latitude,
     this.longitude,
     this.locationName,
+    this.country,
   }) : this.id = id ?? DateTime.now().millisecondsSinceEpoch.toString(),
        this.createdAt = createdAt ?? Timestamp.now();
 
@@ -60,6 +62,7 @@ class Post {
       latitude: data['latitude']?.toDouble(),
       longitude: data['longitude']?.toDouble(),
       locationName: data['locationName'] as String?,
+      country: data['country'] as String?,
     );
   }
 
@@ -78,6 +81,7 @@ class Post {
       'latitude': latitude,
       'longitude': longitude,
       'locationName': locationName,
+      'country': country,
     };
   }
 }
