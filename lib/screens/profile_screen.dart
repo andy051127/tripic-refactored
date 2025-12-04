@@ -32,6 +32,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.initState();
     _loadUserData();
     _loadFollowCounts();
+    // 팔로우 카운트 실시간 업데이트를 위한 리스너
+    _setupFollowCountListener();
+  }
+
+  void _setupFollowCountListener() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      // following 컬렉션 변경 감지
+      FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('following')
+          .snapshots()
+          .listen((snapshot) {
+            if (mounted) {
+              final count = snapshot.docs.length;
+              setState(() {
+                _followingCount = count;
+                globalFollowingCount.value = count;
+              });
+            }
+          });
+
+      // followers 컬렉션 변경 감지
+      FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('followers')
+          .snapshots()
+          .listen((snapshot) {
+            if (mounted) {
+              final count = snapshot.docs.length;
+              setState(() {
+                _followerCount = count;
+                globalFollowerCount.value = count;
+              });
+            }
+          });
+    }
   }
 
   // Firestore에서 사용자 데이터 불러오기
@@ -43,18 +82,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
             .collection('users')
             .doc(user.uid)
             .get();
-        
+
         if (userDoc.exists && mounted) {
           final data = userDoc.data();
           if (data != null) {
             // 전역 변수 업데이트
-            globalUserName.value = data['userName'] ?? data['username'] ?? data['name'] ?? 'Unknown';
+            globalUserName.value =
+                data['userName'] ??
+                data['username'] ??
+                data['name'] ??
+                'Unknown';
             globalUserBio.value = data['bio'] ?? 'Traveler ✈️';
             globalUserEmail.value = data['email'] ?? user.email ?? '';
             globalUserPhone.value = data['phoneNumber'] ?? '';
-            
+
             // 프로필 이미지가 있으면 업데이트
-            if (data['profileImage'] != null && data['profileImage'].toString().isNotEmpty) {
+            if (data['profileImage'] != null &&
+                data['profileImage'].toString().isNotEmpty) {
               globalProfileImage.value = data['profileImage'];
               isProfileImageFile.value = false; // 네트워크 이미지
             }
@@ -115,9 +159,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       // 로컬 상태 업데이트
                       globalProfileImage.value = image.path;
                       isProfileImageFile.value = true;
-                      
+
                       // Firestore에 업로드 및 URL 저장
-                      final downloadUrl = await _firestoreService.uploadProfileImage(image.path);
+                      final downloadUrl = await _firestoreService
+                          .uploadProfileImage(image.path);
                       if (mounted) {
                         globalProfileImage.value = downloadUrl;
                         isProfileImageFile.value = false;
@@ -129,9 +174,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   } catch (e) {
                     print("갤러리 에러: $e");
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('사진 업로드 실패: $e')),
-                      );
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text('사진 업로드 실패: $e')));
                     }
                   }
                 },
@@ -150,9 +195,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       // 로컬 상태 업데이트
                       globalProfileImage.value = image.path;
                       isProfileImageFile.value = true;
-                      
+
                       // Firestore에 업로드 및 URL 저장
-                      final downloadUrl = await _firestoreService.uploadProfileImage(image.path);
+                      final downloadUrl = await _firestoreService
+                          .uploadProfileImage(image.path);
                       if (mounted) {
                         globalProfileImage.value = downloadUrl;
                         isProfileImageFile.value = false;
@@ -164,9 +210,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   } catch (e) {
                     print("카메라 에러: $e");
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('사진 업로드 실패: $e')),
-                      );
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text('사진 업로드 실패: $e')));
                     }
                   }
                 },
@@ -207,7 +253,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               globalFollowingCount.value = 0;
               globalPostsNotifier.value = [];
               blockedUsersNotifier.value = [];
-              
+
               await FirebaseAuth.instance.signOut();
               if (context.mounted) {
                 Navigator.pushAndRemoveUntil(
@@ -301,10 +347,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               Expanded(
                 child: TabBarView(
-                  children: [
-                    _buildMyPostsGrid(),
-                    _buildMyPostsMap(),
-                  ],
+                  children: [_buildMyPostsGrid(), _buildMyPostsMap()],
                 ),
               ),
             ],
@@ -330,10 +373,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       valueListenable: globalProfileImage,
                       builder: (context, path, child) {
                         ImageProvider imageProvider;
-                        
+
                         if (path.isEmpty || path == "assets/logo.png") {
                           // 기본 이미지
-                          imageProvider = const AssetImage("assets/basic_profile.png");
+                          imageProvider = const AssetImage(
+                            "assets/basic_profile.png",
+                          );
                         } else if (isProfileImageFile.value) {
                           // 로컬 파일
                           imageProvider = FileImage(File(path));
@@ -344,7 +389,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           // Asset 이미지
                           imageProvider = AssetImage(path);
                         }
-                        
+
                         return CircleAvatar(
                           radius: 40,
                           backgroundColor: Colors.grey,
@@ -380,14 +425,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     StreamBuilder<QuerySnapshot>(
                       stream: FirebaseAuth.instance.currentUser != null
                           ? FirebaseFirestore.instance
-                              .collection('posts')
-                              .where('uid', isEqualTo: FirebaseAuth.instance.currentUser!.uid)
-                              .snapshots()
+                                .collection('posts')
+                                .where(
+                                  'uid',
+                                  isEqualTo:
+                                      FirebaseAuth.instance.currentUser!.uid,
+                                )
+                                .snapshots()
                           : const Stream.empty(),
                       builder: (context, snapshot) {
-                        final postCount = snapshot.data?.docs.length ?? 0;
+                        // 커뮤니티 게시물 제외한 카운트
+                        final allDocs = snapshot.data?.docs ?? [];
+                        final filteredCount = allDocs.where((doc) {
+                          final data = doc.data() as Map<String, dynamic>;
+                          final category = data['category'] as String?;
+                          return category != 'general' &&
+                              category != 'companion';
+                        }).length;
+
                         return _buildStatItem(
-                          "$postCount",
+                          "$filteredCount",
                           "게시물",
                           onTap: () {
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -507,7 +564,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildMyPostsGrid() {
     final currentUser = FirebaseAuth.instance.currentUser;
-    
+
     if (currentUser == null) {
       return const Center(
         child: Text("로그인이 필요합니다.", style: TextStyle(color: Colors.grey)),
@@ -522,17 +579,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           print('❌ 내 게시물 로드 에러: ${snapshot.error}');
-          return Center(
-            child: Text("오류가 발생했습니다: ${snapshot.error}"),
-          );
+          return Center(child: Text("오류가 발생했습니다: ${snapshot.error}"));
         }
 
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        final posts = snapshot.data?.docs ?? [];
-        
+        final allPosts = snapshot.data?.docs ?? [];
+
+        // 커뮤니티 게시물 제외 (category가 'general' 또는 'companion'인 것 제외)
+        final posts = allPosts.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          final category = data['category'] as String?;
+          return category != 'general' && category != 'companion';
+        }).toList();
+
         // 클라이언트 측에서 최신순 정렬
         posts.sort((a, b) {
           final aData = a.data() as Map<String, dynamic>;
@@ -542,8 +604,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           if (aTime == null || bTime == null) return 0;
           return bTime.compareTo(aTime); // 내림차순 (최신순)
         });
-        
-        print('📊 내 게시물 수: ${posts.length}개');
+
+        print('📊 내 게시물 수 (커뮤니티 제외): ${posts.length}개');
 
         if (posts.isEmpty) {
           return const Center(
@@ -563,7 +625,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             final postData = posts[index].data() as Map<String, dynamic>;
             final imageUrl = postData['imageUrl'] ?? '';
             final imageUrls = postData['imageUrls'] as List<dynamic>?;
-            
+
             // 첫 번째 이미지 URL 가져오기
             String displayImage = imageUrl;
             if (imageUrls != null && imageUrls.isNotEmpty) {
@@ -576,9 +638,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => MyPostsDetailScreen(
-                      initialIndex: index,
-                    ),
+                    builder: (context) =>
+                        MyPostsDetailScreen(initialIndex: index),
                   ),
                 );
               },
@@ -615,7 +676,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const Positioned(
                       top: 8,
                       right: 8,
-                      child: Icon(Icons.play_circle_outline, color: Colors.white),
+                      child: Icon(
+                        Icons.play_circle_outline,
+                        color: Colors.white,
+                      ),
                     ),
                 ],
               ),
@@ -628,7 +692,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildMyPostsMap() {
     final currentUser = FirebaseAuth.instance.currentUser;
-    
+
     if (currentUser == null) {
       return const Center(
         child: Text("로그인이 필요합니다.", style: TextStyle(color: Colors.grey)),
@@ -689,11 +753,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        Icons.map,
-                        size: 60,
-                        color: Colors.white,
-                      ),
+                      Icon(Icons.map, size: 60, color: Colors.white),
                       SizedBox(height: 16),
                       Text(
                         '탭하여 전체 지도 보기',
@@ -706,10 +766,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       SizedBox(height: 8),
                       Text(
                         '여행 기록을 확인하세요',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                        ),
+                        style: TextStyle(color: Colors.white70, fontSize: 14),
                       ),
                     ],
                   ),

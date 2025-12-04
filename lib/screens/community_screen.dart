@@ -17,6 +17,8 @@ class CommunityPost {
   final bool isFileImage;
   final String category;
   final DateTime createdAt; // [추가] 작성 시간
+  final String uid; // [추가] 작성자 uid
+  final String id; // [추가] 게시물 id
 
   CommunityPost({
     required this.name,
@@ -28,6 +30,8 @@ class CommunityPost {
     this.isFileImage = false,
     required this.category,
     DateTime? createdAt, // 선택적 매개변수
+    required this.uid,
+    required this.id,
   }) : createdAt = createdAt ?? DateTime.now(); // 없으면 현재 시간
 }
 
@@ -109,6 +113,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
               category: data['category'] ?? 'general',
               createdAt: (data['createdAt'] as Timestamp?)
                   ?.toDate(), // Firestore Timestamp -> DateTime 변환
+              uid: data['uid'] ?? '',
+              id: doc.id,
             );
           }).toList();
 
@@ -123,11 +129,14 @@ class _CommunityScreenState extends State<CommunityScreen> {
           // 통합된 리스트 생성 (홈 화면처럼 연속 스크롤)
           return ListView.builder(
             padding: EdgeInsets.zero,
-            itemCount: (_viewMode == 'split' 
-                ? generalPosts.length + companionPosts.length + 3  // 헤더 2개 + 구분선 1개
+            itemCount: (_viewMode == 'split'
+                ? generalPosts.length +
+                      companionPosts.length +
+                      3 // 헤더 2개 + 구분선 1개
                 : _viewMode == 'post'
-                    ? generalPosts.length + 1  // 헤더 1개
-                    : companionPosts.length + 1),  // 헤더 1개
+                ? generalPosts.length +
+                      1 // 헤더 1개
+                : companionPosts.length + 1), // 헤더 1개
             itemBuilder: (context, index) {
               // split 모드
               if (_viewMode == 'split') {
@@ -137,19 +146,13 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     onTap: () => _toggleView('post'),
                     child: Container(
                       color: Colors.white,
-                      child: _sectionHeader(
-                        "게시글",
-                        isExpanded: false,
-                      ),
+                      child: _sectionHeader("게시글", isExpanded: false),
                     ),
                   );
                 }
                 // 게시글 아이템들
                 if (index <= generalPosts.length) {
-                  return _postItem(
-                    context,
-                    post: generalPosts[index - 1],
-                  );
+                  return _postItem(context, post: generalPosts[index - 1]);
                 }
                 // 구분선
                 if (index == generalPosts.length + 1) {
@@ -187,10 +190,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     onTap: () => _toggleView('post'),
                     child: Container(
                       color: Colors.white,
-                      child: _sectionHeader(
-                        "게시글",
-                        isExpanded: true,
-                      ),
+                      child: _sectionHeader("게시글", isExpanded: true),
                     ),
                   );
                 }
@@ -202,10 +202,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     ),
                   );
                 }
-                return _postItem(
-                  context,
-                  post: generalPosts[index - 1],
-                );
+                return _postItem(context, post: generalPosts[index - 1]);
               }
               // companion 모드 (동행만)
               else {
@@ -230,10 +227,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     ),
                   );
                 }
-                return _postItem(
-                  context,
-                  post: companionPosts[index - 1],
-                );
+                return _postItem(context, post: companionPosts[index - 1]);
               }
             },
           );
@@ -291,6 +285,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
               stats: post.stats,
               imageUrl: post.imageUrl,
               createdAt: post.createdAt, // [추가] 작성일 전달
+              postUid: post.uid,
+              postId: post.id,
+              category: post.category, // [추가] 카테고리 전달
             ),
           ),
         );

@@ -3,9 +3,19 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:intl/intl.dart';
 import '../services/firestore_service.dart'; // Firestore 서비스 import
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class CommunityWriteScreen extends StatefulWidget {
-  const CommunityWriteScreen({super.key});
+  final bool isEdit; // 수정 모드 여부
+  final String? postId; // 수정할 게시물 ID
+  final Map<String, dynamic>? initialData; // 초기 데이터
+
+  const CommunityWriteScreen({
+    super.key,
+    this.isEdit = false,
+    this.postId,
+    this.initialData,
+  });
 
   @override
   State<CommunityWriteScreen> createState() => _CommunityWriteScreenState();
@@ -31,13 +41,47 @@ class _CommunityWriteScreenState extends State<CommunityWriteScreen> {
   bool _isAnonymous = false;
 
   @override
+  void initState() {
+    super.initState();
+    // 수정 모드일 경우 초기 데이터 로드
+    if (widget.isEdit && widget.initialData != null) {
+      _loadInitialData();
+    }
+  }
+
+  void _loadInitialData() {
+    final data = widget.initialData!;
+    _titleController.text = data['title'] ?? '';
+    _contentController.text = data['content'] ?? '';
+    _selectedCategory = data['category'] ?? 'general';
+    _selectedLocation = data['location'];
+
+    // 이미지 URL 로드
+    if (data['imageUrl'] != null && data['imageUrl'].toString().isNotEmpty) {
+      _selectedImages = [data['imageUrl']];
+    } else if (data['imageUrls'] != null) {
+      _selectedImages = List<String>.from(data['imageUrls']);
+    }
+
+    // 동행글 데이터 로드
+    if (_selectedCategory == 'companion') {
+      if (data['memberCount'] != null) {
+        _selectedMemberCount = data['memberCount'];
+      }
+      // 날짜 범위는 저장된 형식에 따라 파싱 필요
+    }
+
+    setState(() {});
+  }
+
+  @override
   void dispose() {
     _titleController.dispose();
     _contentController.dispose();
     super.dispose();
   }
 
-  // 게시하기 버튼 클릭 시 실행
+  // 게시하기/수정하기 버튼 클릭 시 실행
   void _uploadCommunityPost() async {
     if (_titleController.text.isEmpty || _contentController.text.isEmpty) {
       ScaffoldMessenger.of(
@@ -60,6 +104,21 @@ class _CommunityWriteScreenState extends State<CommunityWriteScreen> {
 
     setState(() => _isUploading = true);
 
+    try {
+      if (widget.isEdit) {
+        // 수정 모드
+        await _updatePost();
+      } else {
+        // 등록 모드
+        await _createPost();
+      }
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
+    }
+  }
+
+  // 새 게시물 등록
+  Future<void> _createPost() async {
     try {
       // 이미지 경로 처리 (첫 번째 이미지만 사용하거나 여러 개를 리스트로 저장할 수 있음)
       List<String> imagePaths = _selectedImages;
@@ -95,8 +154,59 @@ class _CommunityWriteScreenState extends State<CommunityWriteScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text("오류 발생: $e")));
-    } finally {
-      if (mounted) setState(() => _isUploading = false);
+    }
+  }
+
+  // 게시물 수정
+  Future<void> _updatePost() async {
+    if (widget.postId == null) return;
+
+    try {
+      // Firestore 업데이트
+      final updateData = {
+        'title': _titleController.text.trim(),
+        'content': _contentController.text.trim(),
+        'category': _selectedCategory,
+        'location': _selectedLocation ?? '',
+        'updatedAt': Timestamp.now(),
+      };
+
+      // 동행글인 경우 추가 필드
+      if (_selectedCategory == 'companion') {
+        if (_selectedMemberCount != null) {
+          updateData['memberCount'] = _selectedMemberCount!;
+        }
+        if (_selectedDateRange != null) {
+          updateData['startDate'] = Timestamp.fromDate(
+            _selectedDateRange!.start,
+          );
+          updateData['endDate'] = Timestamp.fromDate(_selectedDateRange!.end);
+        }
+      }
+
+      // 이미지 처리 (기존 이미지 URL은 그대로 유지, 새 이미지는 업로드 필요)
+      if (_selectedImages.isNotEmpty) {
+        // 첫 번째 이미지가 URL이 아니라 로컬 경로인 경우 업로드 필요
+        // 여기서는 간단히 URL 리스트로 저장
+        updateData['imageUrls'] = _selectedImages;
+        updateData['imageUrl'] = _selectedImages.first;
+      }
+
+      await FirebaseFirestore.instance
+          .collection('posts')
+          .doc(widget.postId)
+          .update(updateData);
+
+      if (!mounted) return;
+      Navigator.pop(context, true); // 수정 완료 신호와 함께 돌아가기
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("게시글이 수정되었습니다.")));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("수정 실패: $e")));
     }
   }
 
@@ -237,9 +347,9 @@ class _CommunityWriteScreenState extends State<CommunityWriteScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         centerTitle: true,
-        title: const Text(
-          "새 게시물 작성",
-          style: TextStyle(
+        title: Text(
+          widget.isEdit ? "게시물 수정" : "새 게시물 작성",
+          style: const TextStyle(
             color: Colors.black,
             fontWeight: FontWeight.bold,
             fontSize: 18,
@@ -262,9 +372,9 @@ class _CommunityWriteScreenState extends State<CommunityWriteScreen> {
                 )
               : TextButton(
                   onPressed: _uploadCommunityPost,
-                  child: const Text(
-                    "게시하기",
-                    style: TextStyle(
+                  child: Text(
+                    widget.isEdit ? "수정하기" : "게시하기",
+                    style: const TextStyle(
                       fontSize: 16,
                       color: Color(0xFF4CA1AF),
                       fontWeight: FontWeight.bold,
@@ -389,6 +499,11 @@ class _CommunityWriteScreenState extends State<CommunityWriteScreen> {
             scrollDirection: Axis.horizontal,
             itemCount: _selectedImages.length,
             itemBuilder: (context, index) {
+              final imagePath = _selectedImages[index];
+              final isNetworkImage =
+                  imagePath.startsWith('http://') ||
+                  imagePath.startsWith('https://');
+
               return Stack(
                 children: [
                   Container(
@@ -398,7 +513,9 @@ class _CommunityWriteScreenState extends State<CommunityWriteScreen> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(8),
                       image: DecorationImage(
-                        image: FileImage(File(_selectedImages[index])),
+                        image: isNetworkImage
+                            ? NetworkImage(imagePath) as ImageProvider
+                            : FileImage(File(imagePath)),
                         fit: BoxFit.cover,
                       ),
                     ),
