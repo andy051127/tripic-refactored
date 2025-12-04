@@ -3,16 +3,19 @@ import 'dart:ui' as ui;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/travel_record_model.dart';
 import '../services/travel_tracker_service.dart';
 
 /// 여행 경로와 사진을 표시하는 전체 화면 지도
 class TravelRecordMapScreen extends StatefulWidget {
   final TravelRecord? travelRecord; // null이면 현재 활성 기록 사용
+  final String? userId; // 특정 사용자의 모든 여행 기록 표시
 
   const TravelRecordMapScreen({
     super.key,
     this.travelRecord,
+    this.userId,
   });
 
   @override
@@ -27,11 +30,17 @@ class _TravelRecordMapScreenState extends State<TravelRecordMapScreen> {
   PhotoRecord? _selectedPhoto;
   LatLng? _currentPosition;
   BitmapDescriptor? _blackDotIcon; // 검은 점 아이콘
+  List<TravelRecord> _userTravelRecords = []; // 사용자의 모든 여행 기록
+  bool _isLoadingRecords = false;
 
   @override
   void initState() {
     super.initState();
-    _trackerService.addListener(_updateMap);
+    if (widget.userId != null) {
+      _loadUserTravelRecords();
+    } else {
+      _trackerService.addListener(_updateMap);
+    }
     _getCurrentLocation();
     _initializeMap();
   }
@@ -81,9 +90,68 @@ class _TravelRecordMapScreenState extends State<TravelRecordMapScreen> {
     }
   }
 
+  // 특정 사용자의 모든 여행 기록 불러오기
+  Future<void> _loadUserTravelRecords() async {
+    if (widget.userId == null) return;
+    
+    setState(() {
+      _isLoadingRecords = true;
+    });
+
+    try {
+      print('📍 사용자 여행 기록 로드 시작: ${widget.userId}');
+      
+      // orderBy 제거 - Firestore 인덱스 불필요
+      final snapshot = await FirebaseFirestore.instance
+          .collection('travel_records')
+          .where('userId', isEqualTo: widget.userId)
+          .get();
+
+      print('📊 Firestore 쿼리 결과: ${snapshot.docs.length}개 문서');
+
+      final records = snapshot.docs
+          .map((doc) {
+            print('  - 문서 ID: ${doc.id}');
+            final data = doc.data();
+            print('    userId: ${data['userId']}');
+            print('    isActive: ${data['isActive']}');
+            print('    routePoints: ${(data['routePoints'] as List?)?.length ?? 0}개');
+            print('    photos: ${(data['photos'] as List?)?.length ?? 0}개');
+            return TravelRecord.fromMap(data, doc.id);
+          })
+          .toList();
+
+      // 메모리에서 시작 시간으로 정렬 (최신순)
+      records.sort((a, b) => b.startTime.compareTo(a.startTime));
+
+      print('✅ 여행 기록 ${records.length}개 로드 완료');
+      for (int i = 0; i < records.length; i++) {
+        print('  [${i + 1}] 경로: ${records[i].routePoints.length}개, 사진: ${records[i].photos.length}개');
+      }
+      
+      if (mounted) {
+        setState(() {
+          _userTravelRecords = records;
+          _isLoadingRecords = false;
+        });
+        _buildMapElements();
+      }
+    } catch (e) {
+      print('❌ 여행 기록 로드 실패: $e');
+      print('   스택: ${StackTrace.current}');
+      if (mounted) {
+        setState(() {
+          _isLoadingRecords = false;
+        });
+      }
+    }
+  }
+
   @override
   void dispose() {
-    _trackerService.removeListener(_updateMap);
+    if (widget.userId == null) {
+      _trackerService.removeListener(_updateMap);
+    }
     _mapController?.dispose();
     super.dispose();
   }
@@ -100,6 +168,16 @@ class _TravelRecordMapScreenState extends State<TravelRecordMapScreen> {
       widget.travelRecord ?? _trackerService.currentRecord;
 
   void _buildMapElements() {
+    _polylines = {};
+    _markers = {};
+
+    // userId가 있으면 사용자의 모든 여행 기록 표시
+    if (widget.userId != null) {
+      _buildUserTravelRecordsMap();
+      return;
+    }
+
+    // 단일 여행 기록 표시
     final record = _currentRecord;
     if (record == null) return;
 
@@ -120,7 +198,6 @@ class _TravelRecordMapScreenState extends State<TravelRecordMapScreen> {
     }
 
     // 모든 사진 위치를 작은 검은 점 마커로 표시
-    _markers = {};
     print('📍 사진 개수: ${record.photos.length}, 아이콘 준비: ${_blackDotIcon != null}');
     if (_blackDotIcon != null) {
       for (int i = 0; i < record.photos.length; i++) {
@@ -146,11 +223,113 @@ class _TravelRecordMapScreenState extends State<TravelRecordMapScreen> {
     }
   }
 
+  // 사용자의 모든 여행 기록을 지도에 표시
+  void _buildUserTravelRecordsMap() {
+    print('🗺️ _buildUserTravelRecordsMap 시작');
+    print('   - 여행 기록 수: ${_userTravelRecords.length}');
+    print('   - 아이콘 준비: ${_blackDotIcon != null}');
+    
+    if (_userTravelRecords.isEmpty) {
+      print('⚠️ 여행 기록이 비어있음');
+      return;
+    }
+    
+    if (_blackDotIcon == null) {
+      print('⚠️ 검은 점 아이콘이 준비되지 않음');
+      return;
+    }
+
+    final polylines = <Polyline>{};
+    final markers = <Marker>{};
+    int photoIndex = 0;
+
+    // 각 여행 기록마다 다른 색상 사용
+    final colors = [
+      Colors.blue,
+      Colors.red,
+      Colors.green,
+      Colors.orange,
+      Colors.purple,
+      Colors.teal,
+    ];
+
+    for (int recordIndex = 0; recordIndex < _userTravelRecords.length; recordIndex++) {
+      final record = _userTravelRecords[recordIndex];
+      final color = colors[recordIndex % colors.length];
+
+      print('📊 기록 [$recordIndex]:');
+      print('   - 경로 포인트: ${record.routePoints.length}개');
+      print('   - 사진: ${record.photos.length}개');
+
+      // 경로 선
+      if (record.routePoints.isNotEmpty) {
+        final points = record.routePoints.map((p) => p.latLng).toList();
+        print('   - 첫 포인트: ${points.first.latitude}, ${points.first.longitude}');
+        print('   - 마지막 포인트: ${points.last.latitude}, ${points.last.longitude}');
+        
+        polylines.add(
+          Polyline(
+            polylineId: PolylineId('route_$recordIndex'),
+            points: points,
+            color: color,
+            width: 4,
+            geodesic: true,
+            jointType: JointType.round,
+            startCap: Cap.roundCap,
+            endCap: Cap.roundCap,
+          ),
+        );
+      }
+
+      // 사진 마커
+      for (final photo in record.photos) {
+        print('   - 사진 마커 추가: ${photo.latitude}, ${photo.longitude}');
+        markers.add(
+          Marker(
+            markerId: MarkerId('photo_${recordIndex}_${photoIndex++}'),
+            position: photo.latLng,
+            icon: _blackDotIcon!,
+            anchor: const Offset(0.5, 0.5),
+            zIndex: 10,
+            consumeTapEvents: true,
+            onTap: () {
+              setState(() {
+                _selectedPhoto = photo;
+              });
+            },
+          ),
+        );
+      }
+    }
+
+    print('✅ 최종 결과:');
+    print('   - 폴리라인: ${polylines.length}개');
+    print('   - 마커: ${markers.length}개');
+
+    setState(() {
+      _polylines = polylines;
+      _markers = markers;
+    });
+
+    print('✅ 여행 기록 ${_userTravelRecords.length}개의 경로와 사진 ${markers.length}개 표시');
+  }
+
   String _formatTime(DateTime time) {
     return '${time.month}/${time.day} ${time.hour}:${time.minute.toString().padLeft(2, '0')}';
   }
 
   LatLng get _initialPosition {
+    // userId 모드: 사용자의 첫 번째 여행 기록 위치
+    if (widget.userId != null && _userTravelRecords.isNotEmpty) {
+      final firstRecord = _userTravelRecords.first;
+      if (firstRecord.routePoints.isNotEmpty) {
+        return firstRecord.routePoints.first.latLng;
+      }
+      if (firstRecord.photos.isNotEmpty) {
+        return firstRecord.photos.first.latLng;
+      }
+    }
+    
     // 1순위: 현재 위치
     if (_currentPosition != null) {
       return _currentPosition!;
@@ -165,12 +344,24 @@ class _TravelRecordMapScreenState extends State<TravelRecordMapScreen> {
   }
 
   void _fitMapToRoute() {
-    final record = _currentRecord;
-    if (record == null ||
-        record.routePoints.isEmpty ||
-        _mapController == null) return;
+    if (_mapController == null) return;
 
-    final points = record.routePoints.map((p) => p.latLng).toList();
+    List<LatLng> points = [];
+
+    // userId 모드: 모든 여행 기록의 포인트 수집
+    if (widget.userId != null) {
+      for (final record in _userTravelRecords) {
+        points.addAll(record.routePoints.map((p) => p.latLng));
+        points.addAll(record.photos.map((p) => p.latLng));
+      }
+    } else {
+      // 단일 기록 모드
+      final record = _currentRecord;
+      if (record == null || record.routePoints.isEmpty) return;
+      points = record.routePoints.map((p) => p.latLng).toList();
+    }
+
+    if (points.isEmpty) return;
     
     double minLat = points.first.latitude;
     double maxLat = points.first.latitude;
@@ -197,6 +388,7 @@ class _TravelRecordMapScreenState extends State<TravelRecordMapScreen> {
   @override
   Widget build(BuildContext context) {
     final record = _currentRecord;
+    final isUserMode = widget.userId != null;
 
     return Scaffold(
       appBar: AppBar(
@@ -209,15 +401,23 @@ class _TravelRecordMapScreenState extends State<TravelRecordMapScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              '여행 기록',
-              style: TextStyle(
+            Text(
+              isUserMode ? '여행 기록 지도' : '여행 기록',
+              style: const TextStyle(
                 color: Colors.black,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            if (record != null)
+            if (isUserMode)
+              Text(
+                '총 ${_userTravelRecords.length}개의 여행 기록',
+                style: const TextStyle(
+                  color: Colors.grey,
+                  fontSize: 12,
+                ),
+              )
+            else if (record != null)
               Text(
                 _formatTime(record.startTime) +
                     (record.endTime != null
@@ -231,7 +431,8 @@ class _TravelRecordMapScreenState extends State<TravelRecordMapScreen> {
           ],
         ),
         actions: [
-          if (record != null && record.routePoints.isNotEmpty)
+          if ((isUserMode && _userTravelRecords.isNotEmpty) ||
+              (!isUserMode && record != null && record.routePoints.isNotEmpty))
             IconButton(
               icon: const Icon(Icons.fit_screen, color: Colors.black),
               onPressed: _fitMapToRoute,
@@ -239,13 +440,17 @@ class _TravelRecordMapScreenState extends State<TravelRecordMapScreen> {
             ),
         ],
       ),
-      body: Stack(
-        children: [
-          GoogleMap(
-            initialCameraPosition: CameraPosition(
-              target: _initialPosition,
-              zoom: 15,
-            ),
+      body: _isLoadingRecords
+          ? const Center(
+              child: CircularProgressIndicator(),
+            )
+          : Stack(
+              children: [
+                GoogleMap(
+                  initialCameraPosition: CameraPosition(
+                    target: _initialPosition,
+                    zoom: 15,
+                  ),
             onMapCreated: (controller) {
               _mapController = controller;
               if (mounted) {
@@ -269,19 +474,19 @@ class _TravelRecordMapScreenState extends State<TravelRecordMapScreen> {
             },
             polylines: _polylines,
             markers: _markers,
-            myLocationEnabled: true,
-            myLocationButtonEnabled: true,
-            zoomControlsEnabled: false,
-            mapToolbarEnabled: false,
-          ),
+                  myLocationEnabled: true,
+                  myLocationButtonEnabled: true,
+                  zoomControlsEnabled: false,
+                  mapToolbarEnabled: false,
+                ),
 
-          // 사진 팝업 (중앙)
-          if (_selectedPhoto != null)
-            Center(
-              child: _buildPhotoPopup(_selectedPhoto!),
+                // 사진 팝업 (중앙)
+                if (_selectedPhoto != null)
+                  Center(
+                    child: _buildPhotoPopup(_selectedPhoto!),
+                  ),
+              ],
             ),
-        ],
-      ),
     );
   }
 

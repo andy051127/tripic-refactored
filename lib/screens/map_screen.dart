@@ -1012,6 +1012,7 @@ class _MapScreenState extends State<MapScreen> {
                                     _selectedLocationForReturn!.longitude,
                                 'locationName':
                                     _selectedLocationName ?? '선택한 위치',
+                                'country': _selectedCountry, // 선택된 국가 정보 추가
                               });
                             } else {
                               // 일반 모드에서는 선택된 국가 반환
@@ -1220,6 +1221,7 @@ class _MapScreenState extends State<MapScreen> {
                       'latitude': _selectedLocationForReturn!.latitude,
                       'longitude': _selectedLocationForReturn!.longitude,
                       'locationName': _selectedLocationName ?? '선택한 위치',
+                      'country': _selectedCountry, // 선택된 국가 정보 추가
                     });
                   },
                   style: ElevatedButton.styleFrom(

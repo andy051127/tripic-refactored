@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../models/post_model.dart';
 import '../services/firestore_service.dart';
-import 'map_screen.dart';
+import 'travel_record_map_screen.dart';
 import 'other_user_posts_detail_screen.dart';
 import 'chat_detail_screen.dart';
 import 'follow_list_screen.dart';
@@ -507,11 +507,11 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
 
     return GestureDetector(
       onTap: () {
-        // 전체 화면 지도로 이동 (해당 사용자의 게시물만 표시)
+        // 전체 화면 지도로 이동 (해당 사용자의 여행 동선과 사진 위치 표시)
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => MapScreen(
+            builder: (context) => TravelRecordMapScreen(
               userId: _targetUserId,
             ),
           ),
@@ -572,7 +572,7 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
                       ),
                       SizedBox(height: 8),
                       Text(
-                        '이 사용자의 게시물 위치를 확인하세요',
+                        '이 사용자의 여행 동선과 사진 위치를 확인하세요',
                         style: TextStyle(
                           color: Colors.white70,
                           fontSize: 14,

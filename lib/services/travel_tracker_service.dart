@@ -19,6 +19,8 @@ class TravelTrackerService extends ChangeNotifier {
   Timer? _periodicTimer; // 5초 타이머 추가
   Position? _lastRecordedPosition; // 마지막으로 기록된 위치
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  DateTime? _lastFirestoreSave; // 마지막 Firestore 저장 시간
+  int _unsavedPointsCount = 0; // 저장되지 않은 포인트 수
 
   // Getters
   bool get isTracking => _isTracking;
@@ -129,6 +131,8 @@ class TravelTrackerService extends ChangeNotifier {
     if (!_isTracking) return;
 
     try {
+      print('🛑 여행 기록 종료 시작...');
+      
       // GPS 추적 중지
       await _positionSubscription?.cancel();
       _positionSubscription = null;
@@ -141,31 +145,42 @@ class TravelTrackerService extends ChangeNotifier {
       _lastRecordedPosition = null;
 
       if (_currentRecord != null) {
-        // 종료 시간 설정 및 저장
+        print('📊 현재 기록 상태:');
+        print('   - ID: ${_currentRecord!.id}');
+        print('   - 경로 포인트: ${_currentRecord!.routePoints.length}개');
+        print('   - 사진: ${_currentRecord!.photos.length}개');
+        
+        // 종료 시간 설정
+        final endTime = DateTime.now();
         _currentRecord = _currentRecord!.copyWith(
-          endTime: DateTime.now(),
+          endTime: endTime,
           isActive: false,
         );
 
-        await _firestore
-            .collection('travel_records')
-            .doc(_currentRecord!.id)
-            .update({
-          'endTime': Timestamp.fromDate(_currentRecord!.endTime!),
-          'isActive': false,
-        });
+        print('💾 Firestore에 최종 데이터 저장 중...');
+        
+        // 최종 저장 (미저장된 데이터 포함)
+        await _saveToFirestore();
+
+        print('✅ Firestore 최종 저장 완료');
+        print('   - 경로 포인트: ${_currentRecord!.routePoints.length}개 저장됨');
+        print('   - 사진: ${_currentRecord!.photos.length}개 저장됨');
+        print('   - isActive: false');
+        print('   - endTime: $endTime');
       }
 
       // SharedPreferences에서 제거
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('active_travel_record_id');
+      print('✅ SharedPreferences 정리 완료');
 
       _isTracking = false;
       notifyListeners();
 
-      print('✅ 여행 기록 종료');
+      print('✅ 여행 기록 종료 완료');
     } catch (e) {
       print('❌ 여행 기록 종료 실패: $e');
+      print('   스택: ${StackTrace.current}');
       rethrow;
     }
   }
@@ -204,6 +219,25 @@ class TravelTrackerService extends ChangeNotifier {
         print('❌ 주기적 위치 업데이트 실패: $e');
       }
     });
+  }
+
+  /// Firestore에 현재 기록 저장
+  Future<void> _saveToFirestore() async {
+    if (_currentRecord == null) return;
+    
+    try {
+      await _firestore
+          .collection('travel_records')
+          .doc(_currentRecord!.id)
+          .set(_currentRecord!.toMap(), SetOptions(merge: true));
+      
+      _lastFirestoreSave = DateTime.now();
+      _unsavedPointsCount = 0;
+      
+      print('💾 Firestore 저장 완료: 경로 ${_currentRecord!.routePoints.length}개, 사진 ${_currentRecord!.photos.length}개');
+    } catch (e) {
+      print('❌ Firestore 저장 실패: $e');
+    }
   }
 
   /// 경로 포인트 추가
@@ -248,18 +282,21 @@ class TravelTrackerService extends ChangeNotifier {
       
       // 마지막 위치 업데이트
       _lastRecordedPosition = position;
-
-      // Firestore 업데이트 (배치로 처리하여 효율성 향상)
-      await _firestore
-          .collection('travel_records')
-          .doc(_currentRecord!.id)
-          .update({
-        'routePoints': FieldValue.arrayUnion([routePoint.toMap()]),
-      });
+      _unsavedPointsCount++;
 
       notifyListeners();
 
-      print('📍 경로 포인트 추가: ${position.latitude}, ${position.longitude}');
+      print('📍 경로 포인트 추가: ${position.latitude}, ${position.longitude} (총 ${_currentRecord!.routePoints.length}개, 미저장: $_unsavedPointsCount개)');      
+
+      // Firestore 배치 저장 (10개마다 또는 30초마다)
+      final now = DateTime.now();
+      final shouldSave = _unsavedPointsCount >= 10 || 
+                        _lastFirestoreSave == null || 
+                        now.difference(_lastFirestoreSave!).inSeconds >= 30;
+      
+      if (shouldSave) {
+        await _saveToFirestore();
+      }
     } catch (e) {
       print('❌ 경로 포인트 추가 실패: $e');
     }
@@ -293,17 +330,12 @@ class TravelTrackerService extends ChangeNotifier {
         ..add(photoRecord);
       _currentRecord = _currentRecord!.copyWith(photos: updatedPhotos);
 
-      // Firestore 업데이트
-      await _firestore
-          .collection('travel_records')
-          .doc(_currentRecord!.id)
-          .update({
-        'photos': FieldValue.arrayUnion([photoRecord.toMap()]),
-      });
-
       notifyListeners();
 
-      print('📸 사진 기록 추가: $photoPath at ${actualPosition.latitude}, ${actualPosition.longitude}');
+      print('📸 사진 기록 추가: $photoPath at ${actualPosition.latitude}, ${actualPosition.longitude} (총 ${_currentRecord!.photos.length}개)');      
+
+      // 사진은 중요하므로 즉시 Firestore에 저장
+      await _saveToFirestore();
     } catch (e) {
       print('❌ 사진 기록 추가 실패: $e');
     }
@@ -324,31 +356,62 @@ class TravelTrackerService extends ChangeNotifier {
   /// 앱 재시작 시 이전 기록 복구
   Future<void> restoreTrackingSession() async {
     try {
+      print('🔄 여행 기록 세션 복구 시도...');
       final prefs = await SharedPreferences.getInstance();
       final recordId = prefs.getString('active_travel_record_id');
 
       if (recordId != null) {
+        print('📱 저장된 기록 ID 발견: $recordId');
         final doc = await _firestore
             .collection('travel_records')
             .doc(recordId)
             .get();
 
         if (doc.exists) {
-          _currentRecord = TravelRecord.fromMap(
-            doc.data() as Map<String, dynamic>,
-            doc.id,
-          );
+          final data = doc.data() as Map<String, dynamic>;
+          print('📊 Firestore에서 기록 로드:');
+          print('   - isActive: ${data['isActive']}');
+          print('   - routePoints: ${(data['routePoints'] as List?)?.length ?? 0}개');
+          print('   - photos: ${(data['photos'] as List?)?.length ?? 0}개');
+          
+          _currentRecord = TravelRecord.fromMap(data, doc.id);
 
           if (_currentRecord!.isActive) {
+            // 마지막 기록된 위치 복원
+            if (_currentRecord!.routePoints.isNotEmpty) {
+              final lastPoint = _currentRecord!.routePoints.last;
+              _lastRecordedPosition = Position(
+                latitude: lastPoint.latitude,
+                longitude: lastPoint.longitude,
+                timestamp: lastPoint.timestamp,
+                accuracy: 0,
+                altitude: 0,
+                altitudeAccuracy: 0,
+                heading: 0,
+                headingAccuracy: 0,
+                speed: 0,
+                speedAccuracy: 0,
+              );
+            }
+            
             _isTracking = true;
             _startLocationTracking();
             notifyListeners();
-            print('✅ 이전 여행 기록 복구: $recordId');
+            print('✅ 이전 여행 기록 복구 완료: $recordId');
+            print('   - 경로: ${_currentRecord!.routePoints.length}개');
+            print('   - 사진: ${_currentRecord!.photos.length}개');
+          } else {
+            print('⚠️ 기록이 비활성 상태 (isActive: false)');
           }
+        } else {
+          print('⚠️ Firestore에 기록이 존재하지 않음');
         }
+      } else {
+        print('ℹ️ 저장된 활성 기록 없음');
       }
     } catch (e) {
       print('❌ 여행 기록 복구 실패: $e');
+      print('   스택: ${StackTrace.current}');
     }
   }
 
