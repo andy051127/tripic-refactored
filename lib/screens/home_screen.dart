@@ -140,6 +140,7 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
   Position? _currentPosition;
   GoogleMapController? _mapController;
   final ScrollController _scrollController = ScrollController();
+  String? _selectedCountry; // 선택된 국가
 
   @override
   void initState() {
@@ -271,118 +272,186 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
 
           // [수정됨] 홈 화면에는 'feed' 카테고리만 보여주도록 필터링
           // (커뮤니티 글은 'general' 또는 'companion' 이므로 제외됨)
-          final feedPosts = allPosts
+          var feedPosts = allPosts
               .where((post) => post.category == 'feed')
               .toList();
 
-          return ListView.builder(
-            controller: _scrollController,
-            itemCount: feedPosts.length + 1,
-            itemBuilder: (context, index) {
-              if (index == 0) {
-                return Column(
-                  children: [
-                    GestureDetector(
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const MapScreen(),
+          // 선택된 국가가 있으면 해당 국가의 게시물만 필터링
+          if (_selectedCountry != null) {
+            feedPosts = feedPosts
+                .where((post) => post.country == _selectedCountry)
+                .toList();
+          }
+
+          return Column(
+            children: [
+              // 선택된 국가 표시
+              if (_selectedCountry != null)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  color: Colors.blue.withOpacity(0.1),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.public, color: Colors.blue, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '$_selectedCountry의 게시물',
+                          style: const TextStyle(
+                            color: Colors.blue,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
                         ),
                       ),
-                      child: Container(
-                        width: double.infinity,
-                        height: 120,
-                        decoration: BoxDecoration(color: Colors.blue[50]),
-                        child: _currentPosition == null
-                            ? const Center(child: CircularProgressIndicator())
-                            : Stack(
-                                children: [
-                                  GoogleMap(
-                                    initialCameraPosition: CameraPosition(
-                                      target: LatLng(
-                                        _currentPosition!.latitude,
-                                        _currentPosition!.longitude,
-                                      ),
-                                      zoom: 14,
-                                    ),
-                                    onMapCreated: (controller) {
-                                      _mapController = controller;
-                                    },
-                                    myLocationEnabled: true,
-                                    myLocationButtonEnabled: false,
-                                    zoomControlsEnabled: false,
-                                    mapToolbarEnabled: false,
-                                    compassEnabled: false,
-                                  ),
-                                  Container(
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topCenter,
-                                        end: Alignment.bottomCenter,
-                                        colors: [
-                                          Colors.black.withOpacity(0.3),
-                                          Colors.transparent,
-                                          Colors.black.withOpacity(0.3),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  const Center(
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _selectedCountry = null;
+                          });
+                        },
+                        child: const Text(
+                          '전체 보기',
+                          style: TextStyle(color: Colors.blue, fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              Expanded(
+                child: ListView.builder(
+                  controller: _scrollController,
+                  itemCount: feedPosts.length + 1,
+                  itemBuilder: (context, index) {
+                    if (index == 0) {
+                      return Column(
+                        children: [
+                          GestureDetector(
+                            onTap: () async {
+                              final result = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const MapScreen(),
+                                ),
+                              );
+                              if (result != null && result is String) {
+                                setState(() {
+                                  _selectedCountry = result;
+                                });
+                                // 스크롤을 맨 위로
+                                if (_scrollController.hasClients) {
+                                  _scrollController.animateTo(
+                                    0,
+                                    duration: const Duration(milliseconds: 300),
+                                    curve: Curves.easeOut,
+                                  );
+                                }
+                              }
+                            },
+                            child: Container(
+                              width: double.infinity,
+                              height: 120,
+                              decoration: BoxDecoration(color: Colors.blue[50]),
+                              child: _currentPosition == null
+                                  ? const Center(
+                                      child: CircularProgressIndicator(),
+                                    )
+                                  : Stack(
                                       children: [
-                                        Icon(
-                                          Icons.map,
-                                          color: Colors.white,
-                                          size: 30,
+                                        GoogleMap(
+                                          initialCameraPosition: CameraPosition(
+                                            target: LatLng(
+                                              _currentPosition!.latitude,
+                                              _currentPosition!.longitude,
+                                            ),
+                                            zoom: 14,
+                                          ),
+                                          onMapCreated: (controller) {
+                                            _mapController = controller;
+                                          },
+                                          myLocationEnabled: true,
+                                          myLocationButtonEnabled: false,
+                                          zoomControlsEnabled: false,
+                                          mapToolbarEnabled: false,
+                                          compassEnabled: false,
                                         ),
-                                        SizedBox(height: 8),
-                                        Text(
-                                          "내 주변 친구들의 여행 기록 보기",
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                            shadows: [
-                                              Shadow(
-                                                blurRadius: 4,
-                                                color: Colors.black,
+                                        Container(
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              begin: Alignment.topCenter,
+                                              end: Alignment.bottomCenter,
+                                              colors: [
+                                                Colors.black.withOpacity(0.3),
+                                                Colors.transparent,
+                                                Colors.black.withOpacity(0.3),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                        const Center(
+                                          child: Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.map,
+                                                color: Colors.white,
+                                                size: 30,
+                                              ),
+                                              SizedBox(height: 8),
+                                              Text(
+                                                "여행한 국가별로 올라온 게시물 보기",
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.bold,
+                                                  shadows: [
+                                                    Shadow(
+                                                      blurRadius: 4,
+                                                      color: Colors.black,
+                                                    ),
+                                                  ],
+                                                ),
                                               ),
                                             ],
                                           ),
                                         ),
                                       ],
                                     ),
-                                  ),
-                                ],
-                              ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                  ],
-                );
-              }
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                        ],
+                      );
+                    }
 
-              final post = feedPosts[index - 1]; // 필터링된 리스트 사용
+                    final post = feedPosts[index - 1]; // 필터링된 리스트 사용
 
-              return PostItem(
-                post: post,
-                currentUserId: FirebaseAuth.instance.currentUser?.uid ?? '',
-                onDelete: () {
-                  // 삭제 로직 (로컬 state만 갱신하는 것이 아니라 Firestore 삭제가 필요하지만, 일단 UI 갱신용)
-                },
-                onBlock: () {
-                  // 차단 로직
-                  final currentBlocked = List<String>.from(
-                    blockedUsersNotifier.value,
-                  );
-                  if (!currentBlocked.contains(post.userName)) {
-                    currentBlocked.add(post.userName);
-                    blockedUsersNotifier.value = currentBlocked;
-                  }
-                },
-              );
-            },
+                    return PostItem(
+                      post: post,
+                      currentUserId:
+                          FirebaseAuth.instance.currentUser?.uid ?? '',
+                      onDelete: () {
+                        // 삭제 로직 (로컬 state만 갱신하는 것이 아니라 Firestore 삭제가 필요하지만, 일단 UI 갱신용)
+                      },
+                      onBlock: () {
+                        // 차단 로직
+                        final currentBlocked = List<String>.from(
+                          blockedUsersNotifier.value,
+                        );
+                        if (!currentBlocked.contains(post.userName)) {
+                          currentBlocked.add(post.userName);
+                          blockedUsersNotifier.value = currentBlocked;
+                        }
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
           );
         },
       ),

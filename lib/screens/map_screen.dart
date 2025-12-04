@@ -1014,7 +1014,8 @@ class _MapScreenState extends State<MapScreen> {
                                     _selectedLocationName ?? '선택한 위치',
                               });
                             } else {
-                              Navigator.pop(context);
+                              // 일반 모드에서는 선택된 국가 반환
+                              Navigator.pop(context, _selectedCountry);
                             }
                           },
                         ),
