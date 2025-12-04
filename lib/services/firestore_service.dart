@@ -729,6 +729,61 @@ class FirestoreService {
     }
   }
 
+  // 게시물 공유 메시지 전송
+  Future<void> sendPostMessage({
+    required String chatRoomId,
+    required String receiverId,
+    required String postId,
+    required String postTitle,
+    required String postImageUrl,
+    required String postAuthor,
+  }) async {
+    User? user = _auth.currentUser;
+    if (user == null) throw Exception("로그인이 필요합니다.");
+
+    try {
+      // 사용자 정보 가져오기
+      final userDoc = await _db.collection('users').doc(user.uid).get();
+      final userData = userDoc.data();
+      final userName =
+          userData?['userName'] ??
+          userData?['username'] ??
+          userData?['name'] ??
+          '알 수 없음';
+      final userProfileImage = userData?['profileImage'] ?? '';
+
+      // 메시지 추가
+      await _db
+          .collection('chatRooms')
+          .doc(chatRoomId)
+          .collection('messages')
+          .add({
+            'senderId': user.uid,
+            'senderName': userName,
+            'senderProfileImage': userProfileImage,
+            'receiverId': receiverId,
+            'content': '게시물을 공유했습니다.',
+            'type': 'post',
+            'postId': postId,
+            'postTitle': postTitle,
+            'postImageUrl': postImageUrl,
+            'postAuthor': postAuthor,
+            'timestamp': FieldValue.serverTimestamp(),
+          });
+
+      // 채팅방 정보 업데이트
+      await _db.collection('chatRooms').doc(chatRoomId).update({
+        'lastMessage': '게시물을 공유했습니다.',
+        'lastMessageType': 'post',
+        'lastMessageTime': FieldValue.serverTimestamp(),
+        'unreadCount.$receiverId': FieldValue.increment(1),
+      });
+    } catch (e) {
+      print("게시물 전송 실패: $e");
+      rethrow;
+    }
+  }
+
   // 6. 메시지 목록 스트림
   Stream<QuerySnapshot> getMessagesStream(String chatRoomId) {
     return _db

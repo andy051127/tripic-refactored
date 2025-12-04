@@ -8,12 +8,12 @@ import 'community_screen.dart';
 import 'travel_plan_screen.dart';
 import 'photo_picker_screen.dart';
 import 'message_list_screen.dart';
-import 'chat_detail_screen.dart';
 import 'map_screen.dart';
 import 'profile_screen.dart';
 import 'other_user_profile_screen.dart';
 import 'search_screen.dart';
 import 'translator_screen.dart';
+import 'share_post_screen.dart';
 import '../models/post_model.dart';
 import '../widgets/comment_modal.dart';
 import '../models/activity_model.dart';
@@ -302,12 +302,22 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
                     return Column(
                       children: [
                         GestureDetector(
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const MapScreen(),
-                            ),
-                          ),
+                          onTap: () async {
+                            // 지도 화면으로 이동하여 국가 선택
+                            final selectedCountry = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const MapScreen(),
+                              ),
+                            );
+                            
+                            // 선택된 국가가 있으면 상태 업데이트
+                            if (selectedCountry != null && selectedCountry is String) {
+                              setState(() {
+                                _selectedCountry = selectedCountry;
+                              });
+                            }
+                          },
                           child: Container(
                             width: double.infinity,
                             height: 120,
@@ -379,6 +389,49 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
                                   ),
                           ),
                         ),
+                        // 선택된 국가 배너
+                        if (_selectedCountry != null)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            color: Colors.blue[50],
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.filter_alt,
+                                  color: Colors.blue,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    '$_selectedCountry 게시물만 보기',
+                                    style: const TextStyle(
+                                      color: Colors.blue,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _selectedCountry = null;
+                                    });
+                                  },
+                                  child: const Text(
+                                    '전체 보기',
+                                    style: TextStyle(
+                                      color: Colors.blue,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         const SizedBox(height: 8),
                       ],
                     );
@@ -420,6 +473,10 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
         if (hiddenPostIds.contains(post.id)) return false;
         // 차단한 사용자의 게시물 제외
         if (blockedUserIds.contains(post.uid)) return false;
+        // 선택된 국가가 있으면 해당 국가 게시물만 표시
+        if (_selectedCountry != null && post.country != _selectedCountry) {
+          return false;
+        }
         return true;
       }).toList();
     } catch (e) {
@@ -1291,10 +1348,7 @@ class _PostItemState extends State<PostItem> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => ChatDetailScreen(
-                        chatPartnerName: widget.post.userName,
-                        chatPartnerId: widget.post.uid,
-                      ),
+                      builder: (context) => SharePostScreen(post: widget.post),
                     ),
                   );
                 },

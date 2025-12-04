@@ -330,6 +330,8 @@ class _MessageListScreenState extends State<MessageListScreen> {
                               } else if (chatRoom.lastMessageType ==
                                   'location') {
                                 lastMessagePreview = '📍 위치를 보냈습니다.';
+                              } else if (chatRoom.lastMessageType == 'post') {
+                                lastMessagePreview = '📄 게시물을 공유했습니다.';
                               }
 
                               String timeString = '';

@@ -7,11 +7,15 @@ class Message {
   final String senderProfileImage;
   final String receiverId;
   final String content; // 텍스트 메시지 내용
-  final String type; // 'text', 'image', 'location'
+  final String type; // 'text', 'image', 'location', 'post'
   final String? imageUrl; // 이미지 URL (type='image'일 때)
   final double? latitude; // 위도 (type='location'일 때)
   final double? longitude; // 경도 (type='location'일 때)
   final String? locationName; // 위치 이름 (type='location'일 때)
+  final String? postId; // 게시물 ID (type='post'일 때)
+  final String? postTitle; // 게시물 제목 (type='post'일 때)
+  final String? postImageUrl; // 게시물 이미지 (type='post'일 때)
+  final String? postAuthor; // 게시물 작성자 (type='post'일 때)
   final DateTime? timestamp;
 
   Message({
@@ -26,6 +30,10 @@ class Message {
     this.latitude,
     this.longitude,
     this.locationName,
+    this.postId,
+    this.postTitle,
+    this.postImageUrl,
+    this.postAuthor,
     this.timestamp,
   });
 
@@ -44,6 +52,10 @@ class Message {
       latitude: data['latitude']?.toDouble(),
       longitude: data['longitude']?.toDouble(),
       locationName: data['locationName'],
+      postId: data['postId'],
+      postTitle: data['postTitle'],
+      postImageUrl: data['postImageUrl'],
+      postAuthor: data['postAuthor'],
       timestamp: (data['timestamp'] as Timestamp?)?.toDate(),
     );
   }
@@ -61,6 +73,10 @@ class Message {
       'latitude': latitude,
       'longitude': longitude,
       'locationName': locationName,
+      'postId': postId,
+      'postTitle': postTitle,
+      'postImageUrl': postImageUrl,
+      'postAuthor': postAuthor,
       'timestamp': timestamp != null ? Timestamp.fromDate(timestamp!) : FieldValue.serverTimestamp(),
     };
   }

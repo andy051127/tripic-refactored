@@ -6,7 +6,9 @@ import 'package:intl/intl.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../services/firestore_service.dart';
 import '../models/message_model.dart';
+import '../models/post_model.dart';
 import 'map_screen.dart';
+import 'post_detail_screen.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final String chatPartnerName;
@@ -463,6 +465,141 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 ),
               ),
             ],
+          ),
+        );
+        break;
+
+      case 'post':
+        contentWidget = GestureDetector(
+          onTap: () async {
+            // 게시물로 이동
+            if (message.postId != null) {
+              try {
+                // Firestore에서 게시물 데이터 가져오기
+                final postDoc = await FirebaseFirestore.instance
+                    .collection('posts')
+                    .doc(message.postId)
+                    .get();
+                
+                if (postDoc.exists && mounted) {
+                  // Post 객체로 변환
+                  final post = Post.fromMap(
+                    postDoc.data() as Map<String, dynamic>,
+                    postDoc.id,
+                  );
+                  
+                  // PostDetailScreen으로 이동
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => PostDetailScreen(post: post),
+                    ),
+                  );
+                } else {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('게시물을 찾을 수 없습니다')),
+                    );
+                  }
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('오류가 발생했습니다: $e')),
+                  );
+                }
+              }
+            }
+          },
+          child: Container(
+            width: 280,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 게시물 이미지
+                if (message.postImageUrl != null && message.postImageUrl!.isNotEmpty)
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                    child: Image.network(
+                      message.postImageUrl!,
+                      width: double.infinity,
+                      height: 200,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Container(
+                          width: double.infinity,
+                          height: 200,
+                          color: Colors.grey[200],
+                          child: const Center(child: CircularProgressIndicator()),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          width: double.infinity,
+                          height: 200,
+                          color: Colors.grey[200],
+                          child: const Icon(Icons.image_not_supported, size: 50),
+                        );
+                      },
+                    ),
+                  ),
+                // 게시물 정보
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.article, size: 16, color: Colors.blue),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              message.postTitle ?? '게시물',
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '작성자: ${message.postAuthor ?? "알 수 없음"}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(Icons.touch_app, size: 14, color: Colors.blue[700]),
+                          const SizedBox(width: 4),
+                          Text(
+                            '탭하여 게시물 보기',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.blue[700],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         );
         break;
