@@ -9,12 +9,14 @@ class WritePostScreen extends StatefulWidget {
   final List<String> images;
   final String? taggedFriend;
   final LatLng? selectedLocation; // 선택된 위치 추가
+  final String? selectedLocationName; // 선택된 위치 이름 추가
 
   const WritePostScreen({
     super.key, 
     required this.images, 
     this.taggedFriend,
     this.selectedLocation, // 선택된 위치 추가
+    this.selectedLocationName, // 선택된 위치 이름 추가
   });
 
   @override
@@ -51,13 +53,15 @@ class _WritePostScreenState extends State<WritePostScreen> {
       await _firestoreService.addPost(
         title: _titleController.text,
         content: _contentController.text,
-        location: widget.selectedLocation != null
-            ? "${widget.selectedLocation!.latitude.toStringAsFixed(4)}, ${widget.selectedLocation!.longitude.toStringAsFixed(4)}"
-            : "",
+        location: widget.selectedLocationName ?? 
+            (widget.selectedLocation != null
+                ? "${widget.selectedLocation!.latitude.toStringAsFixed(4)}, ${widget.selectedLocation!.longitude.toStringAsFixed(4)}"
+                : ""),
         localImagePaths: widget.images, // 여러 이미지 전달
         taggedFriend: widget.taggedFriend,
         latitude: widget.selectedLocation?.latitude,
         longitude: widget.selectedLocation?.longitude,
+        locationName: widget.selectedLocationName, // 위치 이름 전달
       );
 
       // 2. 로컬 상태(globalPostsNotifier) 업데이트
@@ -69,9 +73,10 @@ class _WritePostScreenState extends State<WritePostScreen> {
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         uid: currentUser?.uid ?? '',
         userName: currentUserName, // 올바른 닉네임 사용
-        location: widget.selectedLocation != null
-            ? "${widget.selectedLocation!.latitude.toStringAsFixed(4)}, ${widget.selectedLocation!.longitude.toStringAsFixed(4)}"
-            : "",
+        location: widget.selectedLocationName ?? 
+            (widget.selectedLocation != null
+                ? "${widget.selectedLocation!.latitude.toStringAsFixed(4)}, ${widget.selectedLocation!.longitude.toStringAsFixed(4)}"
+                : ""),
         imagePath: widget.images[0],
         imageUrls: widget.images, // 여러 이미지 경로 추가
         title: _titleController.text,
@@ -79,6 +84,7 @@ class _WritePostScreenState extends State<WritePostScreen> {
         isFile: true,
         latitude: widget.selectedLocation?.latitude,
         longitude: widget.selectedLocation?.longitude,
+        locationName: widget.selectedLocationName, // 위치 이름 전달
       );
 
       final currentPosts = List<Post>.from(globalPostsNotifier.value);
