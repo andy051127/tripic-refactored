@@ -12,9 +12,9 @@ class MapScreen extends StatefulWidget {
   final bool isSelectionMode; // 위치 선택 모드인지 여부
   final LatLng? initialLocation; // 초기 위치 (게시물 위치 등)
   final String? userId; // 특정 사용자의 게시물만 표시할 경우 사용
-  
+
   const MapScreen({
-    super.key, 
+    super.key,
     this.isSelectionMode = false,
     this.initialLocation,
     this.userId,
@@ -35,7 +35,8 @@ class _MapScreenState extends State<MapScreen> {
   List<Post> _userPosts = []; // 검색된 사용자의 게시물 목록
   int _currentPostIndex = 0; // 현재 보고 있는 게시물 인덱스
   String? _searchedUserName; // 검색된 사용자 이름
-  
+  String? _selectedCountry; // 선택된 국가
+
   // ⚠️ 중요: Google Cloud Console에서 발급받은 실제 API 키로 교체하세요
   static const String _googleApiKey = 'AIzaSyBZt7UnBDxY-D6jrsuj_Y7Q5JSolghwwjg';
 
@@ -128,7 +129,7 @@ class _MapScreenState extends State<MapScreen> {
   void initState() {
     super.initState();
     _checkPermissions();
-    
+
     // 선택 모드가 아닐 때만 친구 게시물 마커 생성
     if (!widget.isSelectionMode) {
       _loadPostMarkers();
@@ -151,34 +152,46 @@ class _MapScreenState extends State<MapScreen> {
     try {
       // Firestore에서 위치 정보가 있는 게시물만 가져오기
       Query query = FirebaseFirestore.instance.collection('posts');
-      
+
       // userId가 지정되어 있으면 해당 사용자의 게시물만 필터링
       if (widget.userId != null) {
         query = query.where('uid', isEqualTo: widget.userId);
       }
-      
+
       final QuerySnapshot snapshot = await query.get();
 
       Set<Marker> markers = {};
-      
+
       for (var doc in snapshot.docs) {
         final data = doc.data() as Map<String, dynamic>;
-        
+
         // latitude와 longitude가 모두 존재하는지 확인
         if (data['latitude'] != null && data['longitude'] != null) {
           final post = Post.fromMap(data, doc.id);
-          
-          markers.add(
-            Marker(
-              markerId: MarkerId(post.id),
-              position: LatLng(post.latitude!, post.longitude!),
-              infoWindow: InfoWindow(
-                title: post.userName,
-                snippet: post.title,
+
+          // 국가 필터링 적용
+          bool shouldShow = false;
+          if (_selectedCountry != null) {
+            // 국가가 선택되었을 때: 해당 국가의 게시물만 표시
+            shouldShow = post.country == _selectedCountry;
+          } else {
+            // 국가가 선택되지 않았을 때: country가 null이거나 비어있는 게시물만 표시
+            shouldShow = post.country == null || post.country!.isEmpty;
+          }
+
+          if (shouldShow) {
+            markers.add(
+              Marker(
+                markerId: MarkerId(post.id),
+                position: LatLng(post.latitude!, post.longitude!),
+                infoWindow: InfoWindow(
+                  title: post.userName,
+                  snippet: post.title,
+                ),
+                onTap: () => _showPostPreview(post),
               ),
-              onTap: () => _showPostPreview(post),
-            ),
-          );
+            );
+          }
         }
       }
 
@@ -186,15 +199,15 @@ class _MapScreenState extends State<MapScreen> {
         setState(() {
           _markers = markers;
         });
-        
+
         print('✅ 마커 로드 성공: ${markers.length}개의 마커 생성됨');
       }
     } catch (e) {
       print('❌ 게시물 마커 로드 실패: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('게시물을 불러오는데 실패했습니다: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('게시물을 불러오는데 실패했습니다: $e')));
       }
     }
   }
@@ -218,9 +231,9 @@ class _MapScreenState extends State<MapScreen> {
     } catch (e) {
       print("위치 가져오기 실패: $e");
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('위치를 가져올 수 없습니다')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('위치를 가져올 수 없습니다')));
       }
     }
   }
@@ -250,7 +263,7 @@ class _MapScreenState extends State<MapScreen> {
       for (var doc in snapshot.docs) {
         final data = doc.data() as Map<String, dynamic>;
         final userName = data['userName'] ?? '';
-        
+
         if (userName.toLowerCase().contains(query.toLowerCase()) &&
             data['latitude'] != null &&
             data['longitude'] != null) {
@@ -261,17 +274,11 @@ class _MapScreenState extends State<MapScreen> {
 
       if (matchedPosts.isNotEmpty) {
         final firstPost = matchedPosts[0];
-        targetLocation = LatLng(
-          firstPost.latitude!,
-          firstPost.longitude!,
-        );
-        
+        targetLocation = LatLng(firstPost.latitude!, firstPost.longitude!);
+
         await controller.animateCamera(
           CameraUpdate.newCameraPosition(
-            CameraPosition(
-              target: targetLocation,
-              zoom: 15,
-            ),
+            CameraPosition(target: targetLocation, zoom: 15),
           ),
         );
 
@@ -282,11 +289,13 @@ class _MapScreenState extends State<MapScreen> {
             _currentPostIndex = 0;
             _searchedUserName = matchedUserName;
           });
-          
+
           final postCount = matchedPosts.length;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text("📍 '$matchedUserName'님의 게시물 $postCount개를 찾았습니다. (1/$postCount)"),
+              content: Text(
+                "📍 '$matchedUserName'님의 게시물 $postCount개를 찾았습니다. (1/$postCount)",
+              ),
               duration: const Duration(seconds: 2),
             ),
           );
@@ -304,13 +313,10 @@ class _MapScreenState extends State<MapScreen> {
         targetLocation = entry.value;
         foundName = entry.key;
         foundInLocalData = true;
-        
+
         await controller.animateCamera(
           CameraUpdate.newCameraPosition(
-            CameraPosition(
-              target: targetLocation,
-              zoom: 15,
-            ),
+            CameraPosition(target: targetLocation, zoom: 15),
           ),
         );
 
@@ -318,9 +324,9 @@ class _MapScreenState extends State<MapScreen> {
           setState(() {
             _isSearching = false;
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("📍 '$foundName'(으)로 이동합니다.")),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text("📍 '$foundName'(으)로 이동합니다.")));
         }
         return;
       }
@@ -336,7 +342,7 @@ class _MapScreenState extends State<MapScreen> {
   Future<void> _searchWithGooglePlaces(String query) async {
     try {
       // Places API - Text Search 사용
-      final String url = 
+      final String url =
           'https://maps.googleapis.com/maps/api/place/textsearch/json'
           '?query=$query'
           '&language=ko'
@@ -377,9 +383,11 @@ class _MapScreenState extends State<MapScreen> {
             });
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(data['status'] == 'ZERO_RESULTS' 
-                    ? '검색 결과를 찾을 수 없습니다.'
-                    : 'API 오류: ${data['status']}'),
+                content: Text(
+                  data['status'] == 'ZERO_RESULTS'
+                      ? '검색 결과를 찾을 수 없습니다.'
+                      : 'API 오류: ${data['status']}',
+                ),
               ),
             );
           }
@@ -393,9 +401,9 @@ class _MapScreenState extends State<MapScreen> {
         setState(() {
           _isSearching = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('검색 중 오류가 발생했습니다: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('검색 중 오류가 발생했습니다: $e')));
       }
     }
   }
@@ -407,10 +415,7 @@ class _MapScreenState extends State<MapScreen> {
 
     await controller.animateCamera(
       CameraUpdate.newCameraPosition(
-        CameraPosition(
-          target: targetLocation,
-          zoom: 15,
-        ),
+        CameraPosition(target: targetLocation, zoom: 15),
       ),
     );
 
@@ -424,11 +429,10 @@ class _MapScreenState extends State<MapScreen> {
           Marker(
             markerId: const MarkerId('selected_location'),
             position: targetLocation,
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-            infoWindow: InfoWindow(
-              title: '선택한 위치',
-              snippet: result['name'],
+            icon: BitmapDescriptor.defaultMarkerWithHue(
+              BitmapDescriptor.hueRed,
             ),
+            infoWindow: InfoWindow(title: '선택한 위치', snippet: result['name']),
           ),
         );
         _isSearching = false;
@@ -441,7 +445,9 @@ class _MapScreenState extends State<MapScreen> {
           Marker(
             markerId: MarkerId('search_result_${result['placeId']}'),
             position: targetLocation,
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+            icon: BitmapDescriptor.defaultMarkerWithHue(
+              BitmapDescriptor.hueBlue,
+            ),
             infoWindow: InfoWindow(
               title: result['name'],
               snippet: result['address'],
@@ -463,14 +469,14 @@ class _MapScreenState extends State<MapScreen> {
   // 다음 게시물로 이동
   Future<void> _navigateToNextPost() async {
     if (_userPosts.isEmpty) return;
-    
+
     setState(() {
       _currentPostIndex = (_currentPostIndex + 1) % _userPosts.length;
     });
-    
+
     final post = _userPosts[_currentPostIndex];
     final controller = await _controller.future;
-    
+
     await controller.animateCamera(
       CameraUpdate.newCameraPosition(
         CameraPosition(
@@ -479,7 +485,7 @@ class _MapScreenState extends State<MapScreen> {
         ),
       ),
     );
-    
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -491,18 +497,19 @@ class _MapScreenState extends State<MapScreen> {
       );
     }
   }
-  
+
   // 이전 게시물로 이동
   Future<void> _navigateToPreviousPost() async {
     if (_userPosts.isEmpty) return;
-    
+
     setState(() {
-      _currentPostIndex = (_currentPostIndex - 1 + _userPosts.length) % _userPosts.length;
+      _currentPostIndex =
+          (_currentPostIndex - 1 + _userPosts.length) % _userPosts.length;
     });
-    
+
     final post = _userPosts[_currentPostIndex];
     final controller = await _controller.future;
-    
+
     await controller.animateCamera(
       CameraUpdate.newCameraPosition(
         CameraPosition(
@@ -511,7 +518,7 @@ class _MapScreenState extends State<MapScreen> {
         ),
       ),
     );
-    
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -528,7 +535,8 @@ class _MapScreenState extends State<MapScreen> {
   void _onMapTapped(LatLng location) {
     setState(() {
       _selectedLocationForReturn = location;
-      _selectedLocationName = '선택한 위치 (${location.latitude.toStringAsFixed(4)}, ${location.longitude.toStringAsFixed(4)})';
+      _selectedLocationName =
+          '선택한 위치 (${location.latitude.toStringAsFixed(4)}, ${location.longitude.toStringAsFixed(4)})';
       _markers.clear(); // 기존 마커 제거
       _markers.add(
         Marker(
@@ -537,7 +545,8 @@ class _MapScreenState extends State<MapScreen> {
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
           infoWindow: InfoWindow(
             title: '선택한 위치',
-            snippet: '${location.latitude.toStringAsFixed(4)}, ${location.longitude.toStringAsFixed(4)}',
+            snippet:
+                '${location.latitude.toStringAsFixed(4)}, ${location.longitude.toStringAsFixed(4)}',
           ),
         ),
       );
@@ -560,10 +569,10 @@ class _MapScreenState extends State<MapScreen> {
       backgroundColor: Colors.transparent,
       builder: (context) {
         // 첫 번째 이미지 가져오기
-        final String imageUrl = post.imageUrls.isNotEmpty 
-            ? post.imageUrls[0] 
+        final String imageUrl = post.imageUrls.isNotEmpty
+            ? post.imageUrls[0]
             : (post.imageUrl.isNotEmpty ? post.imageUrl : '');
-        
+
         return FutureBuilder<DocumentSnapshot>(
           future: FirebaseFirestore.instance
               .collection('users')
@@ -572,146 +581,371 @@ class _MapScreenState extends State<MapScreen> {
           builder: (context, userSnapshot) {
             String? profileImageUrl;
             if (userSnapshot.hasData && userSnapshot.data!.exists) {
-              final userData = userSnapshot.data!.data() as Map<String, dynamic>?;
+              final userData =
+                  userSnapshot.data!.data() as Map<String, dynamic>?;
               profileImageUrl = userData?['profileImage'];
             }
-            
+
             return Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            bottom: MediaQuery.of(context).viewInsets.bottom + MediaQuery.of(context).padding.bottom + 20,
-            top: 20,
-          ),
-          child: Container(
-            height: 150,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, 5),
-                ),
-              ],
-            ),
-          child: Row(
-            children: [
-              // 사진 영역
-              Container(
-                width: 120,
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                bottom:
+                    MediaQuery.of(context).viewInsets.bottom +
+                    MediaQuery.of(context).padding.bottom +
+                    20,
+                top: 20,
+              ),
+              child: Container(
                 height: 150,
                 decoration: BoxDecoration(
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    bottomLeft: Radius.circular(20),
-                  ),
-                  color: Colors.grey[200],
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
                 ),
-                child: imageUrl.isNotEmpty
-                    ? ClipRRect(
+                child: Row(
+                  children: [
+                    // 사진 영역
+                    Container(
+                      width: 120,
+                      height: 150,
+                      decoration: BoxDecoration(
                         borderRadius: const BorderRadius.only(
                           topLeft: Radius.circular(20),
                           bottomLeft: Radius.circular(20),
                         ),
-                        child: Image.network(
-                          imageUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return const Icon(Icons.image, color: Colors.grey, size: 50);
-                          },
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return const Center(child: CircularProgressIndicator());
-                          },
-                        ),
-                      )
-                    : const Icon(Icons.image, color: Colors.grey, size: 50),
-              ),
-              // 정보 영역
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 12,
-                            backgroundColor: Colors.grey,
-                            backgroundImage: profileImageUrl != null && profileImageUrl.isNotEmpty
-                                ? NetworkImage(profileImageUrl)
-                                : const AssetImage('assets/basic_profile.png') as ImageProvider,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              post.userName,
-                              style: const TextStyle(fontWeight: FontWeight.bold),
+                        color: Colors.grey[200],
+                      ),
+                      child: imageUrl.isNotEmpty
+                          ? ClipRRect(
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(20),
+                                bottomLeft: Radius.circular(20),
+                              ),
+                              child: Image.network(
+                                imageUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return const Icon(
+                                    Icons.image,
+                                    color: Colors.grey,
+                                    size: 50,
+                                  );
+                                },
+                                loadingBuilder:
+                                    (context, child, loadingProgress) {
+                                      if (loadingProgress == null) return child;
+                                      return const Center(
+                                        child: CircularProgressIndicator(),
+                                      );
+                                    },
+                              ),
+                            )
+                          : const Icon(
+                              Icons.image,
+                              color: Colors.grey,
+                              size: 50,
+                            ),
+                    ),
+                    // 정보 영역
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 12,
+                                  backgroundColor: Colors.grey,
+                                  backgroundImage:
+                                      profileImageUrl != null &&
+                                          profileImageUrl.isNotEmpty
+                                      ? NetworkImage(profileImageUrl)
+                                      : const AssetImage(
+                                              'assets/basic_profile.png',
+                                            )
+                                            as ImageProvider,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    post.userName,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              post.title,
+                              style: const TextStyle(fontSize: 16),
+                              maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                        ],
+                            const Spacer(),
+                            StreamBuilder<int>(
+                              stream: FirebaseFirestore.instance
+                                  .collection('posts')
+                                  .doc(post.id)
+                                  .collection('likes')
+                                  .snapshots()
+                                  .map((snapshot) => snapshot.docs.length),
+                              builder: (context, likeSnapshot) {
+                                final likeCount =
+                                    likeSnapshot.data ?? post.likeCount;
+
+                                return StreamBuilder<int>(
+                                  stream: FirebaseFirestore.instance
+                                      .collection('posts')
+                                      .doc(post.id)
+                                      .collection('comments')
+                                      .snapshots()
+                                      .map((snapshot) => snapshot.docs.length),
+                                  builder: (context, commentSnapshot) {
+                                    final commentCount =
+                                        commentSnapshot.data ?? 0;
+
+                                    return Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.favorite,
+                                          size: 16,
+                                          color: Colors.red,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          "$likeCount",
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        const Icon(
+                                          Icons.comment,
+                                          size: 16,
+                                          color: Colors.grey,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          "$commentCount",
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+                              },
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        post.title,
-                        style: const TextStyle(fontSize: 16),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const Spacer(),
-                      StreamBuilder<int>(
-                        stream: FirebaseFirestore.instance
-                            .collection('posts')
-                            .doc(post.id)
-                            .collection('likes')
-                            .snapshots()
-                            .map((snapshot) => snapshot.docs.length),
-                        builder: (context, likeSnapshot) {
-                          final likeCount = likeSnapshot.data ?? post.likeCount;
-                          
-                          return StreamBuilder<int>(
-                            stream: FirebaseFirestore.instance
-                                .collection('posts')
-                                .doc(post.id)
-                                .collection('comments')
-                                .snapshots()
-                                .map((snapshot) => snapshot.docs.length),
-                            builder: (context, commentSnapshot) {
-                              final commentCount = commentSnapshot.data ?? 0;
-                              
-                              return Row(
-                                children: [
-                                  const Icon(Icons.favorite, size: 16, color: Colors.red),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    "$likeCount",
-                                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  const Icon(Icons.comment, size: 16, color: Colors.grey),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    "$commentCount",
-                                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                  ),
-                                ],
-                              );
-                            },
-                          );
-                        },
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-        ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // 국가 선택 모달 표시
+  void _showCountrySelector() {
+    final TextEditingController searchController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            // 국가 리스트
+            final Map<String, String> countries = {
+              '대한민국': '🇰🇷',
+              '일본': '🇯🇵',
+              '중국': '🇨🇳',
+              '대만': '🇹🇼',
+              '홍콩': '🇭🇰',
+              '마카오': '🇲🇴',
+              '싱가포르': '🇸🇬',
+              '태국': '🇹🇭',
+              '베트남': '🇻🇳',
+              '필리핀': '🇵🇭',
+              '말레이시아': '🇲🇾',
+              '인도네시아': '🇮🇩',
+              '미얀마': '🇲🇲',
+              '캄보디아': '🇰🇭',
+              '라오스': '🇱🇦',
+              '인도': '🇮🇳',
+              '네팔': '🇳🇵',
+              '몰디브': '🇲🇻',
+              '스리랑카': '🇱🇰',
+              '미국': '🇺🇸',
+              '캐나다': '🇨🇦',
+              '멕시코': '🇲🇽',
+              '쿠바': '🇨🇺',
+              '브라질': '🇧🇷',
+              '아르헨티나': '🇦🇷',
+              '페루': '🇵🇪',
+              '칠레': '🇨🇱',
+              '영국': '🇬🇧',
+              '프랑스': '🇫🇷',
+              '이탈리아': '🇮🇹',
+              '스페인': '🇪🇸',
+              '독일': '🇩🇪',
+              '네덜란드': '🇳🇱',
+              '벨기에': '🇧🇪',
+              '스위스': '🇨🇭',
+              '오스트리아': '🇦🇹',
+              '체코': '🇨🇿',
+              '헝가리': '🇭🇺',
+              '폴란드': '🇵🇱',
+              '그리스': '🇬🇷',
+              '터키': '🇹🇷',
+              '포르투갈': '🇵🇹',
+              '아일랜드': '🇮🇪',
+              '노르웨이': '🇳🇴',
+              '스웨덴': '🇸🇪',
+              '덴마크': '🇩🇰',
+              '핀란드': '🇫🇮',
+              '아이슬란드': '🇮🇸',
+              '러시아': '🇷🇺',
+              '호주': '🇦🇺',
+              '뉴질랜드': '🇳🇿',
+              '이집트': '🇪🇬',
+              '모로코': '🇲🇦',
+              '남아프리카공화국': '🇿🇦',
+              '케냐': '🇰🇪',
+              '탄자니아': '🇹🇿',
+              '아랍에미리트': '🇦🇪',
+              '사우디아라비아': '🇸🇦',
+              '카타르': '🇶🇦',
+              '요르단': '🇯🇴',
+              '이스라엘': '🇮🇱',
+            };
+
+            // 검색어로 필터링
+            final filteredCountries = countries.entries.where((entry) {
+              final searchTerm = searchController.text.toLowerCase();
+              return entry.key.toLowerCase().contains(searchTerm);
+            }).toList();
+
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.7,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          "국가 선택",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: TextField(
+                      controller: searchController,
+                      onChanged: (value) {
+                        setModalState(() {});
+                      },
+                      decoration: InputDecoration(
+                        hintText: '국가 검색',
+                        prefixIcon: const Icon(Icons.search),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // 전체 보기 옵션
+                  ListTile(
+                    leading: const Icon(Icons.public, size: 32),
+                    title: const Text(
+                      '전체 보기',
+                      style: TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                    trailing: _selectedCountry == null
+                        ? const Icon(Icons.check, color: Colors.blue)
+                        : null,
+                    onTap: () {
+                      setState(() {
+                        _selectedCountry = null;
+                      });
+                      Navigator.pop(context);
+                      _loadPostMarkers();
+                    },
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: filteredCountries.length,
+                      itemBuilder: (context, index) {
+                        final country = filteredCountries[index];
+                        final isSelected = _selectedCountry == country.key;
+
+                        return ListTile(
+                          leading: Text(
+                            country.value,
+                            style: const TextStyle(fontSize: 32),
+                          ),
+                          title: Text(
+                            country.key,
+                            style: const TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                          trailing: isSelected
+                              ? const Icon(Icons.check, color: Colors.blue)
+                              : null,
+                          onTap: () {
+                            setState(() {
+                              _selectedCountry = country.key;
+                            });
+                            Navigator.pop(context);
+                            _loadPostMarkers();
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
             );
           },
         );
@@ -726,108 +960,32 @@ class _MapScreenState extends State<MapScreen> {
         bottom: true, // 하단 안전 영역 확보
         child: Stack(
           children: [
-          // 전체 화면 지도
-          GoogleMap(
-            initialCameraPosition: CameraPosition(
-              target: widget.initialLocation ?? _kSeoulCityHall,
-              zoom: 15,
+            // 전체 화면 지도
+            GoogleMap(
+              initialCameraPosition: CameraPosition(
+                target: widget.initialLocation ?? _kSeoulCityHall,
+                zoom: 15,
+              ),
+              markers: _markers,
+              myLocationEnabled: true,
+              myLocationButtonEnabled: false,
+              zoomControlsEnabled: false,
+              mapToolbarEnabled: false,
+              onMapCreated: (GoogleMapController controller) {
+                _controller.complete(controller);
+              },
+              // 선택 모드일 때만 지도 탭으로 마커 추가 가능
+              onTap: widget.isSelectionMode ? _onMapTapped : null,
             ),
-            markers: _markers,
-            myLocationEnabled: true,
-            myLocationButtonEnabled: false,
-            zoomControlsEnabled: false,
-            mapToolbarEnabled: false,
-            onMapCreated: (GoogleMapController controller) {
-              _controller.complete(controller);
-            },
-            // 선택 모드일 때만 지도 탭으로 마커 추가 가능
-            onTap: widget.isSelectionMode ? _onMapTapped : null,
-          ),
 
-          // 상단 검색창
-          Positioned(
-            top: 50,
-            left: 16,
-            right: 16,
-            child: Column(
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 10,
-                        offset: const Offset(0, 5),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.arrow_back),
-                        onPressed: () {
-                          // 선택 모드일 경우 선택된 위치 반환
-                          if (widget.isSelectionMode && _selectedLocationForReturn != null) {
-                            Navigator.pop(context, {
-                              'latitude': _selectedLocationForReturn!.latitude,
-                              'longitude': _selectedLocationForReturn!.longitude,
-                              'locationName': _selectedLocationName ?? '선택한 위치',
-                            });
-                          } else {
-                            Navigator.pop(context);
-                          }
-                        },
-                      ),
-                      Expanded(
-                        child: TextField(
-                          controller: _searchController,
-                          textInputAction: TextInputAction.search,
-                          onSubmitted: _performSearch,
-                          onChanged: (value) {
-                            // 입력하는 동안 검색 결과 초기화
-                            if (_searchResults.isNotEmpty) {
-                              setState(() {
-                                _searchResults = [];
-                              });
-                            }
-                          },
-                          onTap: () {
-                            setState(() {
-                              _isSearching = true;
-                            });
-                          },
-                          decoration: const InputDecoration(
-                            hintText: "장소, 주소, 친구 이름 검색",
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 10),
-                          ),
-                        ),
-                      ),
-                      if (_searchController.text.isNotEmpty)
-                        IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            setState(() {
-                              _searchController.clear();
-                              _isSearching = false;
-                              _searchResults = [];
-                            });
-                          },
-                        ),
-                      IconButton(
-                        icon: const Icon(Icons.search, color: Colors.blue),
-                        onPressed: () => _performSearch(_searchController.text),
-                      ),
-                    ],
-                  ),
-                ),
-                
-                // 검색 결과 리스트
-                if (_searchResults.isNotEmpty)
+            // 상단 검색창
+            Positioned(
+              top: 50,
+              left: 16,
+              right: 16,
+              child: Column(
+                children: [
                   Container(
-                    margin: const EdgeInsets.only(top: 10),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
@@ -839,139 +997,256 @@ class _MapScreenState extends State<MapScreen> {
                         ),
                       ],
                     ),
-                    constraints: const BoxConstraints(maxHeight: 300),
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      itemCount: _searchResults.length,
-                      separatorBuilder: (context, index) => const Divider(height: 1),
-                      itemBuilder: (context, index) {
-                        final result = _searchResults[index];
-                        return ListTile(
-                          leading: const Icon(Icons.place, color: Colors.blue),
-                          title: Text(
-                            result['name'],
-                            style: const TextStyle(fontWeight: FontWeight.w500),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.arrow_back),
+                          onPressed: () {
+                            // 선택 모드일 경우 선택된 위치 반환
+                            if (widget.isSelectionMode &&
+                                _selectedLocationForReturn != null) {
+                              Navigator.pop(context, {
+                                'latitude':
+                                    _selectedLocationForReturn!.latitude,
+                                'longitude':
+                                    _selectedLocationForReturn!.longitude,
+                                'locationName':
+                                    _selectedLocationName ?? '선택한 위치',
+                              });
+                            } else {
+                              // 일반 모드에서는 선택된 국가 반환
+                              Navigator.pop(context, _selectedCountry);
+                            }
+                          },
+                        ),
+                        Expanded(
+                          child: TextField(
+                            controller: _searchController,
+                            textInputAction: TextInputAction.search,
+                            onSubmitted: _performSearch,
+                            onChanged: (value) {
+                              // 입력하는 동안 검색 결과 초기화
+                              if (_searchResults.isNotEmpty) {
+                                setState(() {
+                                  _searchResults = [];
+                                });
+                              }
+                            },
+                            onTap: () {
+                              setState(() {
+                                _isSearching = true;
+                              });
+                            },
+                            decoration: const InputDecoration(
+                              hintText: "장소, 주소, 친구 이름 검색",
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 10,
+                              ),
+                            ),
                           ),
-                          subtitle: Text(
-                            result['address'],
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 12),
+                        ),
+                        if (_searchController.text.isNotEmpty)
+                          IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              setState(() {
+                                _searchController.clear();
+                                _isSearching = false;
+                                _searchResults = [];
+                              });
+                            },
                           ),
-                          onTap: () => _moveToSearchResult(result),
-                        );
-                      },
-                    ),
-                  ),
-              ],
-            ),
-          ),
-
-          // 사용자 게시물 탐색 버튼 (검색된 경우에만 표시)
-          if (_userPosts.length > 1)
-            Positioned(
-              top: 150,
-              right: 20,
-              child: Column(
-                children: [
-                  // 이전 게시물 버튼
-                  FloatingActionButton(
-                    heroTag: 'prev',
-                    mini: true,
-                    backgroundColor: Colors.white,
-                    elevation: 4,
-                    onPressed: _navigateToPreviousPost,
-                    child: const Icon(Icons.arrow_upward, color: Colors.blue),
-                  ),
-                  const SizedBox(height: 8),
-                  // 게시물 카운터
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
+                        IconButton(
+                          icon: const Icon(Icons.search, color: Colors.blue),
+                          onPressed: () =>
+                              _performSearch(_searchController.text),
                         ),
                       ],
                     ),
-                    child: Text(
-                      '${_currentPostIndex + 1}/${_userPosts.length}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue,
+                  ),
+
+                  // 검색 결과 리스트
+                  if (_searchResults.isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(top: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      constraints: const BoxConstraints(maxHeight: 300),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: _searchResults.length,
+                        separatorBuilder: (context, index) =>
+                            const Divider(height: 1),
+                        itemBuilder: (context, index) {
+                          final result = _searchResults[index];
+                          return ListTile(
+                            leading: const Icon(
+                              Icons.place,
+                              color: Colors.blue,
+                            ),
+                            title: Text(
+                              result['name'],
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            subtitle: Text(
+                              result['address'],
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            onTap: () => _moveToSearchResult(result),
+                          );
+                        },
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  // 다음 게시물 버튼
-                  FloatingActionButton(
-                    heroTag: 'next',
-                    mini: true,
-                    backgroundColor: Colors.white,
-                    elevation: 4,
-                    onPressed: _navigateToNextPost,
-                    child: const Icon(Icons.arrow_downward, color: Colors.blue),
-                  ),
                 ],
               ),
             ),
 
-          // 내 위치로 이동 버튼
-          Positioned(
-            bottom: 20, // 안전 영역 고려하여 간격 조정
-            right: 20,
-            child: FloatingActionButton(
-              backgroundColor: Colors.white,
-              elevation: 4,
-              onPressed: _moveToCurrentLocation,
-              child: const Icon(Icons.my_location, color: Colors.blue),
-            ),
-          ),
-
-          // 선택 모드일 때 하단에 확인 버튼 표시
-          if (widget.isSelectionMode && _selectedLocationForReturn != null)
-            Positioned(
-              bottom: 20, // 안전 영역 고려하여 간격 조정
-              left: 20,
-              right: 90,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context, {
-                    'latitude': _selectedLocationForReturn!.latitude,
-                    'longitude': _selectedLocationForReturn!.longitude,
-                    'locationName': _selectedLocationName ?? '선택한 위치',
-                  });
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 4,
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+            // 사용자 게시물 탐색 버튼 (검색된 경우에만 표시)
+            if (_userPosts.length > 1)
+              Positioned(
+                top: 150,
+                right: 20,
+                child: Column(
                   children: [
-                    Icon(Icons.check, color: Colors.white),
-                    SizedBox(width: 8),
-                    Text(
-                      '이 위치로 선택',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                    // 이전 게시물 버튼
+                    FloatingActionButton(
+                      heroTag: 'prev',
+                      mini: true,
+                      backgroundColor: Colors.white,
+                      elevation: 4,
+                      onPressed: _navigateToPreviousPost,
+                      child: const Icon(Icons.arrow_upward, color: Colors.blue),
+                    ),
+                    const SizedBox(height: 8),
+                    // 게시물 카운터
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
                         color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        '${_currentPostIndex + 1}/${_userPosts.length}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // 다음 게시물 버튼
+                    FloatingActionButton(
+                      heroTag: 'next',
+                      mini: true,
+                      backgroundColor: Colors.white,
+                      elevation: 4,
+                      onPressed: _navigateToNextPost,
+                      child: const Icon(
+                        Icons.arrow_downward,
+                        color: Colors.blue,
                       ),
                     ),
                   ],
                 ),
               ),
+
+            // 국가 선택 버튼 (내 위치 버튼 위쪽)
+            Positioned(
+              bottom: 90, // 내 위치 버튼 위에 배치
+              right: 20,
+              child: FloatingActionButton.extended(
+                onPressed: _showCountrySelector,
+                backgroundColor: Colors.blue,
+                elevation: 4,
+                heroTag: 'country_selector',
+                icon: const Icon(Icons.public, color: Colors.white),
+                label: Text(
+                  _selectedCountry ?? '국가 선택',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
             ),
+
+            // 내 위치로 이동 버튼
+            Positioned(
+              bottom: 20, // 안전 영역 고려하여 간격 조정
+              right: 20,
+              child: FloatingActionButton(
+                backgroundColor: Colors.white,
+                elevation: 4,
+                heroTag: 'my_location',
+                onPressed: _moveToCurrentLocation,
+                child: const Icon(Icons.my_location, color: Colors.blue),
+              ),
+            ),
+
+            // 선택 모드일 때 하단에 확인 버튼 표시
+            if (widget.isSelectionMode && _selectedLocationForReturn != null)
+              Positioned(
+                bottom: 20, // 안전 영역 고려하여 간격 조정
+                left: 20,
+                right: 90,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context, {
+                      'latitude': _selectedLocationForReturn!.latitude,
+                      'longitude': _selectedLocationForReturn!.longitude,
+                      'locationName': _selectedLocationName ?? '선택한 위치',
+                    });
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 4,
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.check, color: Colors.white),
+                      SizedBox(width: 8),
+                      Text(
+                        '이 위치로 선택',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
           ],
         ),
       ),

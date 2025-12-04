@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart'; // [추가] 로그인 관리�
 import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart'; // [추가] 로그인 화면
 import 'screens/home_screen.dart'; // [추가] 홈 화면
+import 'services/travel_tracker_service.dart'; // [추가] 여행 추적 서비스
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized(); // 플러터 엔진 초기화
@@ -13,6 +14,9 @@ void main() async {
   await Firebase.initializeApp();
 
   await initializeDateFormatting(); // 날짜 데이터 초기화
+  
+  // [추가] 이전 여행 기록 세션 복구
+  await TravelTrackerService().restoreTrackingSession();
 
   runApp(const TripicApp());
 }
