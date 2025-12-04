@@ -32,6 +32,87 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
 
   bool _isSaving = false;
 
+  // 전세계 주요 국가 및 도시 데이터
+  final Map<String, List<String>> _countriesAndCities = {
+    '대한민국': ['서울', '부산', '제주도', '인천', '대구', '광주', '대전', '울산', '수원', '창원'],
+    '일본': ['도쿄', '오사카', '교토', '후쿠오카', '삿포로', '오키나와', '나고야', '요코하마', '고베', '나라'],
+    '중국': ['베이징', '상하이', '광저우', '청두', '심천', '항저우', '시안', '충칭', '우한'],
+    '대만': ['타이페이', '가오슝', '타이중', '타이난', '지룽'],
+    '홍콩': ['홍콩'],
+    '마카오': ['마카오'],
+    '싱가포르': ['싱가포르'],
+    '태국': ['방콕', '치앙마이', '푸껫', '파타야', '크라비', '후아힌'],
+    '베트남': ['하노이', '호치민', '다낭', '나트랑', '하롱베이', '호이안'],
+    '필리핀': ['마닐라', '세부', '보라카이', '팔라완', '보홀'],
+    '말레이시아': ['쿠알라룸푸르', '페낭', '코타키나발루', '랑카위', '조호바루'],
+    '인도네시아': ['자카르타', '발리', '족자카르타', '수라바야', '반둥'],
+    '미얀마': ['양곤', '만달레이', '바간', '인레호수'],
+    '캄보디아': ['프놈펜', '시엠립', '씨아누크빌'],
+    '라오스': ['비엔티안', '루앙프라방', '방비엥'],
+    '인도': ['델리', '뭄바이', '자이푸르', '아그라', '벵갈루루', '첸나이', '고아'],
+    '네팔': ['카트만두', '포카라', '룸비니'],
+    '몰디브': ['말레', '북몰리', '남몰리', '아리'],
+    '스리랑카': ['콜롬보', '캔디', '갈레'],
+    '미국': ['뉴욕', '로스앤젤레스', '샌프란시스코', '라스베가스', '시카고', '마이애미', '보스턴', '시애틀', '워싱턴DC', '올랜도'],
+    '캐나다': ['밴쿠버', '토론토', '몬트리올', '퀘벡', '캘거리', '오타와'],
+    '멕시코': ['멕시코시티', '칸쿤', '과달라하라', '몬테레이'],
+    '쿠바': ['아바나', '산티아고', '바라데로'],
+    '브라질': ['리우데자네이루', '상파울루', '브라질리아', '살바도르'],
+    '아르헨티나': ['부에노스아이레스', '멘도사', '이과수'],
+    '페루': ['리마', '쿠스코', '마추픽추'],
+    '칠레': ['산티아고', '발파라이소', '푼타아레나스'],
+    '영국': ['런던', '에든버러', '맨체스터', '리버풀', '옥스퍼드', '캠브리지'],
+    '프랑스': ['파리', '니스', '리옹', '마르세유', '칸', '보르도', '스트라스부르'],
+    '이탈리아': ['로마', '베네치아', '밀라노', '피렌체', '나폴리', '베로나', '볼로냐'],
+    '스페인': ['바르셀로나', '마드리드', '세비야', '발렌시아', '그라나다', '빌바오'],
+    '독일': ['베를린', '뮌헨', '프랑크푸르트', '함부르크', '쾰른', '드레스덴'],
+    '네덜란드': ['암스테르담', '로테르담', '헤이그', '위트레흐트'],
+    '벨기에': ['브뤼셀', '브뤼헤', '겐트', '앤트워프'],
+    '스위스': ['취리히', '제네바', '루체른', '인터라켄', '베른', '로잔'],
+    '오스트리아': ['비엔나', '잘츠부르크', '인스브루크', '할슈타트'],
+    '체코': ['프라하', '체스키크룸로프', '브르노'],
+    '헝가리': ['부다페스트', '데브레첸', '세게드'],
+    '폴란드': ['바르샤바', '크라쿠프', '그단스크', '브로츠와프'],
+    '그리스': ['아테네', '산토리니', '미코노스', '크레타', '테살로니키'],
+    '터키': ['이스탄불', '카파도키아', '안탈리아', '이즈미르', '파묵칼레'],
+    '포르투갈': ['리스본', '포르투', '파티마', '신트라'],
+    '아일랜드': ['더블린', '골웨이', '코크'],
+    '노르웨이': ['오슬로', '베르겐', '트롬쇠'],
+    '스웨덴': ['스톡홀름', '예테보리', '말뫼'],
+    '덴마크': ['코펜하겐', '오르후스', '오덴세'],
+    '핀란드': ['헬싱키', '로바니에미', '탐페레'],
+    '아이슬란드': ['레이캬비크', '아쿠레이리', '비크'],
+    '러시아': ['모스크바', '상트페테르부르크', '블라디보스토크', '이르쿠츠크'],
+    '호주': ['시드니', '멜버른', '브리즈번', '골드코스트', '퍼스', '케언즈'],
+    '뉴질랜드': ['오클랜드', '웰링턴', '퀸스타운', '크라이스트처치'],
+    '이집트': ['카이로', '룩소르', '아스완', '후르가다'],
+    '모로코': ['마라케시', '카사블랑카', '페즈', '라바트'],
+    '남아프리카공화국': ['케이프타운', '요하네스버그', '더반'],
+    '케냐': ['나이로비', '몸바사', '말린디'],
+    '탄자니아': ['다르에스살람', '아루샤', '잔지바르'],
+    '아랍에미리트': ['두바이', '아부다비', '샤르자'],
+    '사우디아라비아': ['리야드', '제다', '메카', '메디나'],
+    '카타르': ['도하'],
+    '요르단': ['암만', '페트라', '아카바'],
+    '이스라엘': ['예루살렘', '텔아비브', '하이파'],
+  };
+
+  // 국가별 국기 이모지
+  final Map<String, String> _countryFlags = {
+    '대한민국': '🇰🇷', '일본': '🇯🇵', '중국': '🇨🇳', '대만': '🇹🇼', '홍콩': '🇭🇰', '마카오': '🇲🇴',
+    '싱가포르': '🇸🇬', '태국': '🇹🇭', '베트남': '🇻🇳', '필리핀': '🇵🇭', '말레이시아': '🇲🇾',
+    '인도네시아': '🇮🇩', '미얀마': '🇲🇲', '캄보디아': '🇰🇭', '라오스': '🇱🇦', '인도': '🇮🇳',
+    '네팔': '🇳🇵', '몰디브': '🇲🇻', '스리랑카': '🇱🇰', '미국': '🇺🇸', '캐나다': '🇨🇦',
+    '멕시코': '🇲🇽', '쿠바': '🇨🇺', '브라질': '🇧🇷', '아르헨티나': '🇦🇷', '페루': '🇵🇪',
+    '칠레': '🇨🇱', '영국': '🇬🇧', '프랑스': '🇫🇷', '이탈리아': '🇮🇹', '스페인': '🇪🇸',
+    '독일': '🇩🇪', '네덜란드': '🇳🇱', '벨기에': '🇧🇪', '스위스': '🇨🇭', '오스트리아': '🇦🇹',
+    '체코': '🇨🇿', '헝가리': '🇭🇺', '폴란드': '🇵🇱', '그리스': '🇬🇷', '터키': '🇹🇷',
+    '포르투갈': '🇵🇹', '아일랜드': '🇮🇪', '노르웨이': '🇳🇴', '스웨덴': '🇸🇪', '덴마크': '🇩🇰',
+    '핀란드': '🇫🇮', '아이슬란드': '🇮🇸', '러시아': '🇷🇺', '호주': '🇦🇺', '뉴질랜드': '🇳🇿',
+    '이집트': '🇪🇬', '모로코': '🇲🇦', '남아프리카공화국': '🇿🇦', '케냐': '🇰🇪', '탄자니아': '🇹🇿',
+    '아랍에미리트': '🇦🇪', '사우디아라비아': '🇸🇦', '카타르': '🇶🇦', '요르단': '🇯🇴', '이스라엘': '🇮🇱',
+  };
+
   @override
   void initState() {
     super.initState();
@@ -149,62 +230,66 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
-        child: Column(
-          children: [
-            const SizedBox(height: 10),
-            _buildMenuCard(
-              context,
-              icon: "📅",
-              title: _selectedDateRange,
-              onTap: () => _showDateModal(context),
-              isSelected: _selectedDateRange != "날짜 설정",
-            ),
-            _buildMenuCard(
-              context,
-              icon: "🌍",
-              title: _selectedCountry,
-              onTap: () => _showCountryModal(context),
-              isSelected: _selectedCountry != "국가 설정",
-            ),
-            _buildMenuCard(
-              context,
-              icon: "✈️",
-              title: _flightInfo,
-              onTap: () => _showFlightModal(context),
-              isSelected: _flightInfo != "비행편 설정",
-            ),
-            _buildMenuCard(
-              context,
-              icon: "🏠",
-              title: _hotelInfo,
-              onTap: () => _showHotelModal(context),
-              isSelected: _hotelInfo != "숙소 설정",
-            ),
-            _buildMenuCard(
-              context,
-              icon: "👥",
-              title: _members.isEmpty ? "인원 추가" : "인원 ${_members.length}명",
-              onTap: () => _showMemberModal(context),
-              isSelected: _members.isNotEmpty,
-            ),
-            _buildMenuCard(
-              context,
-              icon: "🧳",
-              title: _supplies.isEmpty ? "준비물 추가" : "준비물 ${_supplies.length}개",
-              onTap: () => _showSupplyModal(context),
-              isSelected: _supplies.isNotEmpty,
-            ),
-            _buildMenuCard(
-              context,
-              icon: "📋",
-              title: _todoList.isEmpty ? "리스트 추가" : "할 일 ${_todoList.length}개",
-              onTap: () => _showListModal(context),
-              isSelected: _todoList.isNotEmpty,
-            ),
-            const SizedBox(height: 30),
-          ],
-        ),
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+          child: Column(
+            children: [
+              const SizedBox(height: 10),
+              _buildMenuCard(
+                context,
+                icon: "📅",
+                title: _selectedDateRange,
+                onTap: () => _showDateModal(context),
+                isSelected: _selectedDateRange != "날짜 설정",
+              ),
+              _buildMenuCard(
+                context,
+                icon: "🌍",
+                title: _selectedCountry,
+                onTap: () => _showCountryModal(context),
+                isSelected: _selectedCountry != "국가 설정",
+              ),
+              _buildMenuCard(
+                context,
+                icon: "✈️",
+                title: _flightInfo,
+                onTap: () => _showFlightModal(context),
+                isSelected: _flightInfo != "비행편 설정",
+              ),
+              _buildMenuCard(
+                context,
+                icon: "🏠",
+                title: _hotelInfo,
+                onTap: () => _showHotelModal(context),
+                isSelected: _hotelInfo != "숙소 설정",
+              ),
+              _buildMenuCard(
+                context,
+                icon: "👥",
+                title: _members.isEmpty ? "인원 추가" : "인원 ${_members.length}명",
+                onTap: () => _showMemberModal(context),
+                isSelected: _members.isNotEmpty,
+              ),
+              _buildMenuCard(
+                context,
+                icon: "🧳",
+                title: _supplies.isEmpty
+                    ? "준비물 추가"
+                    : "준비물 ${_supplies.length}개",
+                onTap: () => _showSupplyModal(context),
+                isSelected: _supplies.isNotEmpty,
+              ),
+              _buildMenuCard(
+                context,
+                icon: "📋",
+                title: _todoList.isEmpty
+                    ? "리스트 추가"
+                    : "할 일 ${_todoList.length}개",
+                onTap: () => _showListModal(context),
+                isSelected: _todoList.isNotEmpty,
+              ),
+              const SizedBox(height: 30),
+            ],
+          ),
         ),
       ),
     );
@@ -404,72 +489,189 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
   }
 
   void _showCountryModal(BuildContext context) {
-    /* 기존 코드 복사 */
+    String? tempCountry;
+    String? tempCity;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.9,
-        padding: const EdgeInsets.all(20),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: Container(
+            height: MediaQuery.of(context).size.height * 0.9,
+            padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 20,
+              bottom: MediaQuery.of(context).padding.bottom + 20,
+            ),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+              _buildModalHeader(context, "국가 설정"),
+              const SizedBox(height: 20),
+              const Text(
+                "국가 및 도시 선택",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: Column(
+                  children: [
+                    // 국가 선택 드롭다운
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          isExpanded: true,
+                          hint: const Text("국가 선택"),
+                          value: tempCountry,
+                          items: _countriesAndCities.keys.map((country) {
+                            final flag = _countryFlags[country] ?? '🌍';
+                            return DropdownMenuItem(
+                              value: country,
+                              child: Row(
+                                children: [
+                                  Text(
+                                    flag,
+                                    style: const TextStyle(fontSize: 20),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(country),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            setModalState(() {
+                              tempCountry = value;
+                              tempCity = null;
+                            });
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // 도시 선택 드롭다운
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: tempCountry == null
+                            ? Colors.grey.shade200
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          isExpanded: true,
+                          hint: const Text("도시 선택"),
+                          value: tempCity,
+                          items: tempCountry != null
+                              ? _countriesAndCities[tempCountry]!.map((city) {
+                                  return DropdownMenuItem(
+                                    value: city,
+                                    child: Text(city),
+                                  );
+                                }).toList()
+                              : [],
+                          onChanged: tempCountry != null
+                              ? (value) {
+                                  setModalState(() {
+                                    tempCity = value;
+                                  });
+                                }
+                              : null,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // 선택된 국가/도시 표시
+                    if (tempCountry != null && tempCity != null)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.green.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.check_circle,
+                              color: Colors.green.shade700,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              _countryFlags[tempCountry] ?? '🌍',
+                              style: const TextStyle(fontSize: 20),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                "$tempCountry, $tempCity",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green.shade700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: (tempCountry != null && tempCity != null)
+                      ? () {
+                          final flag = _countryFlags[tempCountry] ?? '🌍';
+                          setState(() {
+                            _selectedCountry = "$flag $tempCountry, $tempCity";
+                          });
+                          Navigator.pop(context);
+                        }
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4CA1AF),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    disabledBackgroundColor: Colors.grey.shade300,
+                  ),
+                  child: const Text(
+                    "이 지역으로 선택하기",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildModalHeader(context, "국가 설정"),
-            const SizedBox(height: 20),
-            _buildInputBox("여기서 검색", icon: Icons.search),
-            const SizedBox(height: 24),
-            const Text(
-              "지도로 찾기",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              height: 180,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.blue[50],
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Center(
-                child: Icon(Icons.map, size: 50, color: Colors.black26),
-              ),
-            ),
-            const SizedBox(height: 30),
-            const Text(
-              "빠른 지역 찾기",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            const SizedBox(height: 16),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _buildCountryCard(context, "🇺🇸", "미국", "뉴욕"),
-                  _buildCountryCard(context, "🇮🇹", "이탈리아", "로마"),
-                  _buildCountryCard(context, "🇵🇹", "포르투갈", "리스본"),
-                  _buildCountryCard(context, "🇯🇵", "일본", "오사카"),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Divider(),
-            Expanded(
-              child: ListView(
-                children: [
-                  _buildListTile(context, "🇫🇷", "프랑스", "파리"),
-                  _buildListTile(context, "🇬🇧", "영국", "런던"),
-                  _buildListTile(context, "🇪🇸", "스페인", "바르셀로나"),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
-      ),
     );
   }
 
@@ -933,26 +1135,6 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
     );
   }
 
-  Widget _buildInputBox(String hint, {IconData? icon}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 18, color: Colors.black54),
-            const SizedBox(width: 10),
-          ],
-          Text(hint, style: TextStyle(color: Colors.grey[600])),
-        ],
-      ),
-    );
-  }
-
   Widget _buildTimeSelectBox(TimeOfDay? time, String hint) {
     return Container(
       width: double.infinity,
@@ -1019,72 +1201,6 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildCountryCard(
-    BuildContext context,
-    String flag,
-    String country,
-    String city,
-  ) {
-    return GestureDetector(
-      onTap: () {
-        setState(() => _selectedCountry = "$country, $city");
-        Navigator.pop(context);
-      },
-      child: Container(
-        margin: const EdgeInsets.only(right: 16),
-        child: Column(
-          children: [
-            Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.grey.shade200),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
-                    blurRadius: 5,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Center(
-                child: Text(flag, style: const TextStyle(fontSize: 30)),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              country,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-            ),
-            Text(
-              city,
-              style: const TextStyle(fontSize: 10, color: Colors.grey),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildListTile(
-    BuildContext context,
-    String flag,
-    String country,
-    String city,
-  ) {
-    return ListTile(
-      leading: Text(flag, style: const TextStyle(fontSize: 24)),
-      title: Text(country),
-      subtitle: Text(city),
-      onTap: () {
-        setState(() => _selectedCountry = "$country, $city");
-        Navigator.pop(context);
-      },
     );
   }
 }

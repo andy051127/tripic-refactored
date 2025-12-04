@@ -26,6 +26,7 @@ class _PhotoEditorScreenState extends State<PhotoEditorScreen> {
   final ImagePicker _picker = ImagePicker();
   final Completer<GoogleMapController> _mapController = Completer();
   LatLng? _selectedLocation;
+  String? _selectedLocationName; // 선택된 위치 이름 추가
   LatLng _currentPosition = const LatLng(37.5666805, 126.9784147); // 서울 시청 기본값
 
   @override
@@ -209,6 +210,7 @@ class _PhotoEditorScreenState extends State<PhotoEditorScreen> {
                           images: _images,
                           taggedFriend: _taggedFriend,
                           selectedLocation: _selectedLocation, // 선택된 위치 전달
+                          selectedLocationName: _selectedLocationName, // 위치 이름 전달
                         ),
                       ),
                     );
@@ -330,26 +332,33 @@ class _PhotoEditorScreenState extends State<PhotoEditorScreen> {
                 );
                 
                 // map_screen에서 위치를 선택하고 돌아온 경우
-                if (result != null && result is LatLng) {
-                  setState(() {
-                    _selectedLocation = result;
-                  });
+                if (result != null && result is Map<String, dynamic>) {
+                  final latitude = result['latitude'] as double?;
+                  final longitude = result['longitude'] as double?;
+                  final locationName = result['locationName'] as String?;
                   
-                  // 선택된 위치로 지도 이동
-                  final controller = await _mapController.future;
-                  controller.animateCamera(
-                    CameraUpdate.newLatLng(result),
-                  );
-                  
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          '위치 선택됨: ${result.latitude.toStringAsFixed(4)}, ${result.longitude.toStringAsFixed(4)}',
-                        ),
-                        duration: const Duration(seconds: 2),
-                      ),
+                  if (latitude != null && longitude != null) {
+                    setState(() {
+                      _selectedLocation = LatLng(latitude, longitude);
+                      _selectedLocationName = locationName ?? '선택한 위치';
+                    });
+                    
+                    // 선택된 위치로 지도 이동
+                    final controller = await _mapController.future;
+                    controller.animateCamera(
+                      CameraUpdate.newLatLng(_selectedLocation!),
                     );
+                    
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            '위치 선택됨: $_selectedLocationName',
+                          ),
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    }
                   }
                 }
               },

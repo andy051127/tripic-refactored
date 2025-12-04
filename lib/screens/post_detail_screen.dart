@@ -232,6 +232,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                               MaterialPageRoute(
                                 builder: (context) => ChatDetailScreen(
                                   chatPartnerName: widget.post.userName,
+                                  chatPartnerId: widget.post.uid,
                                 ),
                               ),
                             );

@@ -16,6 +16,7 @@ class _MemberInfoScreenState extends State<MemberInfoScreen> {
 
   // 컨트롤러
   late TextEditingController _nameController;
+  late TextEditingController _bioController;
   late TextEditingController _emailController;
   late TextEditingController _phoneController;
 
@@ -24,6 +25,7 @@ class _MemberInfoScreenState extends State<MemberInfoScreen> {
     super.initState();
     // 현재 전역 변수 값으로 초기화
     _nameController = TextEditingController(text: globalUserName.value);
+    _bioController = TextEditingController(text: globalUserBio.value);
     _emailController = TextEditingController(text: globalUserEmail.value);
     _phoneController = TextEditingController(text: globalUserPhone.value);
   }
@@ -31,6 +33,7 @@ class _MemberInfoScreenState extends State<MemberInfoScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _bioController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
     super.dispose();
@@ -49,12 +52,14 @@ class _MemberInfoScreenState extends State<MemberInfoScreen> {
             .doc(user.uid)
             .update({
               'userName': _nameController.text,
+              'bio': _bioController.text,
               'email': _emailController.text,
               'phoneNumber': _phoneController.text,
             });
 
         // 2. 전역 변수 업데이트 (앱 내 반영)
         globalUserName.value = _nameController.text;
+        globalUserBio.value = _bioController.text;
         globalUserEmail.value = _emailController.text;
         globalUserPhone.value = _phoneController.text;
 
@@ -140,11 +145,12 @@ class _MemberInfoScreenState extends State<MemberInfoScreen> {
               isEditable: _isEditing,
             ),
             _buildInfoTile(
-              Icons.perm_identity,
-              "아이디",
-              TextEditingController(text: "tripic_user_01"),
-              isEditable: false,
-            ), // 아이디는 수정 불가 예시
+              Icons.info_outline,
+              "자기소개",
+              _bioController,
+              isEditable: _isEditing,
+              maxLines: 3,
+            ),
 
             const SizedBox(height: 30),
             const Text(
@@ -194,6 +200,7 @@ class _MemberInfoScreenState extends State<MemberInfoScreen> {
     String title,
     TextEditingController controller, {
     required bool isEditable,
+    int maxLines = 1,
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -206,12 +213,19 @@ class _MemberInfoScreenState extends State<MemberInfoScreen> {
         ), // 수정 중이면 테두리 색상 변경
       ),
       child: Row(
+        crossAxisAlignment: maxLines > 1 ? CrossAxisAlignment.start : CrossAxisAlignment.center,
         children: [
-          Icon(icon, color: Colors.grey[600], size: 22),
+          Padding(
+            padding: EdgeInsets.only(top: maxLines > 1 ? 8 : 0),
+            child: Icon(icon, color: Colors.grey[600], size: 22),
+          ),
           const SizedBox(width: 16),
-          Text(
-            title,
-            style: const TextStyle(fontSize: 16, color: Colors.black54),
+          Padding(
+            padding: EdgeInsets.only(top: maxLines > 1 ? 8 : 0),
+            child: Text(
+              title,
+              style: const TextStyle(fontSize: 16, color: Colors.black54),
+            ),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -219,6 +233,7 @@ class _MemberInfoScreenState extends State<MemberInfoScreen> {
                 ? TextField(
                     controller: controller,
                     textAlign: TextAlign.end,
+                    maxLines: maxLines,
                     decoration: const InputDecoration(
                       border: InputBorder.none,
                       isDense: true,
@@ -232,6 +247,7 @@ class _MemberInfoScreenState extends State<MemberInfoScreen> {
                 : Text(
                     controller.text,
                     textAlign: TextAlign.end,
+                    maxLines: maxLines,
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,

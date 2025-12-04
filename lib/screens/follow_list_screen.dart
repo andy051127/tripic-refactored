@@ -201,6 +201,108 @@ class _FollowListScreenState extends State<FollowListScreen> {
       return const SizedBox.shrink();
     }
 
+    // 본인 프로필에서 진입한 경우 (본인의 팔로워/팔로잉 목록)
+    final isOwnProfile = _targetUserId == currentUser?.uid;
+
+    if (isOwnProfile) {
+      if (isFollower) {
+        // 팔로워 탭: 삭제 버튼
+        return GestureDetector(
+          onTap: () async {
+            // 확인 다이얼로그 표시
+            final confirm = await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('팔로워 삭제'),
+                content: const Text('이 팔로워를 삭제하시겠습니까?'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('취소'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text(
+                      '삭제',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  ),
+                ],
+              ),
+            );
+
+            if (confirm == true) {
+              try {
+                await _firestoreService.removeFollower(userId);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('팔로워를 삭제했습니다')),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('오류가 발생했습니다: $e')),
+                  );
+                }
+              }
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.grey[200],
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: const Text(
+              "삭제",
+              style: TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        );
+      } else {
+        // 팔로잉 탭: 언팔로우 버튼
+        return GestureDetector(
+          onTap: () async {
+            try {
+              await _firestoreService.unfollowUser(userId);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('언팔로우했습니다')),
+                );
+              }
+            } catch (e) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('오류가 발생했습니다: $e')),
+                );
+              }
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.grey[200],
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: const Text(
+              "언팔로우",
+              style: TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
+    // 다른 사용자 프로필에서 진입한 경우: 기존 팔로우/언팔로우 버튼
     return FutureBuilder<bool>(
       future: _firestoreService.isFollowing(userId),
       builder: (context, snapshot) {

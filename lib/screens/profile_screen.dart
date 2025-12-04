@@ -12,7 +12,8 @@ import 'follow_list_screen.dart';
 import 'photo_picker_screen.dart';
 import 'member_info_screen.dart';
 import 'map_screen.dart';
-import 'travel_record_map_screen.dart'; // 추가
+import 'travel_record_map_screen.dart';
+import 'my_posts_detail_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -195,6 +196,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           TextButton(
             onPressed: () async {
+              // 전역 변수 초기화
+              globalProfileImage.value = "assets/logo.png";
+              isProfileImageFile.value = false;
+              globalUserName.value = "null";
+              globalUserBio.value = "null";
+              globalUserEmail.value = "null";
+              globalUserPhone.value = "null";
+              globalFollowerCount.value = 0;
+              globalFollowingCount.value = 0;
+              globalPostsNotifier.value = [];
+              blockedUsersNotifier.value = [];
+              
               await FirebaseAuth.instance.signOut();
               if (context.mounted) {
                 Navigator.pushAndRemoveUntil(
@@ -520,6 +533,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         final posts = snapshot.data?.docs ?? [];
         
+        // 클라이언트 측에서 최신순 정렬
+        posts.sort((a, b) {
+          final aData = a.data() as Map<String, dynamic>;
+          final bData = b.data() as Map<String, dynamic>;
+          final aTime = aData['createdAt'] as Timestamp?;
+          final bTime = bData['createdAt'] as Timestamp?;
+          if (aTime == null || bTime == null) return 0;
+          return bTime.compareTo(aTime); // 내림차순 (최신순)
+        });
+        
         print('📊 내 게시물 수: ${posts.length}개');
 
         if (posts.isEmpty) {
@@ -549,7 +572,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
             return GestureDetector(
               onTap: () {
-                // TODO: 게시물 상세 화면으로 이동
+                // 게시물 상세 화면으로 이동 (선택한 인덱스부터 시작)
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => MyPostsDetailScreen(
+                      initialIndex: index,
+                    ),
+                  ),
+                );
               },
               child: Stack(
                 fit: StackFit.expand,

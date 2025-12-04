@@ -120,81 +120,122 @@ class _CommunityScreenState extends State<CommunityScreen> {
               .where((p) => p.category == 'companion')
               .toList();
 
-          return Column(
-            children: [
-              // [1] 게시글 영역
-              if (_viewMode == 'split' || _viewMode == 'post')
-                Expanded(
-                  child: Column(
-                    children: [
-                      GestureDetector(
-                        onTap: () => _toggleView('post'),
-                        child: Container(
-                          width: double.infinity,
-                          color: Colors.white,
-                          child: _sectionHeader(
-                            "게시글",
-                            isExpanded: _viewMode == 'post',
-                          ),
-                        ),
+          // 통합된 리스트 생성 (홈 화면처럼 연속 스크롤)
+          return ListView.builder(
+            padding: EdgeInsets.zero,
+            itemCount: (_viewMode == 'split' 
+                ? generalPosts.length + companionPosts.length + 3  // 헤더 2개 + 구분선 1개
+                : _viewMode == 'post'
+                    ? generalPosts.length + 1  // 헤더 1개
+                    : companionPosts.length + 1),  // 헤더 1개
+            itemBuilder: (context, index) {
+              // split 모드
+              if (_viewMode == 'split') {
+                // 게시글 헤더
+                if (index == 0) {
+                  return GestureDetector(
+                    onTap: () => _toggleView('post'),
+                    child: Container(
+                      color: Colors.white,
+                      child: _sectionHeader(
+                        "게시글",
+                        isExpanded: false,
                       ),
-                      Expanded(
-                        child: generalPosts.isEmpty
-                            ? const Center(child: Text("게시글이 없습니다."))
-                            : ListView.builder(
-                                padding: EdgeInsets.zero,
-                                itemCount: generalPosts.length,
-                                itemBuilder: (context, index) => _postItem(
-                                  context,
-                                  post: generalPosts[index],
-                                ),
-                              ),
+                    ),
+                  );
+                }
+                // 게시글 아이템들
+                if (index <= generalPosts.length) {
+                  return _postItem(
+                    context,
+                    post: generalPosts[index - 1],
+                  );
+                }
+                // 구분선
+                if (index == generalPosts.length + 1) {
+                  return const Divider(
+                    thickness: 8,
+                    height: 8,
+                    color: Color(0xFFF5F5F5),
+                  );
+                }
+                // 동행 헤더
+                if (index == generalPosts.length + 2) {
+                  return GestureDetector(
+                    onTap: () => _toggleView('companion'),
+                    child: Container(
+                      color: Colors.white,
+                      padding: const EdgeInsets.only(top: 10.0, bottom: 5),
+                      child: _sectionHeader(
+                        "동행",
+                        isExpanded: false,
+                        showArrow: true,
                       ),
-                    ],
-                  ),
-                ),
-
-              if (_viewMode == 'split')
-                const Divider(
-                  thickness: 8,
-                  height: 8,
-                  color: Color(0xFFF5F5F5),
-                ),
-
-              // [2] 동행 영역
-              if (_viewMode == 'split' || _viewMode == 'companion')
-                Expanded(
-                  child: Column(
-                    children: [
-                      GestureDetector(
-                        onTap: () => _toggleView('companion'),
-                        child: Container(
-                          width: double.infinity,
-                          color: Colors.white,
-                          padding: const EdgeInsets.only(top: 10.0, bottom: 5),
-                          child: _sectionHeader(
-                            "동행",
-                            isExpanded: _viewMode == 'companion',
-                            showArrow: true,
-                          ),
-                        ),
+                    ),
+                  );
+                }
+                // 동행 아이템들
+                return _postItem(
+                  context,
+                  post: companionPosts[index - generalPosts.length - 3],
+                );
+              }
+              // post 모드 (게시글만)
+              else if (_viewMode == 'post') {
+                if (index == 0) {
+                  return GestureDetector(
+                    onTap: () => _toggleView('post'),
+                    child: Container(
+                      color: Colors.white,
+                      child: _sectionHeader(
+                        "게시글",
+                        isExpanded: true,
                       ),
-                      Expanded(
-                        child: companionPosts.isEmpty
-                            ? const Center(child: Text("동행 글이 없습니다."))
-                            : ListView.builder(
-                                padding: EdgeInsets.zero,
-                                itemCount: companionPosts.length,
-                                itemBuilder: (context, index) => _postItem(
-                                  context,
-                                  post: companionPosts[index],
-                                ),
-                              ),
+                    ),
+                  );
+                }
+                if (generalPosts.isEmpty && index == 1) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(40.0),
+                      child: Text("게시글이 없습니다."),
+                    ),
+                  );
+                }
+                return _postItem(
+                  context,
+                  post: generalPosts[index - 1],
+                );
+              }
+              // companion 모드 (동행만)
+              else {
+                if (index == 0) {
+                  return GestureDetector(
+                    onTap: () => _toggleView('companion'),
+                    child: Container(
+                      color: Colors.white,
+                      child: _sectionHeader(
+                        "동행",
+                        isExpanded: true,
+                        showArrow: true,
                       ),
-                    ],
-                  ),
-                ),
-            ],
+                    ),
+                  );
+                }
+                if (companionPosts.isEmpty && index == 1) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(40.0),
+                      child: Text("동행 글이 없습니다."),
+                    ),
+                  );
+                }
+                return _postItem(
+                  context,
+                  post: companionPosts[index - 1],
+                );
+              }
+            },
           );
         },
       ),

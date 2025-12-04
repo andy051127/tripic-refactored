@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/firestore_service.dart';
 import 'chat_detail_screen.dart'; // 채팅방 이동용
 
 class FriendListScreen extends StatefulWidget {
@@ -12,27 +15,37 @@ class FriendListScreen extends StatefulWidget {
 }
 
 class _FriendListScreenState extends State<FriendListScreen> {
-  // 가상의 팔로워(친구) 데이터
-  final List<String> friends = [
-    "가나다",
-    "김 군",
-    "김찬희",
-    "이경환",
-    "이예진",
-    "안해진",
-    "야구오",
-    "김지오",
-    "김오디",
-    "박명수",
-    "유재석",
-    "강호동",
-  ];
-
+  final FirestoreService _firestoreService = FirestoreService();
+  
   // 선택된 친구들을 저장할 리스트 (다중 선택용)
   final Set<String> _selectedFriends = {};
 
   @override
   Widget build(BuildContext context) {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    
+    if (currentUser == null) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
+            onPressed: () => Navigator.pop(context),
+          ),
+          centerTitle: true,
+          title: const Text(
+            "친구 목록",
+            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          ),
+        ),
+        body: const Center(
+          child: Text("로그인이 필요합니다."),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -73,81 +86,140 @@ class _FriendListScreenState extends State<FriendListScreen> {
         ],
       ),
       body: SafeArea(
-        child: ListView.builder(
-        itemCount: friends.length,
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        itemBuilder: (context, index) {
-          final name = friends[index];
-          final isSelected = _selectedFriends.contains(name);
+        child: StreamBuilder<QuerySnapshot>(
+          stream: _firestoreService.getFollowingStream(currentUser.uid),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-          return ListTile(
-            onTap: () {
-              if (widget.isSelectionMode) {
-                // [1] 선택 모드: 리스트에 추가/제거 (다중 선택)
-                setState(() {
-                  if (isSelected) {
-                    _selectedFriends.remove(name);
-                  } else {
-                    _selectedFriends.add(name);
-                  }
-                });
-              } else {
-                // [2] 채팅 모드: 해당 친구와의 채팅방으로 이동
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        ChatDetailScreen(chatPartnerName: name),
-                  ),
-                );
-              }
-            },
-            leading: Stack(
-              children: [
-                const CircleAvatar(
-                  radius: 24,
-                  backgroundColor: Colors.grey,
-                  child: Icon(Icons.person, color: Colors.white),
-                ),
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: Colors.blue, // 활동 중 표시
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
+            if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.people_outline, size: 80, color: Colors.grey[300]),
+                    const SizedBox(height: 16),
+                    Text(
+                      "팔로잉하는 친구가 없습니다",
+                      style: TextStyle(color: Colors.grey[600], fontSize: 16),
                     ),
-                  ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      "다른 사용자를 팔로우해보세요!",
+                      style: TextStyle(color: Colors.grey, fontSize: 14),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            title: Text(
-              name,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            subtitle: const Text(
-              "게시물 2   팔로잉 20   팔로워 30",
-              style: TextStyle(color: Colors.grey, fontSize: 12),
-            ),
-            // 선택 모드일 때는 체크박스 아이콘 표시
-            trailing: widget.isSelectionMode
-                ? Icon(
-                    isSelected
-                        ? Icons.check_circle
-                        : Icons.radio_button_unchecked,
-                    color: isSelected ? Colors.blue : Colors.grey,
-                    size: 24,
-                  )
-                : const Icon(
-                    Icons.message_outlined,
-                    color: Colors.grey,
-                    size: 20,
-                  ),
-          );
-        },
+              );
+            }
+
+            final followingDocs = snapshot.data!.docs;
+
+            return ListView.builder(
+              itemCount: followingDocs.length,
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              itemBuilder: (context, index) {
+                final followingUserId = followingDocs[index].id;
+
+                return FutureBuilder<Map<String, dynamic>?>(
+                  future: _firestoreService.getUserInfo(followingUserId),
+                  builder: (context, userSnapshot) {
+                    if (!userSnapshot.hasData) {
+                      return const SizedBox.shrink();
+                    }
+
+                    final userData = userSnapshot.data!;
+                    final userName = userData['userName'] ?? '알 수 없음';
+                    final userProfileImage = userData['profileImage'] ?? '';
+                    final isSelected = _selectedFriends.contains(userName);
+
+                    return FutureBuilder<Map<String, int>>(
+                      future: _firestoreService.getFollowCounts(followingUserId),
+                      builder: (context, countsSnapshot) {
+                        final followerCount = countsSnapshot.data?['followers'] ?? 0;
+                        final followingCount = countsSnapshot.data?['following'] ?? 0;
+
+                        return FutureBuilder<QuerySnapshot>(
+                          future: FirebaseFirestore.instance
+                              .collection('posts')
+                              .where('uid', isEqualTo: followingUserId)
+                              .get(),
+                          builder: (context, postsSnapshot) {
+                            final postCount = postsSnapshot.data?.docs.length ?? 0;
+
+                            return ListTile(
+                              onTap: () {
+                                if (widget.isSelectionMode) {
+                                  // [1] 선택 모드: 리스트에 추가/제거 (다중 선택)
+                                  setState(() {
+                                    if (isSelected) {
+                                      _selectedFriends.remove(userName);
+                                    } else {
+                                      _selectedFriends.add(userName);
+                                    }
+                                  });
+                                } else {
+                                  // [2] 채팅 모드: 해당 친구와의 채팅방으로 이동
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => ChatDetailScreen(
+                                        chatPartnerName: userName,
+                                        chatPartnerId: followingUserId,
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
+                              leading: CircleAvatar(
+                                radius: 24,
+                                backgroundColor: Colors.grey,
+                                backgroundImage: userProfileImage.isNotEmpty
+                                    ? NetworkImage(userProfileImage)
+                                    : null,
+                                child: userProfileImage.isEmpty
+                                    ? const Icon(Icons.person, color: Colors.white)
+                                    : null,
+                              ),
+                              title: Text(
+                                userName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              subtitle: Text(
+                                "게시물 $postCount   팔로잉 $followingCount   팔로워 $followerCount",
+                                style: const TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              // 선택 모드일 때는 체크박스 아이콘 표시
+                              trailing: widget.isSelectionMode
+                                  ? Icon(
+                                      isSelected
+                                          ? Icons.check_circle
+                                          : Icons.radio_button_unchecked,
+                                      color: isSelected ? Colors.blue : Colors.grey,
+                                      size: 24,
+                                    )
+                                  : const Icon(
+                                      Icons.message_outlined,
+                                      color: Colors.grey,
+                                      size: 20,
+                                    ),
+                            );
+                          },
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            );
+          },
         ),
       ),
     );

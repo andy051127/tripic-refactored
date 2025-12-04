@@ -5,6 +5,9 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../models/post_model.dart';
 import '../services/firestore_service.dart';
 import 'map_screen.dart';
+import 'other_user_posts_detail_screen.dart';
+import 'chat_detail_screen.dart';
+import 'follow_list_screen.dart';
 
 class OtherUserProfileScreen extends StatefulWidget {
   final String userName;
@@ -30,6 +33,7 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
   int _followingCount = 0;
   int _postCount = 0;
   String? _targetUserId;
+  String _userBio = '';
 
   @override
   void initState() {
@@ -105,6 +109,18 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
             .where('uid', isEqualTo: targetId)
             .get();
 
+        // 사용자 정보 가져오기 (자기소개 포함)
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(targetId)
+            .get();
+        
+        String userBio = '';
+        if (userDoc.exists) {
+          final userData = userDoc.data();
+          userBio = userData?['bio'] ?? '';
+        }
+
         print('📊 게시물 수: ${postsSnapshot.docs.length}개');
 
         if (mounted) {
@@ -113,6 +129,7 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
             _followerCount = counts['followers'] ?? 0;
             _followingCount = counts['following'] ?? 0;
             _postCount = postsSnapshot.docs.length;
+            _userBio = userBio;
             _isLoading = false;
           });
         }
@@ -212,9 +229,42 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                               children: [
-                                _buildStatItem("$_postCount", "게시물"),
-                                _buildStatItem("$_followerCount", "팔로워"),
-                                _buildStatItem("$_followingCount", "팔로잉"),
+                                _buildStatItem("$_postCount", "게시물", onTap: () {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text("아래에서 게시물을 확인하세요! ↓"),
+                                      duration: Duration(seconds: 1),
+                                    ),
+                                  );
+                                }),
+                                _buildStatItem("$_followerCount", "팔로워", onTap: () {
+                                  if (_targetUserId != null) {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => FollowListScreen(
+                                          userName: widget.userName,
+                                          initialIndex: 0,
+                                          userId: _targetUserId,
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                }),
+                                _buildStatItem("$_followingCount", "팔로잉", onTap: () {
+                                  if (_targetUserId != null) {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => FollowListScreen(
+                                          userName: widget.userName,
+                                          initialIndex: 1,
+                                          userId: _targetUserId,
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                }),
                               ],
                             ),
                           ),
@@ -228,6 +278,11 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
                           fontSize: 14,
                         ),
                       ),
+                      if (_userBio.isNotEmpty)
+                        Text(
+                          _userBio,
+                          style: const TextStyle(fontSize: 14),
+                        ),
                       const SizedBox(height: 16),
                       Row(
                         children: [
@@ -263,17 +318,46 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
                           ),
                           const SizedBox(width: 8),
                           Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              decoration: BoxDecoration(
-                                border:
-                                    Border.all(color: Colors.grey.shade300),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Center(
-                                child: Text(
-                                  "메시지",
-                                  style: TextStyle(fontWeight: FontWeight.bold),
+                            child: GestureDetector(
+                              onTap: () async {
+                                if (_targetUserId != null) {
+                                  // DM 화면으로 이동
+                                  try {
+                                    final chatRoomId = await _firestoreService.getOrCreateChatRoom(_targetUserId!);
+                                    if (mounted) {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => ChatDetailScreen(
+                                            chatRoomId: chatRoomId,
+                                            chatPartnerId: _targetUserId!,
+                                            chatPartnerName: widget.userName,
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    print('채팅방 생성 실패: $e');
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('채팅방 생성에 실패했습니다: $e')),
+                                      );
+                                    }
+                                  }
+                                }
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                decoration: BoxDecoration(
+                                  border:
+                                      Border.all(color: Colors.grey.shade300),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Center(
+                                  child: Text(
+                                    "메시지",
+                                    style: TextStyle(fontWeight: FontWeight.bold),
+                                  ),
                                 ),
                               ),
                             ),
@@ -339,6 +423,16 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
 
         final posts = snapshot.data?.docs ?? [];
         
+        // 클라이언트 측에서 최신순 정렬
+        posts.sort((a, b) {
+          final aData = a.data() as Map<String, dynamic>;
+          final bData = b.data() as Map<String, dynamic>;
+          final aTime = aData['createdAt'] as Timestamp?;
+          final bTime = bData['createdAt'] as Timestamp?;
+          if (aTime == null || bTime == null) return 0;
+          return bTime.compareTo(aTime); // 내림차순 (최신순)
+        });
+        
         print('📊 로드된 게시물 수: ${posts.length}개');
 
         if (posts.isEmpty) {
@@ -366,7 +460,16 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
 
             return GestureDetector(
               onTap: () {
-                // TODO: 게시물 상세 화면으로 이동
+                // 게시물 상세 화면으로 이동
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => OtherUserPostsDetailScreen(
+                      initialIndex: index,
+                      userId: _targetUserId!,
+                    ),
+                  ),
+                );
               },
               child: Container(
                 color: Colors.grey[300],
@@ -486,15 +589,19 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
     );
   }
 
-  Widget _buildStatItem(String count, String label) {
-    return Column(
-      children: [
-        Text(
-          count,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-        Text(label, style: const TextStyle(fontSize: 12)),
-      ],
+  Widget _buildStatItem(String count, String label, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.translucent,
+      child: Column(
+        children: [
+          Text(
+            count,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          ),
+          Text(label, style: const TextStyle(fontSize: 12)),
+        ],
+      ),
     );
   }
 }
