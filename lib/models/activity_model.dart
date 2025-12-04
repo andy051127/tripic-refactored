@@ -21,15 +21,7 @@ class ActivityItem {
 
 // 전역 활동 리스트 (내 활동 기록용)
 final ValueNotifier<List<ActivityItem>> globalActivitiesNotifier =
-    ValueNotifier<List<ActivityItem>>([
-      ActivityItem(
-        type: ActivityType.comment,
-        postTitle: "부산 여행 추천",
-        content: "정말 좋은 정보네요! 감사합니다.",
-        time: "10분 전",
-        imagePath: "assets/logo.png",
-      ),
-    ]);
+    ValueNotifier<List<ActivityItem>>([]);
 
 // [추가] 전역 보관함 리스트 (실제 저장된 게시물 목록용)
 final ValueNotifier<List<ActivityItem>> savedPostsNotifier =

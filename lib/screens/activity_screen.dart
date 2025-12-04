@@ -8,7 +8,7 @@ class ActivityScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 4, // 댓글, 좋아요, 스크랩, 공유
+      length: 3, // 댓글, 좋아요, 공유
       child: Scaffold(
         backgroundColor: Colors.white,
         appBar: AppBar(
@@ -30,7 +30,6 @@ class ActivityScreen extends StatelessWidget {
             tabs: [
               Tab(text: "댓글"),
               Tab(text: "좋아요"),
-              Tab(text: "스크랩"),
               Tab(text: "공유"), // 공유 내역은 추후 구현 가능
             ],
           ),
@@ -39,7 +38,6 @@ class ActivityScreen extends StatelessWidget {
           children: [
             _buildActivityList(ActivityType.comment),
             _buildActivityList(ActivityType.like),
-            _buildActivityList(ActivityType.save),
             _buildActivityList(ActivityType.share),
           ],
         ),

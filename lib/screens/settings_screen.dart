@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'privacy_settings_screen.dart';
-import 'blocked_users_screen.dart';
+import 'blocked_and_hidden_screen.dart';
+import 'saved_posts_screen.dart';
 import 'activity_screen.dart';
 import 'notification_settings_screen.dart';
-import 'language_translation_screen.dart';
 import 'information_screen.dart';
 import 'help_screen.dart';
-import 'saved_posts_screen.dart'; // [신규] 보관함 화면 import
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -79,13 +78,26 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   _buildSettingItem(
                     context,
-                    Icons.block,
-                    "차단된계정",
+                    Icons.shield_outlined,
+                    "차단 및 숨긴 게시물",
                     onTap: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const BlockedUsersScreen(),
+                          builder: (context) => const BlockedAndHiddenScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildSettingItem(
+                    context,
+                    Icons.bookmark_border,
+                    "보관 및 다운로드",
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const SavedPostsScreen(),
                         ),
                       );
                     },
@@ -103,7 +115,6 @@ class SettingsScreen extends StatelessWidget {
                       );
                     },
                   ),
-
                   _buildSettingItem(
                     context,
                     Icons.notifications_none,
@@ -114,36 +125,6 @@ class SettingsScreen extends StatelessWidget {
                         MaterialPageRoute(
                           builder: (context) =>
                               const NotificationSettingsScreen(),
-                        ),
-                      );
-                    },
-                  ),
-
-                  // [수정] 보관 및 다운로드 -> 보관함 화면 연결
-                  _buildSettingItem(
-                    context,
-                    Icons.download_outlined,
-                    "보관 및 다운로드",
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const SavedPostsScreen(),
-                        ),
-                      );
-                    },
-                  ),
-
-                  _buildSettingItem(
-                    context,
-                    Icons.language,
-                    "언어 및 번역",
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              const LanguageTranslationScreen(),
                         ),
                       );
                     },

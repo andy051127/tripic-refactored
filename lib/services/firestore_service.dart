@@ -967,6 +967,24 @@ class FirestoreService {
     }
   }
 
+  // 게시물 숨김 해제
+  Future<void> unhidePost(String postId) async {
+    User? user = _auth.currentUser;
+    if (user == null) throw Exception("로그인이 필요합니다.");
+
+    try {
+      await _db
+          .collection('users')
+          .doc(user.uid)
+          .collection('hiddenPosts')
+          .doc(postId)
+          .delete();
+    } catch (e) {
+      print('게시물 숨김 해제 실패: $e');
+      rethrow;
+    }
+  }
+
   // 차단된 사용자 상세 정보 가져오기 (스트림)
   Stream<List<Map<String, dynamic>>> getBlockedUsersStream() {
     User? user = _auth.currentUser;
@@ -1000,5 +1018,78 @@ class FirestoreService {
 
           return blockedUsers;
         });
+  }
+
+  // 게시물 보관함에 저장
+  Future<void> savePost(String postId) async {
+    User? user = _auth.currentUser;
+    if (user == null) throw Exception("로그인이 필요합니다.");
+
+    try {
+      await _db
+          .collection('users')
+          .doc(user.uid)
+          .collection('savedPosts')
+          .doc(postId)
+          .set({'savedAt': FieldValue.serverTimestamp()});
+    } catch (e) {
+      print('게시물 저장 실패: $e');
+      rethrow;
+    }
+  }
+
+  // 보관함에서 게시물 삭제
+  Future<void> unsavePost(String postId) async {
+    User? user = _auth.currentUser;
+    if (user == null) throw Exception("로그인이 필요합니다.");
+
+    try {
+      await _db
+          .collection('users')
+          .doc(user.uid)
+          .collection('savedPosts')
+          .doc(postId)
+          .delete();
+    } catch (e) {
+      print('보관함에서 삭제 실패: $e');
+      rethrow;
+    }
+  }
+
+  // 보관된 게시물 ID 목록 가져오기
+  Future<List<String>> getSavedPostIds() async {
+    User? user = _auth.currentUser;
+    if (user == null) return [];
+
+    try {
+      final snapshot = await _db
+          .collection('users')
+          .doc(user.uid)
+          .collection('savedPosts')
+          .get();
+      return snapshot.docs.map((doc) => doc.id).toList();
+    } catch (e) {
+      print('보관된 게시물 목록 가져오기 실패: $e');
+      return [];
+    }
+  }
+
+  // 게시물이 보관되어 있는지 확인
+  Future<bool> isPostSaved(String postId) async {
+    User? user = _auth.currentUser;
+    if (user == null) return false;
+
+    try {
+      final doc = await _db
+          .collection('users')
+          .doc(user.uid)
+          .collection('savedPosts')
+          .doc(postId)
+          .get();
+      return doc.exists;
+    } catch (e) {
+      print('보관 상태 확인 실패: $e');
+      return false;
+    }
   }
 }

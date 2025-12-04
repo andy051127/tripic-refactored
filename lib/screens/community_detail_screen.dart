@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'chat_detail_screen.dart'; // DM 이동용
 import 'package:intl/intl.dart'; // 날짜 포맷용
+import '../models/activity_model.dart'; // 활동 내역 저장용
 
 class CommunityDetailScreen extends StatefulWidget {
   final String name;
@@ -51,14 +52,22 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
   // 댓글 추가 함수
   void _addComment() {
     if (_commentController.text.isNotEmpty) {
+      final commentText = _commentController.text;
       setState(() {
         _comments.add({
           'name': '나(Me)',
-          'content': _commentController.text,
+          'content': commentText,
           'time': '방금 전',
         });
         _commentController.clear();
       });
+      // 활동 내역에 댓글 저장
+      addActivity(
+        ActivityType.comment,
+        widget.title,
+        commentText,
+        widget.imageUrl,
+      );
       FocusScope.of(context).unfocus();
     }
   }

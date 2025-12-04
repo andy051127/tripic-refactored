@@ -13,6 +13,7 @@ import 'map_screen.dart';
 import 'profile_screen.dart';
 import 'other_user_profile_screen.dart';
 import 'search_screen.dart';
+import 'translator_screen.dart';
 import '../models/post_model.dart';
 import '../widgets/comment_modal.dart';
 import '../models/activity_model.dart';
@@ -230,6 +231,13 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
           ),
         ),
         actions: [
+          IconButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const TranslatorScreen()),
+            ),
+            icon: const Icon(Icons.translate, color: Colors.black, size: 28),
+          ),
           IconButton(
             onPressed: () => Navigator.push(
               context,
@@ -583,6 +591,7 @@ class _PostItemState extends State<PostItem> {
     super.initState();
     _loadProfileImage();
     _checkIfLiked();
+    _checkIfSaved();
   }
 
   @override
@@ -620,6 +629,19 @@ class _PostItemState extends State<PostItem> {
     }
   }
 
+  Future<void> _checkIfSaved() async {
+    try {
+      final isSaved = await _firestoreService.isPostSaved(widget.post.id);
+      if (mounted) {
+        setState(() {
+          _isSaved = isSaved;
+        });
+      }
+    } catch (e) {
+      print('보관 상태 확인 실패: $e');
+    }
+  }
+
   Future<void> _toggleLike() async {
     // UI 즉시 업데이트
     setState(() {
@@ -629,6 +651,13 @@ class _PostItemState extends State<PostItem> {
     try {
       if (_isLiked) {
         await _firestoreService.likePost(widget.post.id);
+        // 좋아요를 누른 경우 활동 내역에 저장
+        addActivity(
+          ActivityType.like,
+          widget.post.title,
+          "게시물에 좋아요를 눌렀습니다.",
+          widget.post.imageUrl,
+        );
       } else {
         await _firestoreService.unlikePost(widget.post.id);
       }
@@ -637,6 +666,47 @@ class _PostItemState extends State<PostItem> {
       if (mounted) {
         setState(() {
           _isLiked = !_isLiked;
+        });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('오류가 발생했습니다: $e')));
+      }
+    }
+  }
+
+  Future<void> _toggleSave() async {
+    // UI 즉시 업데이트
+    setState(() {
+      _isSaved = !_isSaved;
+    });
+
+    try {
+      if (_isSaved) {
+        await _firestoreService.savePost(widget.post.id);
+        addActivity(
+          ActivityType.save,
+          widget.post.title,
+          "보관함에 저장했습니다.",
+          widget.post.imageUrl,
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text("게시물이 보관함에 저장되었습니다.")));
+        }
+      } else {
+        await _firestoreService.unsavePost(widget.post.id);
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text("보관함에서 삭제되었습니다.")));
+        }
+      }
+    } catch (e) {
+      // 오류 발생 시 상태 되돌리기
+      if (mounted) {
+        setState(() {
+          _isSaved = !_isSaved;
         });
         ScaffoldMessenger.of(
           context,
@@ -720,9 +790,9 @@ class _PostItemState extends State<PostItem> {
                     await _firestoreService.hidePost(widget.post.id);
                     widget.onDelete();
                     if (context.mounted) {
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(const SnackBar(content: Text("게시물을 숨겼습니다.")));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("게시물을 숨겼습니다.")),
+                      );
                     }
                   } catch (e) {
                     if (context.mounted) {
@@ -1248,22 +1318,7 @@ class _PostItemState extends State<PostItem> {
               ),
               const SizedBox(width: 16),
               GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _isSaved = !_isSaved;
-                  });
-                  if (_isSaved) {
-                    addActivity(
-                      ActivityType.save,
-                      widget.post.title,
-                      "보관함에 저장했습니다.",
-                      widget.post.imageUrl,
-                    );
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("게시물이 보관함에 저장되었습니다.")),
-                    );
-                  }
-                },
+                onTap: _toggleSave,
                 child: Icon(
                   _isSaved ? Icons.bookmark : Icons.bookmark_border,
                   size: 28,
