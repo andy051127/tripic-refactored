@@ -637,13 +637,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return GestureDetector(
       onTap: () {
-        // 여행 기록 지도로 이동
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const TravelRecordMapScreen(),
-          ),
-        );
+        // 여행 기록 지도로 이동 (현재 사용자의 모든 여행 기록 표시)
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => TravelRecordMapScreen(
+                userId: user.uid, // 현재 사용자의 모든 여행 기록 표시
+              ),
+            ),
+          );
+        }
       },
       child: Container(
         height: 300,
