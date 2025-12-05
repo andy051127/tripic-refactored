@@ -282,14 +282,14 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
           return FutureBuilder<List<Post>>(
             future: _filterBlockedAndHiddenPosts(feedPosts, firestoreService),
             builder: (context, filterSnapshot) {
-              if (filterSnapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
+              // 로딩 중이더라도 이전 데이터가 있으면 계속 표시
               final filteredPosts = filterSnapshot.data ?? feedPosts;
 
               return ListView.builder(
                 controller: _scrollController,
+                addAutomaticKeepAlives: true, // 자동으로 위젯 상태 유지
+                addRepaintBoundaries: true, // 리페인트 최적화
+                cacheExtent: 500, // 화면 밖 위젯도 캐시
                 itemCount: filteredPosts.length + 1,
                 itemBuilder: (context, index) {
                   if (index == 0) {
@@ -304,9 +304,10 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
                                 builder: (context) => const MapScreen(),
                               ),
                             );
-                            
+
                             // 선택된 국가가 있으면 상태 업데이트
-                            if (selectedCountry != null && selectedCountry is String) {
+                            if (selectedCountry != null &&
+                                selectedCountry is String) {
                               setState(() {
                                 _selectedCountry = selectedCountry;
                               });
@@ -471,10 +472,10 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
       for (final post in posts) {
         // 숨긴 게시물 제외
         if (hiddenPostIds.contains(post.id)) continue;
-        
+
         // 차단한 사용자의 게시물 제외
         if (blockedUserIds.contains(post.uid)) continue;
-        
+
         // 선택된 국가가 있으면 해당 국가 게시물만 표시
         if (_selectedCountry != null && post.country != _selectedCountry) {
           continue;
@@ -594,7 +595,11 @@ class PostItem extends StatefulWidget {
   State<PostItem> createState() => _PostItemState();
 }
 
-class _PostItemState extends State<PostItem> {
+class _PostItemState extends State<PostItem>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true; // 위젯 상태 유지
+
   bool _isLiked = false;
   bool _isSaved = false;
   bool _showMap = false;
@@ -933,15 +938,15 @@ class _PostItemState extends State<PostItem> {
         }
       } else {
         // 사용자를 찾을 수 없는 경우
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('사용자를 찾을 수 없습니다.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('사용자를 찾을 수 없습니다.')));
       }
     } catch (e) {
       print('태그된 사용자 프로필 탐색 오류: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('프로필을 불러올 수 없습니다.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('프로필을 불러올 수 없습니다.')));
     }
   }
 
@@ -951,7 +956,7 @@ class _PostItemState extends State<PostItem> {
 
     for (int i = 0; i < names.length; i++) {
       final name = names[i];
-      
+
       // 각 이름을 클릭 가능한 위젯으로 생성
       widgets.add(
         GestureDetector(
@@ -970,13 +975,7 @@ class _PostItemState extends State<PostItem> {
       // 마지막 이름이 아니면 쉼표 추가
       if (i < names.length - 1) {
         widgets.add(
-          const Text(
-            ", ",
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey,
-            ),
-          ),
+          const Text(", ", style: TextStyle(fontSize: 12, color: Colors.grey)),
         );
       }
     }
@@ -999,9 +998,9 @@ class _PostItemState extends State<PostItem> {
 
       if (!planDoc.exists) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('여행 계획을 찾을 수 없습니다')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('여행 계획을 찾을 수 없습니다')));
         }
         return;
       }
@@ -1033,10 +1032,7 @@ class _PostItemState extends State<PostItem> {
             children: [
               const Text(
                 '여행 계획',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 20),
               GestureDetector(
@@ -1110,7 +1106,11 @@ class _PostItemState extends State<PostItem> {
                             // 여행 정보
                             Row(
                               children: [
-                                const Icon(Icons.location_on, size: 16, color: Colors.blue),
+                                const Icon(
+                                  Icons.location_on,
+                                  size: 16,
+                                  color: Colors.blue,
+                                ),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
@@ -1126,7 +1126,11 @@ class _PostItemState extends State<PostItem> {
                             const SizedBox(height: 8),
                             Row(
                               children: [
-                                const Icon(Icons.calendar_today, size: 16, color: Colors.blue),
+                                const Icon(
+                                  Icons.calendar_today,
+                                  size: 16,
+                                  color: Colors.blue,
+                                ),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
@@ -1151,11 +1155,18 @@ class _PostItemState extends State<PostItem> {
                             bottomRight: Radius.circular(11),
                           ),
                         ),
-                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 10,
+                          horizontal: 16,
+                        ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.touch_app, size: 16, color: Colors.blue[700]),
+                            Icon(
+                              Icons.touch_app,
+                              size: 16,
+                              color: Colors.blue[700],
+                            ),
                             const SizedBox(width: 6),
                             Text(
                               '탭하여 여행 계획 보기',
@@ -1178,14 +1189,21 @@ class _PostItemState extends State<PostItem> {
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('오류가 발생했습니다: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('오류가 발생했습니다: $e')));
       }
     }
   }
 
   void _showMoreOptions() {
+    final isOwnPost = widget.post.uid == widget.currentUserId;
+
+    print('🔍 _showMoreOptions 호출됨');
+    print('   현재 사용자 ID: ${widget.currentUserId}');
+    print('   게시물 작성자 ID: ${widget.post.uid}');
+    print('   내 게시물 여부: $isOwnPost');
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -1207,104 +1225,189 @@ class _PostItemState extends State<PostItem> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildOptionItem(
-                _isFollowing ? Icons.person_remove_outlined : Icons.person_add_outlined,
-                _isFollowing ? "팔로우 취소" : "팔로우",
-                onTap: () async {
-                  Navigator.pop(context);
-                  try {
-                    final firestoreService = FirestoreService();
-                    if (_isFollowing) {
-                      await firestoreService.unfollowUser(widget.post.uid);
-                      setState(() {
-                        _isFollowing = false;
-                      });
-                      globalFollowingCount.value--;
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text("팔로우를 취소했습니다.")),
+              // 내 게시물인 경우 삭제하기만 표시
+              if (isOwnPost)
+                _buildOptionItem(
+                  Icons.delete_outline,
+                  "삭제하기",
+                  isDestructive: true,
+                  onTap: () async {
+                    print('🔘 삭제하기 버튼 클릭됨');
+
+                    // context를 미리 저장
+                    final scaffoldMessenger = ScaffoldMessenger.of(context);
+                    final navigator = Navigator.of(context);
+
+                    navigator.pop(); // 모달 닫기
+
+                    print('📋 삭제 확인 다이얼로그 표시 중...');
+                    // 삭제 확인 다이얼로그
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (dialogContext) => AlertDialog(
+                        title: const Text('게시물 삭제'),
+                        content: const Text('이 게시물을 삭제하시겠습니까?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () {
+                              print('❌ 취소 버튼 클릭됨');
+                              Navigator.pop(dialogContext, false);
+                            },
+                            child: const Text('취소'),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              print('✅ 삭제 확인 버튼 클릭됨');
+                              Navigator.pop(dialogContext, true);
+                            },
+                            child: const Text(
+                              '삭제',
+                              style: TextStyle(color: Colors.red),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+
+                    print('📊 confirm 값: $confirm');
+
+                    if (confirm == true) {
+                      print('✅ 삭제 조건 충족 - 삭제 시작');
+                      try {
+                        print('🗑️ 게시물 삭제 시작: ${widget.post.id}');
+                        print('현재 사용자 UID: ${widget.currentUserId}');
+                        print('게시물 작성자 UID: ${widget.post.uid}');
+
+                        await _firestoreService.deletePost(widget.post.id);
+
+                        print('✅ 게시물 삭제 완료');
+
+                        widget.onDelete(); // UI 갱신
+
+                        scaffoldMessenger.showSnackBar(
+                          const SnackBar(
+                            content: Text('게시물이 삭제되었습니다.'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      } catch (e, stackTrace) {
+                        print('❌ 게시물 삭제 실패: $e');
+                        print('스택 트레이스: $stackTrace');
+                        scaffoldMessenger.showSnackBar(
+                          SnackBar(
+                            content: Text('삭제 실패: $e'),
+                            backgroundColor: Colors.red,
+                          ),
                         );
                       }
                     } else {
-                      await firestoreService.followUser(widget.post.uid);
-                      setState(() {
-                        _isFollowing = true;
-                      });
-                      globalFollowingCount.value++;
+                      print('⚠️ 삭제 취소됨');
+                    }
+                  },
+                )
+              // 다른 사람의 게시물인 경우 기존 옵션 표시
+              else ...[
+                _buildOptionItem(
+                  _isFollowing
+                      ? Icons.person_remove_outlined
+                      : Icons.person_add_outlined,
+                  _isFollowing ? "팔로우 취소" : "팔로우",
+                  onTap: () async {
+                    Navigator.pop(context);
+                    try {
+                      final firestoreService = FirestoreService();
+                      if (_isFollowing) {
+                        await firestoreService.unfollowUser(widget.post.uid);
+                        setState(() {
+                          _isFollowing = false;
+                        });
+                        globalFollowingCount.value--;
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("팔로우를 취소했습니다.")),
+                          );
+                        }
+                      } else {
+                        await firestoreService.followUser(widget.post.uid);
+                        setState(() {
+                          _isFollowing = true;
+                        });
+                        globalFollowingCount.value++;
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("팔로우 했습니다!")),
+                          );
+                        }
+                      }
+                    } catch (e) {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text("팔로우 했습니다!")),
+                          SnackBar(content: Text("오류가 발생했습니다: $e")),
                         );
                       }
                     }
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(SnackBar(content: Text("오류가 발생했습니다: $e")));
+                  },
+                ),
+                const Divider(height: 1),
+                _buildOptionItem(
+                  Icons.visibility_off_outlined,
+                  "숨기기",
+                  onTap: () async {
+                    Navigator.pop(context);
+                    try {
+                      await _firestoreService.hidePost(widget.post.id);
+                      widget.onDelete();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("게시물을 숨겼습니다.")),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text("오류가 발생했습니다: $e")),
+                        );
+                      }
                     }
-                  }
-                },
-              ),
-              const Divider(height: 1),
-              _buildOptionItem(
-                Icons.visibility_off_outlined,
-                "숨기기",
-                onTap: () async {
-                  Navigator.pop(context);
-                  try {
-                    await _firestoreService.hidePost(widget.post.id);
-                    widget.onDelete();
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("게시물을 숨겼습니다.")),
-                      );
+                  },
+                ),
+                const Divider(height: 1),
+                _buildOptionItem(
+                  Icons.block,
+                  "차단",
+                  isDestructive: true,
+                  onTap: () async {
+                    Navigator.pop(context);
+                    try {
+                      await _firestoreService.blockUser(widget.post.uid);
+                      widget.onBlock();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text("${widget.post.userName}님을 차단했습니다."),
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text("오류가 발생했습니다: $e")),
+                        );
+                      }
                     }
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(SnackBar(content: Text("오류가 발생했습니다: $e")));
-                    }
-                  }
-                },
-              ),
-              const Divider(height: 1),
-              _buildOptionItem(
-                Icons.block,
-                "차단",
-                isDestructive: true,
-                onTap: () async {
-                  Navigator.pop(context);
-                  try {
-                    await _firestoreService.blockUser(widget.post.uid);
-                    widget.onBlock();
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text("${widget.post.userName}님을 차단했습니다."),
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(SnackBar(content: Text("오류가 발생했습니다: $e")));
-                    }
-                  }
-                },
-              ),
-              const Divider(height: 1),
-              _buildOptionItem(
-                Icons.campaign_outlined,
-                "신고",
-                isDestructive: true,
-                onTap: () {
-                  Navigator.pop(context);
-                  _showReportDialog();
-                },
-              ),
+                  },
+                ),
+                const Divider(height: 1),
+                _buildOptionItem(
+                  Icons.campaign_outlined,
+                  "신고",
+                  isDestructive: true,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showReportDialog();
+                  },
+                ),
+              ],
             ],
           ),
         ),
@@ -1413,6 +1516,7 @@ class _PostItemState extends State<PostItem> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // AutomaticKeepAliveClientMixin 필수 호출
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1494,7 +1598,8 @@ class _PostItemState extends State<PostItem> {
                                 ),
                               ),
                               ..._buildTaggedFriendWidgets(
-                                  widget.post.taggedFriend!),
+                                widget.post.taggedFriend!,
+                              ),
                             ],
                           ),
                       ],
@@ -1506,18 +1611,18 @@ class _PostItemState extends State<PostItem> {
               // 여행 계획 보기 버튼
               IconButton(
                 onPressed: () {
-                  if (widget.post.travelPlanId != null && widget.post.travelPlanId!.isNotEmpty) {
+                  if (widget.post.travelPlanId != null &&
+                      widget.post.travelPlanId!.isNotEmpty) {
                     _showTravelPlanBanner();
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('이 게시물에는 여행 계획이 연결되어 있지 않습니다')),
+                      const SnackBar(
+                        content: Text('이 게시물에는 여행 계획이 연결되어 있지 않습니다'),
+                      ),
                     );
                   }
                 },
-                icon: const Icon(
-                  Icons.edit_note,
-                  color: Colors.blue,
-                ),
+                icon: const Icon(Icons.edit_note, color: Colors.blue),
                 iconSize: 28,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),

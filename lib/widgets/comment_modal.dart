@@ -48,17 +48,19 @@ class _CommentModalState extends State<CommentModal> {
       );
 
       _controller.clear();
-      
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('댓글이 등록되었습니다.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('댓글이 등록되었습니다.')));
+        // 댓글 추가 성공 시 true 반환하여 부모 위젯에 알림
+        Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('댓글 등록 실패: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('댓글 등록 실패: $e')));
       }
     } finally {
       if (mounted) {
@@ -71,7 +73,7 @@ class _CommentModalState extends State<CommentModal> {
 
   String _getTimeAgo(Timestamp? timestamp) {
     if (timestamp == null) return '방금 전';
-    
+
     final now = DateTime.now();
     final commentTime = timestamp.toDate();
     final difference = now.difference(commentTime);
@@ -90,9 +92,7 @@ class _CommentModalState extends State<CommentModal> {
     final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
 
     return Padding(
-      padding: EdgeInsets.only(
-        bottom: keyboardHeight,
-      ),
+      padding: EdgeInsets.only(bottom: keyboardHeight),
       child: Container(
         height: 500,
         decoration: const BoxDecoration(
@@ -113,7 +113,7 @@ class _CommentModalState extends State<CommentModal> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () => Navigator.pop(context, true),
                   ),
                 ],
               ),
@@ -146,12 +146,14 @@ class _CommentModalState extends State<CommentModal> {
                     itemCount: comments.length,
                     itemBuilder: (context, index) {
                       final commentDoc = comments[index];
-                      final commentData = commentDoc.data() as Map<String, dynamic>;
+                      final commentData =
+                          commentDoc.data() as Map<String, dynamic>;
                       final commentId = commentDoc.id;
                       final userName = commentData['userName'] ?? '알 수 없음';
                       final content = commentData['content'] ?? '';
                       final timestamp = commentData['timestamp'] as Timestamp?;
-                      final profileImage = commentData['userProfileImage'] ?? '';
+                      final profileImage =
+                          commentData['userProfileImage'] ?? '';
                       final commentUserId = commentData['uid'] ?? '';
 
                       return ListTile(
@@ -161,7 +163,11 @@ class _CommentModalState extends State<CommentModal> {
                               ? NetworkImage(profileImage)
                               : null,
                           child: profileImage.isEmpty
-                              ? const Icon(Icons.person, color: Colors.white, size: 20)
+                              ? const Icon(
+                                  Icons.person,
+                                  color: Colors.white,
+                                  size: 20,
+                                )
                               : null,
                         ),
                         title: Row(
@@ -189,7 +195,10 @@ class _CommentModalState extends State<CommentModal> {
                         ),
                         trailing: currentUserId == commentUserId
                             ? IconButton(
-                                icon: const Icon(Icons.delete_outline, size: 20),
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  size: 20,
+                                ),
                                 onPressed: () async {
                                   final confirm = await showDialog<bool>(
                                     context: context,
@@ -198,11 +207,13 @@ class _CommentModalState extends State<CommentModal> {
                                       content: const Text('이 댓글을 삭제하시겠습니까?'),
                                       actions: [
                                         TextButton(
-                                          onPressed: () => Navigator.pop(context, false),
+                                          onPressed: () =>
+                                              Navigator.pop(context, false),
                                           child: const Text('취소'),
                                         ),
                                         TextButton(
-                                          onPressed: () => Navigator.pop(context, true),
+                                          onPressed: () =>
+                                              Navigator.pop(context, true),
                                           child: const Text(
                                             '삭제',
                                             style: TextStyle(color: Colors.red),
@@ -219,13 +230,20 @@ class _CommentModalState extends State<CommentModal> {
                                         commentId,
                                       );
                                       if (context.mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('댓글이 삭제되었습니다.')),
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('댓글이 삭제되었습니다.'),
+                                          ),
                                         );
+                                        // 댓글 삭제 성공 시 부모에 알림
                                       }
                                     } catch (e) {
                                       if (context.mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
                                           SnackBar(content: Text('삭제 실패: $e')),
                                         );
                                       }

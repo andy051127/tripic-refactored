@@ -99,10 +99,14 @@ class FirestoreService {
       if (locationName != null)
         postData['locationName'] = locationName; // 위치 이름 저장
       if (country != null) postData['country'] = country; // 국가 정보 저장
-      if (travelPlanId != null) postData['travelPlanId'] = travelPlanId; // 여행 계획 ID 저장
-      if (travelPlanTitle != null) postData['travelPlanTitle'] = travelPlanTitle; // 여행 계획 제목 저장
-      if (travelPlanDate != null) postData['travelPlanDate'] = travelPlanDate; // 여행 계획 날짜 저장
-      if (travelPlanCountry != null) postData['travelPlanCountry'] = travelPlanCountry; // 여행 계획 국가 저장
+      if (travelPlanId != null)
+        postData['travelPlanId'] = travelPlanId; // 여행 계획 ID 저장
+      if (travelPlanTitle != null)
+        postData['travelPlanTitle'] = travelPlanTitle; // 여행 계획 제목 저장
+      if (travelPlanDate != null)
+        postData['travelPlanDate'] = travelPlanDate; // 여행 계획 날짜 저장
+      if (travelPlanCountry != null)
+        postData['travelPlanCountry'] = travelPlanCountry; // 여행 계획 국가 저장
 
       await _db.collection('posts').add(postData);
     } catch (e) {
@@ -117,6 +121,91 @@ class FirestoreService {
         .collection('posts')
         .orderBy('createdAt', descending: true)
         .snapshots();
+  }
+
+  // [추가] 게시물 삭제
+  Future<void> deletePost(String postId) async {
+    User? user = _auth.currentUser;
+    if (user == null) {
+      print('❌ deletePost 실패: 로그인된 사용자 없음');
+      throw Exception("로그인이 필요합니다.");
+    }
+
+    print('🗑️ deletePost 시작 - postId: $postId, userId: ${user.uid}');
+
+    try {
+      // 게시물 정보 가져오기
+      print('📄 게시물 정보 조회 중...');
+      final postDoc = await _db.collection('posts').doc(postId).get();
+
+      if (!postDoc.exists) {
+        print('❌ 게시물을 찾을 수 없음: $postId');
+        throw Exception("게시물을 찾을 수 없습니다.");
+      }
+
+      final postData = postDoc.data();
+      final postUid = postData?['uid'];
+      print('📌 게시물 작성자 UID: $postUid');
+
+      // 본인의 게시물인지 확인
+      if (postUid != user.uid) {
+        print('❌ 권한 없음: 작성자($postUid) != 현재사용자(${user.uid})');
+        throw Exception("본인의 게시물만 삭제할 수 있습니다.");
+      }
+
+      print('✅ 권한 확인 완료 - 삭제 진행');
+
+      // Storage에서 이미지 삭제
+      final imageUrls = postData?['imageUrls'] as List<dynamic>?;
+      if (imageUrls != null && imageUrls.isNotEmpty) {
+        print('🖼️ 이미지 ${imageUrls.length}개 삭제 중...');
+        for (var imageUrl in imageUrls) {
+          try {
+            if (imageUrl is String && imageUrl.isNotEmpty) {
+              final ref = _storage.refFromURL(imageUrl);
+              await ref.delete();
+              print('✅ 이미지 삭제 완료: $imageUrl');
+            }
+          } catch (e) {
+            print('⚠️ 이미지 삭제 실패 (계속 진행): $e');
+          }
+        }
+      }
+
+      // 게시물의 하위 컬렉션 삭제 (좋아요)
+      print('❤️ 좋아요 삭제 중...');
+      final likesSnapshot = await _db
+          .collection('posts')
+          .doc(postId)
+          .collection('likes')
+          .get();
+
+      for (var doc in likesSnapshot.docs) {
+        await doc.reference.delete();
+      }
+      print('✅ 좋아요 ${likesSnapshot.docs.length}개 삭제 완료');
+
+      // 댓글 삭제
+      print('💬 댓글 삭제 중...');
+      final commentsSnapshot = await _db
+          .collection('posts')
+          .doc(postId)
+          .collection('comments')
+          .get();
+
+      for (var doc in commentsSnapshot.docs) {
+        await doc.reference.delete();
+      }
+      print('✅ 댓글 ${commentsSnapshot.docs.length}개 삭제 완료');
+
+      // 게시물 문서 삭제
+      print('📝 게시물 문서 삭제 중...');
+      await _db.collection('posts').doc(postId).delete();
+      print('✅ 게시물 삭제 완료: $postId');
+    } catch (e) {
+      print('❌ deletePost 실패: $e');
+      rethrow;
+    }
   }
 
   // --- [여행 계획 관련 코드] ---
