@@ -508,6 +508,7 @@ class _PostItemState extends State<PostItem> {
   bool _isLiked = false;
   bool _isSaved = false;
   bool _showMap = false;
+  bool _isFollowing = false;
   String? _profileImageUrl;
   int _currentImageIndex = 0;
   final PageController _pageController = PageController();
@@ -649,6 +650,7 @@ class _PostItemState extends State<PostItem> {
     _loadProfileImage();
     _checkIfLiked();
     _checkIfSaved();
+    _checkIfFollowing();
   }
 
   @override
@@ -696,6 +698,19 @@ class _PostItemState extends State<PostItem> {
       }
     } catch (e) {
       print('보관 상태 확인 실패: $e');
+    }
+  }
+
+  Future<void> _checkIfFollowing() async {
+    try {
+      final isFollowing = await _firestoreService.isFollowing(widget.post.uid);
+      if (mounted) {
+        setState(() {
+          _isFollowing = isFollowing;
+        });
+      }
+    } catch (e) {
+      print('팔로우 상태 확인 실패: $e');
     }
   }
 
@@ -900,24 +915,40 @@ class _PostItemState extends State<PostItem> {
             mainAxisSize: MainAxisSize.min,
             children: [
               _buildOptionItem(
-                Icons.person_add_outlined,
-                "팔로우",
+                _isFollowing ? Icons.person_remove_outlined : Icons.person_add_outlined,
+                _isFollowing ? "팔로우 취소" : "팔로우",
                 onTap: () async {
                   Navigator.pop(context);
                   try {
                     final firestoreService = FirestoreService();
-                    await firestoreService.followUser(widget.post.uid);
-                    globalFollowingCount.value++;
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("팔로우 했습니다!")),
-                      );
+                    if (_isFollowing) {
+                      await firestoreService.unfollowUser(widget.post.uid);
+                      setState(() {
+                        _isFollowing = false;
+                      });
+                      globalFollowingCount.value--;
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("팔로우를 취소했습니다.")),
+                        );
+                      }
+                    } else {
+                      await firestoreService.followUser(widget.post.uid);
+                      setState(() {
+                        _isFollowing = true;
+                      });
+                      globalFollowingCount.value++;
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("팔로우 했습니다!")),
+                        );
+                      }
                     }
                   } catch (e) {
                     if (context.mounted) {
                       ScaffoldMessenger.of(
                         context,
-                      ).showSnackBar(SnackBar(content: Text("팔로우 실패: $e")));
+                      ).showSnackBar(SnackBar(content: Text("오류가 발생했습니다: $e")));
                     }
                   }
                 },

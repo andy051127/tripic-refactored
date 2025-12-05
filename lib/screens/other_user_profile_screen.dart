@@ -34,11 +34,113 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
   int _postCount = 0;
   String? _targetUserId;
   String _userBio = '';
+  String? _selectedCountry; // 선택된 국가
+  List<String> _userCountries = []; // 사용자가 게시물에 사용한 국가 목록
+
+  // 국기 매핑
+  final Map<String, String> _countryFlags = {
+    '대한민국': '🇰🇷',
+    '일본': '🇯🇵',
+    '중국': '🇨🇳',
+    '대만': '🇹🇼',
+    '홍콩': '🇭🇰',
+    '마카오': '🇲🇴',
+    '싱가포르': '🇸🇬',
+    '태국': '🇹🇭',
+    '베트남': '🇻🇳',
+    '필리핀': '🇵🇭',
+    '말레이시아': '🇲🇾',
+    '인도네시아': '🇮🇩',
+    '미얀마': '🇲🇲',
+    '캄보디아': '🇰🇭',
+    '라오스': '🇱🇦',
+    '인도': '🇮🇳',
+    '네팔': '🇳🇵',
+    '몰디브': '🇲🇻',
+    '스리랑카': '🇱🇰',
+    '미국': '🇺🇸',
+    '캐나다': '🇨🇦',
+    '멕시코': '🇲🇽',
+    '쿠바': '🇨🇺',
+    '브라질': '🇧🇷',
+    '아르헨티나': '🇦🇷',
+    '페루': '🇵🇪',
+    '칠레': '🇨🇱',
+    '영국': '🇬🇧',
+    '프랑스': '🇫🇷',
+    '이탈리아': '🇮🇹',
+    '스페인': '🇪🇸',
+    '독일': '🇩🇪',
+    '네덜란드': '🇳🇱',
+    '벨기에': '🇧🇪',
+    '스위스': '🇨🇭',
+    '오스트리아': '🇦🇹',
+    '체코': '🇨🇿',
+    '헝가리': '🇭🇺',
+    '폴란드': '🇵🇱',
+    '그리스': '🇬🇷',
+    '터키': '🇹🇷',
+    '포르투갈': '🇵🇹',
+    '아일랜드': '🇮🇪',
+    '노르웨이': '🇳🇴',
+    '스웨덴': '🇸🇪',
+    '덴마크': '🇩🇰',
+    '핀란드': '🇫🇮',
+    '아이슬란드': '🇮🇸',
+    '러시아': '🇷🇺',
+    '호주': '🇦🇺',
+    '뉴질랜드': '🇳🇿',
+    '이집트': '🇪🇬',
+    '모로코': '🇲🇦',
+    '남아프리카공화국': '🇿🇦',
+    '케냐': '🇰🇪',
+    '탄자니아': '🇹🇿',
+    '아랍에미리트': '🇦🇪',
+    '사우디아라비아': '🇸🇦',
+    '카타르': '🇶🇦',
+    '요르단': '🇯🇴',
+    '이스라엘': '🇮🇱',
+  };
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
+  }
+
+  // 사용자가 게시물에 사용한 국가 목록 로드
+  Future<void> _loadUserCountries() async {
+    if (_targetUserId == null) return;
+
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('posts')
+          .where('uid', isEqualTo: _targetUserId)
+          .get();
+
+      final Set<String> countries = {};
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        final country = data['country'] as String?;
+        final category = data['category'] as String?;
+        
+        // 커뮤니티 게시물 제외하고 국가 정보가 있는 경우만 추가
+        if (country != null && 
+            country.isNotEmpty && 
+            category != 'general' && 
+            category != 'companion') {
+          countries.add(country);
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _userCountries = countries.toList()..sort();
+        });
+      }
+    } catch (e) {
+      print('국가 목록 로드 실패: $e');
+    }
   }
 
   Future<void> _loadUserData() async {
@@ -132,6 +234,8 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
             _userBio = userBio;
             _isLoading = false;
           });
+          // 국가 목록 로드
+          _loadUserCountries();
         }
       } else {
         print('❌ targetId가 비어있음');
@@ -284,6 +388,70 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
                           style: const TextStyle(fontSize: 14),
                         ),
                       const SizedBox(height: 16),
+                      // 국가 필터 배너
+                      if (_userCountries.isNotEmpty)
+                        SizedBox(
+                          height: 40,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: _userCountries.length,
+                            itemBuilder: (context, index) {
+                              final country = _userCountries[index];
+                              final isSelected = _selectedCountry == country;
+                              return GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    if (_selectedCountry == country) {
+                                      _selectedCountry = null; // 토글
+                                    } else {
+                                      _selectedCountry = country;
+                                    }
+                                  });
+                                },
+                                child: Container(
+                                  margin: const EdgeInsets.only(right: 8),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? const Color(0xFF4CA1AF)
+                                        : Colors.grey[200],
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: isSelected
+                                          ? const Color(0xFF4CA1AF)
+                                          : Colors.grey[300]!,
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Text(
+                                        _countryFlags[country] ?? '🌍',
+                                        style: const TextStyle(fontSize: 18),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        country,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: isSelected
+                                              ? Colors.white
+                                              : Colors.black87,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      if (_userCountries.isNotEmpty)
+                        const SizedBox(height: 12),
                       Row(
                         children: [
                           Expanded(
@@ -367,7 +535,6 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
                     ],
                   ),
                 ),
-                const Divider(),
                 Expanded(
                   child: DefaultTabController(
                     length: 2,
@@ -421,7 +588,7 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
           return const Center(child: CircularProgressIndicator());
         }
 
-        final posts = snapshot.data?.docs ?? [];
+        var posts = snapshot.data?.docs ?? [];
         
         // 클라이언트 측에서 최신순 정렬
         posts.sort((a, b) {
@@ -432,6 +599,15 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
           if (aTime == null || bTime == null) return 0;
           return bTime.compareTo(aTime); // 내림차순 (최신순)
         });
+
+        // 국가 필터 적용
+        if (_selectedCountry != null) {
+          posts = posts.where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final country = data['country'] as String?;
+            return country == _selectedCountry;
+          }).toList();
+        }
         
         print('📊 로드된 게시물 수: ${posts.length}개');
 
