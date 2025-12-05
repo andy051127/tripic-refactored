@@ -465,23 +465,119 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
     FirestoreService firestoreService,
   ) async {
     try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return posts;
+
       final hiddenPostIds = await firestoreService.getHiddenPostIds();
       final blockedUserIds = await firestoreService.getBlockedUserIds();
 
-      return posts.where((post) {
+      // 프라이버시 설정 확인을 위한 게시물 필터링
+      final List<Post> filteredPosts = [];
+
+      for (final post in posts) {
         // 숨긴 게시물 제외
-        if (hiddenPostIds.contains(post.id)) return false;
+        if (hiddenPostIds.contains(post.id)) continue;
+        
         // 차단한 사용자의 게시물 제외
-        if (blockedUserIds.contains(post.uid)) return false;
+        if (blockedUserIds.contains(post.uid)) continue;
+        
         // 선택된 국가가 있으면 해당 국가 게시물만 표시
         if (_selectedCountry != null && post.country != _selectedCountry) {
-          return false;
+          continue;
         }
-        return true;
-      }).toList();
+
+        // 자신의 게시물은 항상 표시
+        if (post.uid == currentUser.uid) {
+          filteredPosts.add(post);
+          continue;
+        }
+
+        // 게시물 작성자의 프라이버시 설정 확인
+        final canView = await _checkPrivacySettings(post.uid, currentUser.uid);
+        if (canView) {
+          filteredPosts.add(post);
+        }
+      }
+
+      return filteredPosts;
     } catch (e) {
       print('게시물 필터링 실패: $e');
       return posts;
+    }
+  }
+
+  // 프라이버시 설정 확인 함수
+  Future<bool> _checkPrivacySettings(
+    String postAuthorUid,
+    String currentUserId,
+  ) async {
+    try {
+      // 게시물 작성자의 프라이버시 설정 가져오기
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(postAuthorUid)
+          .get();
+
+      if (!userDoc.exists) return true; // 기본값: 공개
+
+      final userData = userDoc.data();
+      if (userData == null) return true;
+
+      final privacySettings = userData['privacySettings'];
+      if (privacySettings == null) return true; // 설정이 없으면 공개
+
+      final isPublicToFollowers =
+          privacySettings['isPublicToFollowers'] ?? true;
+      final isPublicToMutuals = privacySettings['isPublicToMutuals'] ?? false;
+      final selectedFriends = List<String>.from(
+        privacySettings['selectedFollowingFriends'] ?? [],
+      );
+
+      // 1. 모든 팔로워에게 공개
+      if (isPublicToFollowers) {
+        // 현재 사용자가 작성자를 팔로우하고 있는지 확인
+        final followDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUserId)
+            .collection('following')
+            .doc(postAuthorUid)
+            .get();
+        return followDoc.exists;
+      }
+
+      // 2. 맞팔로우한 사람에게만 공개
+      if (isPublicToMutuals) {
+        // 현재 사용자가 작성자를 팔로우하는지 확인
+        final iFollowAuthor = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUserId)
+            .collection('following')
+            .doc(postAuthorUid)
+            .get()
+            .then((doc) => doc.exists);
+
+        // 작성자가 현재 사용자를 팔로우하는지 확인
+        final authorFollowsMe = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(postAuthorUid)
+            .collection('following')
+            .doc(currentUserId)
+            .get()
+            .then((doc) => doc.exists);
+
+        return iFollowAuthor && authorFollowsMe;
+      }
+
+      // 3. 특정 사람에게만 공개
+      if (selectedFriends.isNotEmpty) {
+        return selectedFriends.contains(currentUserId);
+      }
+
+      // 아무 설정도 없으면 비공개 (false)
+      return false;
+    } catch (e) {
+      print('프라이버시 설정 확인 실패: $e');
+      return true; // 에러 발생 시 기본적으로 보이도록
     }
   }
 }

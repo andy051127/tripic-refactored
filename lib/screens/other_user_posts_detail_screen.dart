@@ -172,6 +172,13 @@ class _OtherUserPostsDetailScreenState extends State<OtherUserPostsDetailScreen>
 
           var posts = snapshot.data?.docs ?? [];
           
+          // 커뮤니티 게시물 제외 (category가 'general' 또는 'companion'인 것 제외)
+          posts = posts.where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final category = data['category'] as String?;
+            return category != 'general' && category != 'companion';
+          }).toList();
+          
           // 클라이언트 측에서 최신순 정렬
           posts.sort((a, b) {
             final aData = a.data() as Map<String, dynamic>;

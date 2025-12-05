@@ -192,6 +192,13 @@ class _MyPostsDetailScreenState extends State<MyPostsDetailScreen> {
 
           var allPosts = snapshot.data?.docs ?? [];
 
+          // 커뮤니티 게시물 제외 (category가 'general' 또는 'companion'인 것 제외)
+          allPosts = allPosts.where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final category = data['category'] as String?;
+            return category != 'general' && category != 'companion';
+          }).toList();
+
           if (allPosts.isEmpty) {
             return const Center(
               child: Text("작성한 게시물이 없습니다.", style: TextStyle(color: Colors.grey)),

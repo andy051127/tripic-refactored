@@ -208,11 +208,18 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
         // 팔로워/팔로잉 수 가져오기
         final counts = await _firestoreService.getFollowCounts(targetId);
         
-        // 게시물 수 가져오기
+        // 게시물 수 가져오기 (커뮤니티 게시물 제외)
         final postsSnapshot = await FirebaseFirestore.instance
             .collection('posts')
             .where('uid', isEqualTo: targetId)
             .get();
+        
+        // 커뮤니티 게시물 제외한 카운트
+        final filteredPostCount = postsSnapshot.docs.where((doc) {
+          final data = doc.data();
+          final category = data['category'] as String?;
+          return category != 'general' && category != 'companion';
+        }).length;
 
         // 사용자 정보 가져오기 (자기소개 및 프라이버시 설정 포함)
         final userDoc = await FirebaseFirestore.instance
@@ -269,7 +276,7 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
           }
         }
 
-        print('📊 게시물 수: ${postsSnapshot.docs.length}개');
+        print('📊 게시물 수 (커뮤니티 제외): $filteredPostCount개');
         print('🔒 프로필 볼 수 있음: $canView');
 
         if (mounted) {
@@ -277,7 +284,7 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
             _isFollowing = isFollowing;
             _followerCount = counts['followers'] ?? 0;
             _followingCount = counts['following'] ?? 0;
-            _postCount = postsSnapshot.docs.length;
+            _postCount = filteredPostCount;
             _userBio = userBio;
             _canViewProfile = canView;
             _isLoading = false;
@@ -642,6 +649,13 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
 
         var posts = snapshot.data?.docs ?? [];
         
+        // 커뮤니티 게시물 제외 (category가 'general' 또는 'companion'인 것 제외)
+        posts = posts.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          final category = data['category'] as String?;
+          return category != 'general' && category != 'companion';
+        }).toList();
+        
         // 클라이언트 측에서 최신순 정렬
         posts.sort((a, b) {
           final aData = a.data() as Map<String, dynamic>;
@@ -661,7 +675,7 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
           }).toList();
         }
         
-        print('📊 로드된 게시물 수: ${posts.length}개');
+        print('📊 로드된 게시물 수 (커뮤니티 제외): ${posts.length}개');
 
         if (posts.isEmpty) {
           return const Center(child: Text("게시물이 없습니다."));
