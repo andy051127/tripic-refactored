@@ -819,6 +819,7 @@ class _PostItemState extends State<PostItem> {
           widget.post.title,
           "게시물에 좋아요를 눌렀습니다.",
           widget.post.imageUrl,
+          postId: widget.post.id,
         );
       } else {
         await _firestoreService.unlikePost(widget.post.id);
@@ -850,6 +851,7 @@ class _PostItemState extends State<PostItem> {
           widget.post.title,
           "보관함에 저장했습니다.",
           widget.post.imageUrl,
+          postId: widget.post.id,
         );
         if (mounted) {
           ScaffoldMessenger.of(

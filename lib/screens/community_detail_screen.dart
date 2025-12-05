@@ -537,6 +537,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
         widget.title,
         commentText,
         widget.imageUrl,
+        postId: widget.postId,
       );
 
       _commentController.clear();

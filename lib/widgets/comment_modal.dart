@@ -44,6 +44,7 @@ class _CommentModalState extends State<CommentModal> {
         widget.postTitle,
         _controller.text,
         widget.postImage,
+        postId: widget.postId,
       );
 
       _controller.clear();

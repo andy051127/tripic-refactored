@@ -9,6 +9,7 @@ class ActivityItem {
   final String content;
   final String time;
   final String? imagePath;
+  final String? postId; // 게시물 ID 추가
 
   ActivityItem({
     required this.type,
@@ -16,6 +17,7 @@ class ActivityItem {
     required this.content,
     required this.time,
     this.imagePath,
+    this.postId, // postId 추가
   }) : id = DateTime.now().millisecondsSinceEpoch.toString();
 }
 
@@ -32,14 +34,16 @@ void addActivity(
   ActivityType type,
   String postTitle,
   String content,
-  String? imagePath,
-) {
+  String? imagePath, {
+  String? postId, // postId 파라미터 추가
+}) {
   final newItem = ActivityItem(
     type: type,
     postTitle: postTitle,
     content: content,
     time: "방금 전",
     imagePath: imagePath,
+    postId: postId, // postId 전달
   );
   globalActivitiesNotifier.value = [newItem, ...globalActivitiesNotifier.value];
 
