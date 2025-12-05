@@ -33,12 +33,22 @@ class _SavedPostsScreenState extends State<SavedPostsScreen> {
               uid: data['uid'] ?? '',
               userName: data['userName'] ?? '',
               imageUrl: data['imageUrl'] ?? '',
+              imageUrls: data['imageUrls'] != null
+                  ? List<String>.from(data['imageUrls'])
+                  : (data['imageUrl'] != null && data['imageUrl'].toString().isNotEmpty
+                      ? [data['imageUrl'].toString()]
+                      : []),
               title: data['title'] ?? '',
               content: data['content'] ?? '',
               location: data['location'] ?? '',
-              latitude: data['latitude'],
-              longitude: data['longitude'],
+              latitude: data['latitude']?.toDouble(),
+              longitude: data['longitude']?.toDouble(),
+              locationName: data['locationName'],
+              category: data['category'] ?? 'feed',
+              country: data['country'] as String?,
+              taggedFriend: data['taggedFriend'] as String?,
               createdAt: data['createdAt'] as Timestamp?,
+              likeCount: data['likeCount'] ?? 0,
             ),
           );
         }

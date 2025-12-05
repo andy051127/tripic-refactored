@@ -92,7 +92,7 @@ class SettingsScreen extends StatelessWidget {
                   _buildSettingItem(
                     context,
                     Icons.bookmark_border,
-                    "보관 및 다운로드",
+                    "보관된 게시물",
                     onTap: () {
                       Navigator.push(
                         context,
