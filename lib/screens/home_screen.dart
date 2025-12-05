@@ -12,7 +12,6 @@ import 'map_screen.dart';
 import 'profile_screen.dart';
 import 'other_user_profile_screen.dart';
 import 'search_screen.dart';
-import 'translator_screen.dart';
 import 'share_post_screen.dart';
 import '../models/post_model.dart';
 import '../widgets/comment_modal.dart';
@@ -231,13 +230,6 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
           ),
         ),
         actions: [
-          IconButton(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const TranslatorScreen()),
-            ),
-            icon: const Icon(Icons.translate, color: Colors.black, size: 28),
-          ),
           IconButton(
             onPressed: () => Navigator.push(
               context,

@@ -23,7 +23,7 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
   DateTime? _startDate;
   DateTime? _endDate;
   String _selectedCountry = "국가 설정";
-  String _flightInfo = "비행편 설정";
+  List<String> _flights = []; // 비행편 리스트로 변경
   String _hotelInfo = "숙소 설정";
 
   List<String> _members = [];
@@ -121,7 +121,10 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
       final p = widget.plan!;
       _selectedDateRange = p.date;
       _selectedCountry = p.country;
-      _flightInfo = p.flightInfo.isNotEmpty ? p.flightInfo : "비행편 설정";
+      // flightInfo가 비어있지 않으면 리스트에 추가
+      if (p.flightInfo.isNotEmpty) {
+        _flights = [p.flightInfo];
+      }
       _hotelInfo = p.hotelInfo.isNotEmpty ? p.hotelInfo : "숙소 설정";
       _members = List.from(p.members);
       _supplies = List.from(p.supplies);
@@ -148,7 +151,7 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
         title: "$_selectedCountry 여행",
         date: _selectedDateRange,
         country: _selectedCountry,
-        flightInfo: _flightInfo != "비행편 설정" ? _flightInfo : "",
+        flightInfo: _flights.isNotEmpty ? _flights.join(', ') : "",
         hotelInfo: _hotelInfo != "숙소 설정" ? _hotelInfo : "",
         members: _members,
         supplies: _supplies,
@@ -230,7 +233,12 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+          padding: const EdgeInsets.only(
+            left: 20.0,
+            right: 20.0,
+            top: 10.0,
+            bottom: 80.0, // 하단 패딩 추가하여 네비게이션 바에 가려지지 않도록 함
+          ),
           child: Column(
             children: [
               const SizedBox(height: 10),
@@ -251,9 +259,11 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
               _buildMenuCard(
                 context,
                 icon: "✈️",
-                title: _flightInfo,
+                title: _flights.isEmpty
+                    ? "비행편 추가"
+                    : "비행편 ${_flights.length}개",
                 onTap: () => _showFlightModal(context),
-                isSelected: _flightInfo != "비행편 설정",
+                isSelected: _flights.isNotEmpty,
               ),
               _buildMenuCard(
                 context,
@@ -365,7 +375,12 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) => Container(
           height: MediaQuery.of(context).size.height * 0.85,
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(context).padding.bottom + 20,
+          ),
           decoration: const BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -507,7 +522,8 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
               left: 20,
               right: 20,
               top: 20,
-              bottom: MediaQuery.of(context).padding.bottom + 20,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 
+                     MediaQuery.of(context).padding.bottom + 20,
             ),
             decoration: const BoxDecoration(
               color: Colors.white,
@@ -676,7 +692,6 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
   }
 
   void _showFlightModal(BuildContext context) {
-    /* 기존 코드 복사 */
     String dAirport = "", dFlight = "";
     TimeOfDay? dTime, aTime;
     showModalBottomSheet(
@@ -686,7 +701,12 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) => Container(
           height: MediaQuery.of(context).size.height * 0.9,
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(context).padding.bottom + 20,
+          ),
           decoration: const BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -695,11 +715,53 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildModalHeader(context, "비행편 설정"),
+                _buildModalHeader(context, "비행편 추가"),
                 const SizedBox(height: 20),
+                // 이미 추가된 비행편 리스트 표시
+                if (_flights.isNotEmpty) ...[
+                  const Text(
+                    "추가된 비행편",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _flights.length,
+                      itemBuilder: (context, i) => ListTile(
+                        dense: true,
+                        leading: const Icon(
+                          Icons.flight_takeoff,
+                          color: Color(0xFF4CA1AF),
+                          size: 20,
+                        ),
+                        title: Text(_flights[i]),
+                        trailing: IconButton(
+                          icon: const Icon(
+                            Icons.remove_circle_outline,
+                            color: Colors.red,
+                            size: 20,
+                          ),
+                          onPressed: () {
+                            setState(() => _flights.removeAt(i));
+                            setModalState(() {});
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Divider(),
+                  const SizedBox(height: 20),
+                ],
                 const Text(
-                  "출발편",
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  "새 비행편 추가",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 const SizedBox(height: 10),
                 _buildTextInputBox("공항명", (v) => dAirport = v),
@@ -731,8 +793,21 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
                 GestureDetector(
                   onTap: () {
                     if (dAirport.isNotEmpty) {
-                      setState(() => _flightInfo = "$dAirport ($dFlight)");
-                      Navigator.pop(context);
+                      String flightInfo = dAirport;
+                      if (dFlight.isNotEmpty) flightInfo += " ($dFlight)";
+                      if (dTime != null) {
+                        flightInfo += " 출발: ${dTime!.format(context)}";
+                      }
+                      if (aTime != null) {
+                        flightInfo += " 도착: ${aTime!.format(context)}";
+                      }
+                      setState(() => _flights.add(flightInfo));
+                      setModalState(() {
+                        dAirport = "";
+                        dFlight = "";
+                        dTime = null;
+                        aTime = null;
+                      });
                     }
                   },
                   child: _buildAddButton(),
@@ -741,6 +816,24 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTimeSelectBox(TimeOfDay? time, String hint) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        time != null ? time.format(context) : hint,
+        style: TextStyle(
+          color: time != null ? Colors.black : Colors.grey[600],
+          fontSize: 14,
         ),
       ),
     );
@@ -756,7 +849,12 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) => Container(
           height: MediaQuery.of(context).size.height * 0.8,
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(context).padding.bottom + 20,
+          ),
           decoration: const BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -802,7 +900,12 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) => Container(
           height: 500,
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(context).padding.bottom + 20,
+          ),
           decoration: const BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -911,7 +1014,8 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
             top: 20,
             left: 20,
             right: 20,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 
+                   MediaQuery.of(context).padding.bottom + 20,
           ),
           decoration: const BoxDecoration(
             color: Colors.white,
@@ -990,7 +1094,8 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
             top: 20,
             left: 20,
             right: 20,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 
+                   MediaQuery.of(context).padding.bottom + 20,
           ),
           decoration: const BoxDecoration(
             color: Colors.white,
@@ -1130,24 +1235,6 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
           border: InputBorder.none,
           hintText: hint,
           hintStyle: TextStyle(color: Colors.grey[600], fontSize: 14),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTimeSelectBox(TimeOfDay? time, String hint) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        time != null ? time.format(context) : hint,
-        style: TextStyle(
-          color: time != null ? Colors.black : Colors.grey[600],
-          fontSize: 14,
         ),
       ),
     );
