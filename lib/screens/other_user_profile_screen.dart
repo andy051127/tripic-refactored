@@ -36,6 +36,9 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
   String _userBio = '';
   String? _selectedCountry; // 선택된 국가
   List<String> _userCountries = []; // 사용자가 게시물에 사용한 국가 목록
+  
+  // 프라이버시 설정
+  bool _canViewProfile = true; // 프로필 볼 수 있는지 여부
 
   // 국기 매핑
   final Map<String, String> _countryFlags = {
@@ -211,19 +214,63 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
             .where('uid', isEqualTo: targetId)
             .get();
 
-        // 사용자 정보 가져오기 (자기소개 포함)
+        // 사용자 정보 가져오기 (자기소개 및 프라이버시 설정 포함)
         final userDoc = await FirebaseFirestore.instance
             .collection('users')
             .doc(targetId)
             .get();
         
         String userBio = '';
+        bool canView = true; // 기본값: 볼 수 있음
+        
         if (userDoc.exists) {
           final userData = userDoc.data();
           userBio = userData?['bio'] ?? '';
+          
+          // 프라이버시 설정 확인
+          final privacySettings = userData?['privacySettings'];
+          if (privacySettings != null) {
+            final isPublicToFollowers = privacySettings['isPublicToFollowers'] ?? true;
+            final isPublicToMutuals = privacySettings['isPublicToMutuals'] ?? false;
+            final selectedFriends = List<String>.from(
+              privacySettings['selectedFollowingFriends'] ?? [],
+            );
+            
+            final currentUser = FirebaseAuth.instance.currentUser;
+            if (currentUser != null && currentUser.uid != targetId) {
+              // 1. 모든 팔로워에게 공개
+              if (isPublicToFollowers) {
+                canView = true;
+              }
+              // 2. 맞팔로우한 사람에게만 공개
+              else if (isPublicToMutuals) {
+                // 현재 사용자가 타겟을 팔로우하고 있는지 확인
+                final iFollowTarget = await _firestoreService.isFollowing(targetId);
+                // 타겟이 나를 팔로우하고 있는지 확인
+                final targetFollowsMe = await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(targetId)
+                    .collection('following')
+                    .doc(currentUser.uid)
+                    .get()
+                    .then((doc) => doc.exists);
+                
+                canView = iFollowTarget && targetFollowsMe;
+              }
+              // 3. 특정 사람에게만 공개
+              else if (selectedFriends.isNotEmpty) {
+                canView = selectedFriends.contains(currentUser.uid);
+              }
+              // 아무 설정도 없으면 비공개
+              else {
+                canView = false;
+              }
+            }
+          }
         }
 
         print('📊 게시물 수: ${postsSnapshot.docs.length}개');
+        print('🔒 프로필 볼 수 있음: $canView');
 
         if (mounted) {
           setState(() {
@@ -232,6 +279,7 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
             _followingCount = counts['following'] ?? 0;
             _postCount = postsSnapshot.docs.length;
             _userBio = userBio;
+            _canViewProfile = canView;
             _isLoading = false;
           });
           // 국가 목록 로드
@@ -552,8 +600,12 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
                         Expanded(
                           child: TabBarView(
                             children: [
-                              _buildUserPostsGrid(),
-                              _buildUserPostsMap(),
+                              _canViewProfile
+                                  ? _buildUserPostsGrid()
+                                  : _buildPrivateAccountView(),
+                              _canViewProfile
+                                  ? _buildUserPostsMap()
+                                  : _buildPrivateAccountView(),
                             ],
                           ),
                         ),
@@ -761,6 +813,39 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildPrivateAccountView() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.lock_outline,
+            size: 80,
+            color: Colors.grey[400],
+          ),
+          const SizedBox(height: 24),
+          Text(
+            "비공개 계정입니다",
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[700],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            "이 계정의 게시물을 보려면\n팔로우 요청이 수락되어야 합니다",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+            ),
+          ),
+        ],
       ),
     );
   }

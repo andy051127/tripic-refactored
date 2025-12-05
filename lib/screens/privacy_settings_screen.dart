@@ -146,7 +146,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
         ),
         centerTitle: true,
         title: const Text(
-          "게시물 공개 범위",
+          "계정 공개 범위",
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
       ),
@@ -160,7 +160,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
                       padding: const EdgeInsets.all(20),
                       children: [
                         const Text(
-                          "내 게시물을 볼 수 있는 사람을 설정하세요.",
+                          "내 계정을 볼 수 있는 사람을 설정하세요.",
                           style: TextStyle(color: Colors.grey, fontSize: 14),
                         ),
                         const SizedBox(height: 20),
@@ -168,16 +168,16 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
                         // 1. 나를 팔로워한 사람들에게 공개
                         _buildSwitchTile(
                           title: "모든 팔로워에게 공개",
-                          subtitle: "나를 팔로워한 사람들이 내 게시물을 볼 수 있습니다.",
+                          subtitle: "나를 팔로워한 사람들이 내 계정을 볼 수 있습니다.",
                           value: _isPublicToFollowers,
                           onChanged: (val) {
-                            setState(() {
-                              _isPublicToFollowers = val;
-                              if (val) {
+                            if (val) {
+                              setState(() {
+                                _isPublicToFollowers = true;
                                 _isPublicToMutuals = false;
                                 _selectedFollowingFriends.clear();
-                              }
-                            });
+                              });
+                            }
                           },
                         ),
 
@@ -189,47 +189,143 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
                           subtitle: "나를 팔로잉하고 나도 팔로잉하는 사람만 볼 수 있습니다.",
                           value: _isPublicToMutuals,
                           onChanged: (val) {
-                            setState(() {
-                              _isPublicToMutuals = val;
-                              if (val) {
+                            if (val) {
+                              setState(() {
                                 _isPublicToFollowers = false;
+                                _isPublicToMutuals = true;
                                 _selectedFollowingFriends.clear();
-                              }
-                            });
+                              });
+                            }
                           },
                         ),
 
                         const Divider(),
-                        const SizedBox(height: 20),
 
                         // 3. 특정 팔로잉 사람에게만 공개
-                        const Text(
-                          "특정 사람에게만 공개",
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        _buildSwitchTile(
+                          title: "특정 사람에게만 공개",
+                          subtitle: "선택한 사람들만 내 계정을 볼 수 있습니다.",
+                          value: _selectedFollowingFriends.isNotEmpty,
+                          onChanged: (val) async {
+                            if (val) {
+                              // 팔로잉 목록 가져오기
+                              final followingUsers = await _getFollowingList();
+                              if (!mounted) return;
+
+                              if (followingUsers.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('팔로잉하는 사람이 없습니다.'),
+                                    duration: Duration(seconds: 2),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              // 선택 다이얼로그 표시
+                              showDialog(
+                                context: context,
+                                builder: (context) {
+                                  List<String> tempSelected = List.from(
+                                    _selectedFollowingFriends,
+                                  );
+                                  return StatefulBuilder(
+                                    builder: (context, setDialogState) {
+                                      return AlertDialog(
+                                        backgroundColor: Colors.white,
+                                        title: const Text("팔로잉 목록에서 선택"),
+                                        content: SingleChildScrollView(
+                                          child: SizedBox(
+                                            width: double.maxFinite,
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: followingUsers.map((
+                                                user,
+                                              ) {
+                                                return CheckboxListTile(
+                                                  title: Text(user['userName']),
+                                                  value: tempSelected.contains(
+                                                    user['uid'],
+                                                  ),
+                                                  onChanged: (val) {
+                                                    setDialogState(() {
+                                                      if (val == true) {
+                                                        tempSelected.add(
+                                                          user['uid'],
+                                                        );
+                                                      } else {
+                                                        tempSelected.remove(
+                                                          user['uid'],
+                                                        );
+                                                      }
+                                                    });
+                                                  },
+                                                );
+                                              }).toList(),
+                                            ),
+                                          ),
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(context),
+                                            child: const Text("취소"),
+                                          ),
+                                          TextButton(
+                                            onPressed: () {
+                                              setState(() {
+                                                _selectedFollowingFriends =
+                                                    tempSelected;
+                                                if (_selectedFollowingFriends
+                                                    .isNotEmpty) {
+                                                  _isPublicToFollowers = false;
+                                                  _isPublicToMutuals = false;
+                                                } else {
+                                                  // 아무도 선택하지 않았다면 기본값으로
+                                                  _isPublicToFollowers = true;
+                                                }
+                                              });
+                                              Navigator.pop(context);
+                                            },
+                                            child: const Text("확인"),
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  );
+                                },
+                              );
+                            } else {
+                              setState(() {
+                                _selectedFollowingFriends.clear();
+                                _isPublicToFollowers = true;
+                              });
+                            }
+                          },
                         ),
+
                         const SizedBox(height: 10),
 
-                        GestureDetector(
-                          onTap: () async {
-                            // 팔로잉 목록 가져오기
-                            final followingUsers = await _getFollowingList();
-                            if (!mounted) return;
+                        // 선택된 사람 수 표시 및 수정 버튼
+                        if (_selectedFollowingFriends.isNotEmpty)
+                          GestureDetector(
+                            onTap: () async {
+                              // 팔로잉 목록 가져오기
+                              final followingUsers = await _getFollowingList();
+                              if (!mounted) return;
 
-                            if (followingUsers.isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('팔로잉하는 사람이 없습니다.'),
-                                  duration: Duration(seconds: 2),
-                                ),
-                              );
-                              return;
-                            }
+                              if (followingUsers.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('팔로잉하는 사람이 없습니다.'),
+                                    duration: Duration(seconds: 2),
+                                  ),
+                                );
+                                return;
+                              }
 
-                            // 선택 다이얼로그 표시
-                            showDialog(
+                              // 선택 다이얼로그 표시
+                              showDialog(
                               context: context,
                               builder: (context) {
                                 List<String> tempSelected = List.from(
@@ -307,7 +403,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
                               border: Border.all(
                                 color: _selectedFollowingFriends.isNotEmpty
                                     ? Colors.blue
-                                    : Colors.transparent,
+                                    : Colors.grey[300]!,
                               ),
                             ),
                             child: Row(
@@ -319,14 +415,13 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       const Text(
-                                        "팔로잉 목록에서 선택",
+                                        "선택한 사람 수정",
                                         style: TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.w500,
                                         ),
                                       ),
-                                      if (_selectedFollowingFriends.isNotEmpty)
-                                        Padding(
+                                      Padding(
                                           padding: const EdgeInsets.only(
                                             top: 4.0,
                                           ),
