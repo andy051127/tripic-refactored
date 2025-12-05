@@ -24,7 +24,7 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
   DateTime? _endDate;
   String _selectedCountry = "국가 설정";
   List<String> _flights = []; // 비행편 리스트로 변경
-  String _hotelInfo = "숙소 설정";
+  List<String> _hotels = []; // 숙소 리스트로 변경
 
   List<String> _members = [];
   List<String> _supplies = [];
@@ -125,7 +125,7 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
       if (p.flightInfo.isNotEmpty) {
         _flights = [p.flightInfo];
       }
-      _hotelInfo = p.hotelInfo.isNotEmpty ? p.hotelInfo : "숙소 설정";
+      _hotels = p.hotelInfo.isNotEmpty ? p.hotelInfo.split(', ') : [];
       _members = List.from(p.members);
       _supplies = List.from(p.supplies);
       _todoList = List.from(p.todoList);
@@ -152,7 +152,7 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
         date: _selectedDateRange,
         country: _selectedCountry,
         flightInfo: _flights.isNotEmpty ? _flights.join(', ') : "",
-        hotelInfo: _hotelInfo != "숙소 설정" ? _hotelInfo : "",
+        hotelInfo: _hotels.join(', '),
         members: _members,
         supplies: _supplies,
         todoList: _todoList,
@@ -268,9 +268,9 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
               _buildMenuCard(
                 context,
                 icon: "🏠",
-                title: _hotelInfo,
+                title: _hotels.isEmpty ? "숙소 추가" : "숙소 ${_hotels.length}개",
                 onTap: () => _showHotelModal(context),
-                isSelected: _hotelInfo != "숙소 설정",
+                isSelected: _hotels.isNotEmpty,
               ),
               _buildMenuCard(
                 context,
@@ -840,8 +840,11 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
   }
 
   void _showHotelModal(BuildContext context) {
-    /* 기존 코드 복사 */
     String hName = "";
+    String hAddress = "";
+    String hCheckIn = "";
+    String hCheckOut = "";
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -865,9 +868,61 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
               children: [
                 _buildModalHeader(context, "숙소 설정"),
                 const SizedBox(height: 20),
-                const Text("1.", style: TextStyle(fontWeight: FontWeight.bold)),
+                // 추가된 숙소 리스트 표시
+                if (_hotels.isNotEmpty) ...[
+                  const Text(
+                    "추가된 숙소",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  const SizedBox(height: 10),
+                  ..._hotels.asMap().entries.map((entry) {
+                    int idx = entry.key;
+                    String hotel = entry.value;
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              hotel,
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+                            onPressed: () {
+                              setState(() => _hotels.removeAt(idx));
+                              setModalState(() {});
+                            },
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  const SizedBox(height: 20),
+                  const Divider(),
+                  const SizedBox(height: 20),
+                ],
+                const Text("1. 숙소명", style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 10),
                 _buildTextInputBox("숙소명", (v) => hName = v),
+                const SizedBox(height: 20),
+                const Text("2. 주소 (선택)", style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 10),
+                _buildTextInputBox("주소", (v) => hAddress = v),
+                const SizedBox(height: 20),
+                const Text("3. 체크인 (선택)", style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 10),
+                _buildTextInputBox("체크인 날짜/시간", (v) => hCheckIn = v),
+                const SizedBox(height: 20),
+                const Text("4. 체크아웃 (선택)", style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 10),
+                _buildTextInputBox("체크아웃 날짜/시간", (v) => hCheckOut = v),
                 const SizedBox(height: 30),
                 const Text(
                   "숙소 추가하기",
@@ -877,8 +932,17 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
                 GestureDetector(
                   onTap: () {
                     if (hName.isNotEmpty) {
-                      setState(() => _hotelInfo = hName);
-                      Navigator.pop(context);
+                      String hotelInfo = hName;
+                      if (hAddress.isNotEmpty) hotelInfo += " ($hAddress)";
+                      if (hCheckIn.isNotEmpty) hotelInfo += " 체크인: $hCheckIn";
+                      if (hCheckOut.isNotEmpty) hotelInfo += " 체크아웃: $hCheckOut";
+                      setState(() => _hotels.add(hotelInfo));
+                      setModalState(() {
+                        hName = "";
+                        hAddress = "";
+                        hCheckIn = "";
+                        hCheckOut = "";
+                      });
                     }
                   },
                   child: _buildAddButton(),

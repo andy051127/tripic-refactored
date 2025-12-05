@@ -25,6 +25,10 @@ class FirestoreService {
     double? longitude,
     String? locationName, // 위치 이름 추가
     String? country, // 국가 정보 추가
+    String? travelPlanId, // 여행 계획 ID 추가
+    String? travelPlanTitle, // 여행 계획 제목 추가
+    String? travelPlanDate, // 여행 계획 날짜 추가
+    String? travelPlanCountry, // 여행 계획 국가 추가
   }) async {
     User? user = _auth.currentUser;
     if (user == null) throw Exception("로그인이 필요합니다.");
@@ -95,6 +99,10 @@ class FirestoreService {
       if (locationName != null)
         postData['locationName'] = locationName; // 위치 이름 저장
       if (country != null) postData['country'] = country; // 국가 정보 저장
+      if (travelPlanId != null) postData['travelPlanId'] = travelPlanId; // 여행 계획 ID 저장
+      if (travelPlanTitle != null) postData['travelPlanTitle'] = travelPlanTitle; // 여행 계획 제목 저장
+      if (travelPlanDate != null) postData['travelPlanDate'] = travelPlanDate; // 여행 계획 날짜 저장
+      if (travelPlanCountry != null) postData['travelPlanCountry'] = travelPlanCountry; // 여행 계획 국가 저장
 
       await _db.collection('posts').add(postData);
     } catch (e) {
@@ -780,6 +788,61 @@ class FirestoreService {
       });
     } catch (e) {
       print("게시물 전송 실패: $e");
+      rethrow;
+    }
+  }
+
+  // 여행 계획 공유 메시지 전송
+  Future<void> sendTravelPlanMessage({
+    required String chatRoomId,
+    required String receiverId,
+    required String travelPlanId,
+    required String travelPlanTitle,
+    required String travelPlanDate,
+    required String travelPlanCountry,
+  }) async {
+    User? user = _auth.currentUser;
+    if (user == null) throw Exception("로그인이 필요합니다.");
+
+    try {
+      // 사용자 정보 가져오기
+      final userDoc = await _db.collection('users').doc(user.uid).get();
+      final userData = userDoc.data();
+      final userName =
+          userData?['userName'] ??
+          userData?['username'] ??
+          userData?['name'] ??
+          '알 수 없음';
+      final userProfileImage = userData?['profileImage'] ?? '';
+
+      // 메시지 추가
+      await _db
+          .collection('chatRooms')
+          .doc(chatRoomId)
+          .collection('messages')
+          .add({
+            'senderId': user.uid,
+            'senderName': userName,
+            'senderProfileImage': userProfileImage,
+            'receiverId': receiverId,
+            'content': '여행 계획을 공유했습니다.',
+            'type': 'travelPlan',
+            'travelPlanId': travelPlanId,
+            'travelPlanTitle': travelPlanTitle,
+            'travelPlanDate': travelPlanDate,
+            'travelPlanCountry': travelPlanCountry,
+            'timestamp': FieldValue.serverTimestamp(),
+          });
+
+      // 채팅방 정보 업데이트
+      await _db.collection('chatRooms').doc(chatRoomId).update({
+        'lastMessage': '여행 계획을 공유했습니다.',
+        'lastMessageType': 'travelPlan',
+        'lastMessageTime': FieldValue.serverTimestamp(),
+        'unreadCount.$receiverId': FieldValue.increment(1),
+      });
+    } catch (e) {
+      print("여행 계획 전송 실패: $e");
       rethrow;
     }
   }

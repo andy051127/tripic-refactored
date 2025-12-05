@@ -7,8 +7,10 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../services/firestore_service.dart';
 import '../models/message_model.dart';
 import '../models/post_model.dart';
+import '../models/travel_plan_model.dart';
 import 'map_screen.dart';
 import 'post_detail_screen.dart';
+import 'travel_plan_detail_screen.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final String chatPartnerName;
@@ -594,6 +596,189 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                             ),
                           ),
                         ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+        break;
+
+      case 'travelPlan':
+        contentWidget = GestureDetector(
+          onTap: () async {
+            // 여행 계획으로 이동
+            print('여행 계획 배너 터치됨');
+            print('travelPlanId: ${message.travelPlanId}');
+            
+            if (message.travelPlanId != null && message.travelPlanId!.isNotEmpty) {
+              try {
+                // Firestore에서 여행 계획 데이터 가져오기
+                print('Firestore에서 여행 계획 조회 중: ${message.travelPlanId}');
+                final planDoc = await FirebaseFirestore.instance
+                    .collection('travel_plans')
+                    .doc(message.travelPlanId)
+                    .get();
+                
+                print('planDoc.exists: ${planDoc.exists}');
+                
+                if (planDoc.exists && mounted) {
+                  // TravelPlan 객체로 변환
+                  final plan = TravelPlan.fromMap(
+                    planDoc.data() as Map<String, dynamic>,
+                    planDoc.id,
+                  );
+                  
+                  print('여행 계획 상세 화면으로 이동: ${plan.title}');
+                  
+                  // TravelPlanDetailScreen으로 이동
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => TravelPlanDetailScreen(plan: plan),
+                    ),
+                  );
+                } else {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('여행 계획을 찾을 수 없습니다')),
+                    );
+                  }
+                }
+              } catch (e) {
+                print('여행 계획 조회 오류: $e');
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('오류가 발생했습니다: $e')),
+                  );
+                }
+              }
+            } else {
+              print('travelPlanId가 null이거나 비어있습니다');
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('여행 계획 정보가 없습니다')),
+                );
+              }
+            }
+          },
+          child: Container(
+            width: 280,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.blue[50]!, Colors.blue[100]!],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.blue[200]!),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.blue.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 메인 컨텐츠
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 여행 계획 아이콘 및 제목
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.blue,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.flight_takeoff,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              message.travelPlanTitle ?? '여행 계획',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      // 여행 정보
+                      Row(
+                        children: [
+                          const Icon(Icons.location_on, size: 16, color: Colors.blue),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              message.travelPlanCountry ?? '국가 정보 없음',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(Icons.calendar_today, size: 16, color: Colors.blue),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              message.travelPlanDate ?? '날짜 정보 없음',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                // 하단 바 (자연스러운 마감)
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.blue[200]!.withOpacity(0.3),
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(11),
+                      bottomRight: Radius.circular(11),
+                    ),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.touch_app, size: 16, color: Colors.blue[700]),
+                      const SizedBox(width: 6),
+                      Text(
+                        '탭하여 여행 계획 보기',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.blue[700],
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ),

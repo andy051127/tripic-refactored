@@ -20,6 +20,10 @@ class Post {
   final String? locationName; // 위치 이름 추가
   final String? country; // 국가 추가
   final String? taggedFriend; // 태그된 친구 추가
+  final String? travelPlanId; // 여행 계획 ID 추가
+  final String? travelPlanTitle; // 여행 계획 제목 추가
+  final String? travelPlanDate; // 여행 계획 날짜 추가
+  final String? travelPlanCountry; // 여행 계획 국가 추가
 
   Post({
     String? id,
@@ -40,6 +44,10 @@ class Post {
     this.locationName,
     this.country,
     this.taggedFriend,
+    this.travelPlanId,
+    this.travelPlanTitle,
+    this.travelPlanDate,
+    this.travelPlanCountry,
   }) : this.id = id ?? DateTime.now().millisecondsSinceEpoch.toString(),
        this.createdAt = createdAt ?? Timestamp.now();
 
@@ -66,6 +74,10 @@ class Post {
       locationName: data['locationName'] as String?,
       country: data['country'] as String?,
       taggedFriend: data['taggedFriend'] as String?,
+      travelPlanId: data['travelPlanId'] as String?,
+      travelPlanTitle: data['travelPlanTitle'] as String?,
+      travelPlanDate: data['travelPlanDate'] as String?,
+      travelPlanCountry: data['travelPlanCountry'] as String?,
     );
   }
 
@@ -86,6 +98,10 @@ class Post {
       'locationName': locationName,
       'country': country,
       'taggedFriend': taggedFriend,
+      'travelPlanId': travelPlanId,
+      'travelPlanTitle': travelPlanTitle,
+      'travelPlanDate': travelPlanDate,
+      'travelPlanCountry': travelPlanCountry,
     };
   }
 }

@@ -11,11 +11,17 @@ import 'add_friend_screen.dart';
 import 'write_post_screen.dart';
 import 'map_screen.dart';
 import 'friend_list_screen.dart';
+import '../models/travel_plan_model.dart';
 
 class PhotoEditorScreen extends StatefulWidget {
   final List<String> initialImages;
+  final TravelPlan? selectedTravelPlan;
 
-  const PhotoEditorScreen({super.key, required this.initialImages});
+  const PhotoEditorScreen({
+    super.key,
+    required this.initialImages,
+    this.selectedTravelPlan,
+  });
 
   @override
   State<PhotoEditorScreen> createState() => _PhotoEditorScreenState();
@@ -224,6 +230,7 @@ class _PhotoEditorScreenState extends State<PhotoEditorScreen> {
                           selectedLocationName:
                               _selectedLocationName, // 위치 이름 전달
                           selectedCountry: _selectedCountry, // 선택된 국가 전달
+                          selectedTravelPlan: widget.selectedTravelPlan, // 여행 계획 전달
                         ),
                       ),
                     );

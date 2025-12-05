@@ -5,6 +5,9 @@ import 'dart:convert'; // JSON 인코딩/디코딩
 import 'package:path_provider/path_provider.dart'; // 앱 디렉토리 접근
 import 'photo_editor_screen.dart'; // 다음 화면 연결
 import '../widgets/travel_tracker_button.dart'; // [추가] 여행 기록 버튼
+import 'select_travel_plan_screen.dart'; // 여행 계획 선택 화면
+import 'travel_plan_detail_screen.dart'; // 여행 계획 상세 화면
+import '../models/travel_plan_model.dart'; // 여행 계획 모델
 import 'package:geolocator/geolocator.dart';
 import '../services/travel_tracker_service.dart';
 
@@ -18,6 +21,7 @@ class PhotoPickerScreen extends StatefulWidget {
 class _PhotoPickerScreenState extends State<PhotoPickerScreen> {
   final ImagePicker _picker = ImagePicker();
   final List<String> _selectedImagePaths = []; // 선택된 사진 경로들
+  TravelPlan? _selectedTravelPlan; // 선택된 여행 계획
 
   // 1. 카메라 촬영 - GPS 정보 즉시 저장
   Future<void> _takePhoto() async {
@@ -198,6 +202,7 @@ class _PhotoPickerScreenState extends State<PhotoPickerScreen> {
                         MaterialPageRoute(
                           builder: (context) => PhotoEditorScreen(
                             initialImages: _selectedImagePaths,
+                            selectedTravelPlan: _selectedTravelPlan, // 여행 계획 전달
                           ),
                         ),
                       );
@@ -258,80 +263,295 @@ class _PhotoPickerScreenState extends State<PhotoPickerScreen> {
 
           const Divider(height: 1),
 
+          // [추가] 여행 계획 버튼
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+            child: ElevatedButton.icon(
+              onPressed: () async {
+                final result = await Navigator.push<TravelPlan>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const SelectTravelPlanScreen(),
+                  ),
+                );
+                if (result != null) {
+                  setState(() {
+                    _selectedTravelPlan = result;
+                  });
+                }
+              },
+              icon: const Icon(Icons.airplane_ticket, color: Colors.white),
+              label: Text(
+                _selectedTravelPlan == null
+                    ? '여행 계획 선택하기'
+                    : '여행 계획 변경하기',
+                style: const TextStyle(color: Colors.white, fontSize: 15),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                minimumSize: const Size(double.infinity, 48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+
+          const Divider(height: 1),
+
           // 선택된 사진 그리드
           Expanded(
-            child: _selectedImagePaths.isEmpty
+            child: _selectedImagePaths.isEmpty && _selectedTravelPlan == null
                 ? Center(
                     child: Text(
-                      "사진을 선택해주세요",
-                      style: TextStyle(color: Colors.grey[400]),
+                      "사진을 선택하거나\n여행 계획을 추가해주세요",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.grey[400], fontSize: 15),
                     ),
                   )
-                : GridView.builder(
-                    padding: const EdgeInsets.all(2),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 3,
-                          crossAxisSpacing: 2,
-                          mainAxisSpacing: 2,
-                        ),
-                    itemCount: _selectedImagePaths.length,
-                    itemBuilder: (context, index) {
-                      return Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          // 실제 파일 이미지 표시
-                          Image.file(
-                            File(_selectedImagePaths[index]),
-                            fit: BoxFit.cover,
-                          ),
-                          // 삭제 버튼 (x)
-                          Positioned(
-                            top: 4,
-                            right: 4,
-                            child: GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  _selectedImagePaths.removeAt(index);
-                                });
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: const BoxDecoration(
-                                  color: Colors.black54,
-                                  shape: BoxShape.circle,
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 여행 계획 배너 (선택된 경우)
+                        if (_selectedTravelPlan != null) ...[
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => TravelPlanDetailScreen(
+                                    plan: _selectedTravelPlan!,
+                                  ),
                                 ),
-                                child: const Icon(
-                                  Icons.close,
-                                  size: 14,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                          ),
-                          // 순서 번호
-                          Positioned(
-                            bottom: 4,
-                            right: 4,
+                              );
+                            },
                             child: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: const BoxDecoration(
-                                color: Colors.blue,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Text(
-                                "${index + 1}",
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
+                              width: double.infinity,
+                              margin: const EdgeInsets.only(bottom: 16),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [Colors.blue[50]!, Colors.blue[100]!],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
                                 ),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.blue[200]!),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.blue.withOpacity(0.1),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // 메인 컨텐츠
+                                  Padding(
+                                    padding: const EdgeInsets.all(16),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        // 여행 계획 아이콘 및 제목
+                                        Row(
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.all(8),
+                                              decoration: BoxDecoration(
+                                                color: Colors.blue,
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: const Icon(
+                                                Icons.flight_takeoff,
+                                                color: Colors.white,
+                                                size: 20,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Text(
+                                                _selectedTravelPlan!.title,
+                                                style: const TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.black87,
+                                                ),
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            IconButton(
+                                              icon: const Icon(Icons.close, size: 20),
+                                              onPressed: () {
+                                                setState(() {
+                                                  _selectedTravelPlan = null;
+                                                });
+                                              },
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints(),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 12),
+                                        // 여행 정보
+                                        Row(
+                                          children: [
+                                            const Icon(Icons.location_on, size: 16, color: Colors.blue),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                _selectedTravelPlan!.country,
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  color: Colors.grey[700],
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          children: [
+                                            const Icon(Icons.calendar_today, size: 16, color: Colors.blue),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                _selectedTravelPlan!.date,
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  color: Colors.grey[700],
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  // 하단 바 (자연스러운 마감)
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue[200]!.withOpacity(0.3),
+                                      borderRadius: const BorderRadius.only(
+                                        bottomLeft: Radius.circular(11),
+                                        bottomRight: Radius.circular(11),
+                                      ),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.touch_app, size: 16, color: Colors.blue[700]),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          '탭하여 여행 계획 보기',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.blue[700],
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
                         ],
-                      );
-                    },
+                        // 사진 그리드
+                        if (_selectedImagePaths.isNotEmpty) ...[
+                          if (_selectedTravelPlan != null)
+                            const Padding(
+                              padding: EdgeInsets.only(bottom: 12),
+                              child: Text(
+                                '선택된 사진',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                            ),
+                          GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            padding: EdgeInsets.zero,
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 3,
+                              crossAxisSpacing: 8,
+                              mainAxisSpacing: 8,
+                            ),
+                            itemCount: _selectedImagePaths.length,
+                            itemBuilder: (context, index) {
+                              return Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  // 실제 파일 이미지 표시
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.file(
+                                      File(_selectedImagePaths[index]),
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                  // 삭제 버튼 (x)
+                                  Positioned(
+                                    top: 4,
+                                    right: 4,
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        setState(() {
+                                          _selectedImagePaths.removeAt(index);
+                                        });
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: const BoxDecoration(
+                                          color: Colors.black54,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.close,
+                                          size: 14,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  // 순서 번호
+                                  Positioned(
+                                    bottom: 4,
+                                    right: 4,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.blue,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Text(
+                                        "${index + 1}",
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
           ),
         ],

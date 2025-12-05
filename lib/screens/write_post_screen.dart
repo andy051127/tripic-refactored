@@ -4,6 +4,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../services/firestore_service.dart';
 import '../models/post_model.dart'; // 로컬 상태 업데이트용
 import 'package:firebase_auth/firebase_auth.dart'; // 사용자 정보 확인
+import '../models/travel_plan_model.dart'; // 여행 계획 모델
 
 class WritePostScreen extends StatefulWidget {
   final List<String> images;
@@ -11,6 +12,7 @@ class WritePostScreen extends StatefulWidget {
   final LatLng? selectedLocation; // 선택된 위치 추가
   final String? selectedLocationName; // 선택된 위치 이름 추가
   final String? selectedCountry; // 선택된 국가 추가
+  final TravelPlan? selectedTravelPlan; // 선택된 여행 계획 추가
 
   const WritePostScreen({
     super.key,
@@ -19,6 +21,7 @@ class WritePostScreen extends StatefulWidget {
     this.selectedLocation, // 선택된 위치 추가
     this.selectedLocationName, // 선택된 위치 이름 추가
     this.selectedCountry, // 선택된 국가 추가
+    this.selectedTravelPlan, // 선택된 여행 계획 추가
   });
 
   @override
@@ -142,6 +145,10 @@ class _WritePostScreenState extends State<WritePostScreen> {
         longitude: widget.selectedLocation?.longitude,
         locationName: widget.selectedLocationName, // 위치 이름 전달
         country: _selectedCountry, // 국가 정보 전달
+        travelPlanId: widget.selectedTravelPlan?.id, // 여행 계획 ID 전달
+        travelPlanTitle: widget.selectedTravelPlan?.title, // 여행 계획 제목 전달
+        travelPlanDate: widget.selectedTravelPlan?.date, // 여행 계획 날짜 전달
+        travelPlanCountry: widget.selectedTravelPlan?.country, // 여행 계획 국가 전달
       );
 
       // 2. 로컬 상태(globalPostsNotifier) 업데이트
@@ -166,6 +173,10 @@ class _WritePostScreenState extends State<WritePostScreen> {
         latitude: widget.selectedLocation?.latitude,
         longitude: widget.selectedLocation?.longitude,
         locationName: widget.selectedLocationName, // 위치 이름 전달
+        travelPlanId: widget.selectedTravelPlan?.id, // 여행 계획 ID
+        travelPlanTitle: widget.selectedTravelPlan?.title, // 여행 계획 제목
+        travelPlanDate: widget.selectedTravelPlan?.date, // 여행 계획 날짜
+        travelPlanCountry: widget.selectedTravelPlan?.country, // 여행 계획 국가
       );
 
       final currentPosts = List<Post>.from(globalPostsNotifier.value);

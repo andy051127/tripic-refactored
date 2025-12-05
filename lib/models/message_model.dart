@@ -16,6 +16,10 @@ class Message {
   final String? postTitle; // 게시물 제목 (type='post'일 때)
   final String? postImageUrl; // 게시물 이미지 (type='post'일 때)
   final String? postAuthor; // 게시물 작성자 (type='post'일 때)
+  final String? travelPlanId; // 여행 계획 ID (type='travelPlan'일 때)
+  final String? travelPlanTitle; // 여행 계획 제목 (type='travelPlan'일 때)
+  final String? travelPlanDate; // 여행 계획 날짜 (type='travelPlan'일 때)
+  final String? travelPlanCountry; // 여행 계획 국가 (type='travelPlan'일 때)
   final DateTime? timestamp;
 
   Message({
@@ -34,6 +38,10 @@ class Message {
     this.postTitle,
     this.postImageUrl,
     this.postAuthor,
+    this.travelPlanId,
+    this.travelPlanTitle,
+    this.travelPlanDate,
+    this.travelPlanCountry,
     this.timestamp,
   });
 
@@ -56,6 +64,10 @@ class Message {
       postTitle: data['postTitle'],
       postImageUrl: data['postImageUrl'],
       postAuthor: data['postAuthor'],
+      travelPlanId: data['travelPlanId'],
+      travelPlanTitle: data['travelPlanTitle'],
+      travelPlanDate: data['travelPlanDate'],
+      travelPlanCountry: data['travelPlanCountry'],
       timestamp: (data['timestamp'] as Timestamp?)?.toDate(),
     );
   }
@@ -77,6 +89,10 @@ class Message {
       'postTitle': postTitle,
       'postImageUrl': postImageUrl,
       'postAuthor': postAuthor,
+      'travelPlanId': travelPlanId,
+      'travelPlanTitle': travelPlanTitle,
+      'travelPlanDate': travelPlanDate,
+      'travelPlanCountry': travelPlanCountry,
       'timestamp': timestamp != null ? Timestamp.fromDate(timestamp!) : FieldValue.serverTimestamp(),
     };
   }

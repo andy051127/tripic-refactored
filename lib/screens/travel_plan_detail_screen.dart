@@ -1,15 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/travel_plan_model.dart';
 import 'travel_plan_setup_screen.dart'; // 수정 화면으로 이동용
 import '../services/firestore_service.dart';
+import 'share_travel_plan_screen.dart';
 
 class TravelPlanDetailScreen extends StatelessWidget {
   final TravelPlan plan;
 
   const TravelPlanDetailScreen({super.key, required this.plan});
 
+  bool _isMyPlan() {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    return currentUser != null && currentUser.uid == plan.uid;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isMyPlan = _isMyPlan();
     return Scaffold(
       backgroundColor: Colors.grey[100], // 배경색 약간 어둡게 하여 종이 느낌 강조
       appBar: AppBar(
@@ -20,11 +28,11 @@ class TravelPlanDetailScreen extends StatelessWidget {
           onPressed: () => Navigator.pop(context),
         ),
         centerTitle: true,
-        title: const Text(
-          "나의 여행 계획",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        title: Text(
+          isMyPlan ? "나의 여행 계획" : "여행 계획",
+          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
-        actions: [
+        actions: isMyPlan ? [
           // 1. 수정 버튼
           IconButton(
             icon: const Icon(Icons.edit, color: Colors.blue),
@@ -46,11 +54,19 @@ class TravelPlanDetailScreen extends StatelessWidget {
             },
           ),
           const SizedBox(width: 10),
-        ],
+        ] : null,
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        child: Stack(
+          children: [
+            // 메인 컨텐츠
+            SingleChildScrollView(
+              padding: const EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: 120, // 공유 버튼 공간 확보 (증가)
+              ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -167,8 +183,62 @@ class TravelPlanDetailScreen extends StatelessWidget {
                 ],
               ),
             ),
+            const SizedBox(height: 20), // 여백 추가
           ],
         ),
+            ),
+            // 공유 버튼 (내 계획일 때만 표시)
+            if (isMyPlan)
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                padding: EdgeInsets.only(
+                  left: 20,
+                  right: 20,
+                  top: 12,
+                  bottom: MediaQuery.of(context).padding.bottom + 12,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, -2),
+                    ),
+                  ],
+                ),
+                child: ElevatedButton(
+                  onPressed: () => _showShareOptions(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.share, size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        '공유하기',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -238,6 +308,118 @@ class TravelPlanDetailScreen extends StatelessWidget {
             child: const Text("삭제", style: TextStyle(color: Colors.red)),
           ),
         ],
+      ),
+    );
+  }
+
+  // 공유 옵션 모달 표시
+  void _showShareOptions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: MediaQuery.of(context).padding.bottom + 20,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 제목
+            const Text(
+              '공유하기',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 20),
+            // DM으로 공유하기
+            _buildShareOption(
+              context,
+              icon: Icons.chat_bubble,
+              title: 'DM으로 공유하기',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ShareTravelPlanScreen(plan: plan),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            // 게시물에 올리기
+            _buildShareOption(
+              context,
+              icon: Icons.photo_library,
+              title: '게시물에 올리기',
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('게시물 작성 화면에서 여행 계획을 선택할 수 있습니다'),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            // 커뮤니티에 올리기
+            _buildShareOption(
+              context,
+              icon: Icons.groups,
+              title: '커뮤니티에 올리기',
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('커뮤니티 작성 화면에서 여행 계획을 선택할 수 있습니다'),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShareOption(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: Colors.blue, size: 24),
+            const SizedBox(width: 16),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
