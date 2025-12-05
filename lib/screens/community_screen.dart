@@ -19,6 +19,11 @@ class CommunityPost {
   final DateTime createdAt; // [추가] 작성 시간
   final String uid; // [추가] 작성자 uid
   final String id; // [추가] 게시물 id
+  final String? travelPlanId; // 여행 계획 ID
+  final String? travelPlanTitle; // 여행 계획 제목
+  final String? travelPlanDate; // 여행 계획 날짜
+  final String? travelPlanCountry; // 여행 계획 국가
+  final String? userProfileImage; // 프로필 이미지
 
   CommunityPost({
     required this.name,
@@ -32,6 +37,11 @@ class CommunityPost {
     DateTime? createdAt, // 선택적 매개변수
     required this.uid,
     required this.id,
+    this.travelPlanId,
+    this.travelPlanTitle,
+    this.travelPlanDate,
+    this.travelPlanCountry,
+    this.userProfileImage,
   }) : createdAt = createdAt ?? DateTime.now(); // 없으면 현재 시간
 }
 
@@ -115,6 +125,11 @@ class _CommunityScreenState extends State<CommunityScreen> {
                   ?.toDate(), // Firestore Timestamp -> DateTime 변환
               uid: data['uid'] ?? '',
               id: doc.id,
+              travelPlanId: data['travelPlanId'],
+              travelPlanTitle: data['travelPlanTitle'],
+              travelPlanDate: data['travelPlanDate'],
+              travelPlanCountry: data['travelPlanCountry'],
+              userProfileImage: data['userProfileImage'],
             );
           }).toList();
 
@@ -287,7 +302,12 @@ class _CommunityScreenState extends State<CommunityScreen> {
               createdAt: post.createdAt, // [추가] 작성일 전달
               postUid: post.uid,
               postId: post.id,
-              category: post.category, // [추가] 카테고리 전달
+              category: post.category, // [추가] 카테곣0리 전달
+              travelPlanId: post.travelPlanId, // 여행 계획 ID 전달
+              travelPlanTitle: post.travelPlanTitle, // 여행 계획 제목 전달
+              travelPlanDate: post.travelPlanDate, // 여행 계획 날짜 전달
+              travelPlanCountry: post.travelPlanCountry, // 여행 계획 국가 전달
+              userProfileImage: post.userProfileImage, // 프로필 이미지 전달
             ),
           ),
         );

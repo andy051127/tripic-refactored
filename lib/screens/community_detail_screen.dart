@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
-import 'chat_detail_screen.dart'; // DM 이동용
 import 'package:intl/intl.dart'; // 날짜 포맷용
 import '../models/activity_model.dart'; // 활동 내역 저장용
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'community_write_screen.dart'; // 수정 화면용
 import '../services/firestore_service.dart'; // 팔로우 기능용
+import '../models/travel_plan_model.dart';
+import 'travel_plan_detail_screen.dart';
+import 'other_user_profile_screen.dart';
+import 'share_post_screen.dart';
+import '../models/post_model.dart';
 
 class CommunityDetailScreen extends StatefulWidget {
   final String name;
@@ -18,6 +22,11 @@ class CommunityDetailScreen extends StatefulWidget {
   final String postUid; // [추가] 게시물 작성자 uid
   final String? postId; // [추가] 게시물 ID (삭제용)
   final String? category; // [추가] 게시물 카테고리
+  final String? travelPlanId; // 여행 계획 ID
+  final String? travelPlanTitle; // 여행 계획 제목
+  final String? travelPlanDate; // 여행 계획 날짜
+  final String? travelPlanCountry; // 여행 계획 국가
+  final String? userProfileImage; // 프로필 이미지
 
   const CommunityDetailScreen({
     super.key,
@@ -31,6 +40,11 @@ class CommunityDetailScreen extends StatefulWidget {
     required this.postUid, // 필수 인자로 추가
     this.postId, // 선택적 인자
     this.category, // 선택적 인자
+    this.travelPlanId,
+    this.travelPlanTitle,
+    this.travelPlanDate,
+    this.travelPlanCountry,
+    this.userProfileImage,
   });
 
   @override
@@ -49,6 +63,9 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
   bool _isFollowing = false;
   final FirestoreService _firestoreService = FirestoreService();
 
+  // 저장 상태
+  bool _isSaved = false;
+
   @override
   void initState() {
     super.initState();
@@ -62,6 +79,259 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
     _checkFollowStatus();
     // 좋아요 상태 확인
     _checkLikeStatus();
+    // 저장 상태 확인
+    _checkSaveStatus();
+  }
+
+  // 저장 상태 확인
+  Future<void> _checkSaveStatus() async {
+    if (widget.postId == null) return;
+
+    try {
+      final isSaved = await _firestoreService.isPostSaved(widget.postId!);
+      if (mounted) {
+        setState(() {
+          _isSaved = isSaved;
+        });
+      }
+    } catch (e) {
+      print('저장 상태 확인 실패: $e');
+    }
+  }
+
+  // 저장/저장 취소 토글
+  Future<void> _toggleSave() async {
+    if (widget.postId == null) return;
+
+    try {
+      if (_isSaved) {
+        await _firestoreService.unsavePost(widget.postId!);
+        if (mounted) {
+          setState(() {
+            _isSaved = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("보관함에서 삭제되었습니다.")),
+          );
+        }
+      } else {
+        await _firestoreService.savePost(widget.postId!);
+        if (mounted) {
+          setState(() {
+            _isSaved = true;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("게시물이 보관함에 저장되었습니다.")),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('오류가 발생했습니다: $e')),
+        );
+      }
+    }
+  }
+
+  // 여행 계획 배너 표시
+  void _showTravelPlanBanner() async {
+    if (widget.travelPlanId == null || widget.travelPlanId!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('이 게시물에는 여행 계획이 연결되어 있지 않습니다')),
+      );
+      return;
+    }
+
+    try {
+      // Firestore에서 여행 계획 조회
+      final planDoc = await FirebaseFirestore.instance
+          .collection('travel_plans')
+          .doc(widget.travelPlanId)
+          .get();
+
+      if (!planDoc.exists) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('여행 계획을 찾을 수 없습니다')),
+          );
+        }
+        return;
+      }
+
+      final plan = TravelPlan.fromMap(
+        planDoc.data() as Map<String, dynamic>,
+        planDoc.id,
+      );
+
+      if (!mounted) return;
+
+      // 배너 모달 표시
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.transparent,
+        builder: (context) => Container(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(context).padding.bottom + 20,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                '여행 계획',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 20),
+              GestureDetector(
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => TravelPlanDetailScreen(plan: plan),
+                    ),
+                  );
+                },
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.blue[50]!, Colors.blue[100]!],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.blue[200]!),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.blue.withOpacity(0.1),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(
+                                    Icons.flight_takeoff,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    plan.title,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black87,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                const Icon(Icons.location_on, size: 16, color: Colors.blue),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    plan.country,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey[700],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                const Icon(Icons.calendar_today, size: 16, color: Colors.blue),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    plan.date,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey[700],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.blue[200]!.withOpacity(0.3),
+                          borderRadius: const BorderRadius.only(
+                            bottomLeft: Radius.circular(11),
+                            bottomRight: Radius.circular(11),
+                          ),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.touch_app, size: 16, color: Colors.blue[700]),
+                            const SizedBox(width: 6),
+                            Text(
+                              '탭하여 여행 계획 보기',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.blue[700],
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('오류가 발생했습니다: $e')),
+        );
+      }
+    }
   }
 
   // 좋아요 상태 확인
@@ -127,7 +397,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
         if (mounted) {
           setState(() {
             _isLiked = false;
-            _likeCount--;
+            if (_likeCount > 0) _likeCount--;
           });
         }
       } else {
@@ -484,7 +754,16 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                   ),
                 ]
               : [
-                  // 타인 게시물: 팔로우/언팔로우, 신고
+                  // 타인 게시물: 저장, 팔로우/언팔로우, 신고
+                  _buildOptionItem(
+                    _isSaved ? Icons.bookmark : Icons.bookmark_border,
+                    _isSaved ? "보관함에서 삭제" : "보관함에 저장",
+                    onTap: () {
+                      Navigator.pop(context);
+                      _toggleSave();
+                    },
+                  ),
+                  const Divider(height: 1),
                   _buildOptionItem(
                     _isFollowing
                         ? Icons.person_remove_outlined
@@ -638,6 +917,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
 
     return Scaffold(
       backgroundColor: Colors.white,
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -655,17 +935,24 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
           ),
         ),
         actions: [
+          // 여행 계획 보기 버튼
+          IconButton(
+            onPressed: _showTravelPlanBanner,
+            icon: const Icon(
+              Icons.edit_note,
+              color: Colors.blue,
+            ),
+          ),
           IconButton(
             onPressed: _showMoreOptions,
             icon: const Icon(Icons.more_vert, color: Colors.black),
           ),
         ],
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -677,17 +964,49 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                       ),
                       child: Row(
                         children: [
-                          const CircleAvatar(
-                            radius: 20,
-                            backgroundColor: Colors.grey,
-                            backgroundImage: AssetImage('assets/logo.png'),
+                          GestureDetector(
+                            onTap: () {
+                              // 프로필 화면으로 이동
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => OtherUserProfileScreen(
+                                    userId: widget.postUid,
+                                    userName: widget.name,
+                                    profileImage: widget.userProfileImage ?? '',
+                                  ),
+                                ),
+                              );
+                            },
+                            child: CircleAvatar(
+                              radius: 20,
+                              backgroundColor: Colors.grey,
+                              backgroundImage: widget.userProfileImage != null && widget.userProfileImage!.isNotEmpty
+                                  ? NetworkImage(widget.userProfileImage!)
+                                  : const AssetImage('assets/logo.png') as ImageProvider,
+                            ),
                           ),
                           const SizedBox(width: 10),
-                          Text(
-                            widget.name,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
+                          GestureDetector(
+                            onTap: () {
+                              // 프로필 화면으로 이동
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => OtherUserProfileScreen(
+                                    userId: widget.postUid,
+                                    userName: widget.name,
+                                    profileImage: widget.userProfileImage ?? '',
+                                  ),
+                                ),
+                              );
+                            },
+                            child: Text(
+                              widget.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
                             ),
                           ),
                           const Spacer(),
@@ -838,24 +1157,57 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                           const SizedBox(width: 20),
 
                           GestureDetector(
-                            onTap: () {
-                              // TODO: 작성자 uid를 파라미터로 받아서 전달해야 함
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => ChatDetailScreen(
-                                    chatPartnerName: widget.name,
-                                    chatPartnerId:
-                                        '', // 임시: 빈 문자열 (나중에 uid 추가 필요)
+                            onTap: () async {
+                              // 공유하기 기능
+                              if (widget.postId == null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('게시물 정보를 찾을 수 없습니다')),
+                                );
+                                return;
+                              }
+
+                              // Firestore에서 전체 데이터 가져오기
+                              final postDoc = await FirebaseFirestore.instance
+                                  .collection('posts')
+                                  .doc(widget.postId)
+                                  .get();
+
+                              if (postDoc.exists) {
+                                final data = postDoc.data()!;
+                                final post = Post(
+                                  id: postDoc.id,
+                                  uid: data['uid'] ?? '',
+                                  userName: data['userName'] ?? '',
+                                  imageUrl: data['imageUrl'] ?? '',
+                                  imageUrls: data['imageUrls'] != null
+                                      ? List<String>.from(data['imageUrls'])
+                                      : [],
+                                  title: data['title'] ?? '',
+                                  content: data['content'] ?? '',
+                                  location: data['location'] ?? '',
+                                  category: data['category'] ?? 'feed',
+                                );
+
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => SharePostScreen(post: post),
                                   ),
-                                ),
-                              );
+                                );
+                              }
                             },
                             child: const Icon(Icons.near_me_outlined, size: 28),
                           ),
 
                           const Spacer(),
-                          const Icon(Icons.bookmark_border, size: 28),
+                          GestureDetector(
+                            onTap: _toggleSave,
+                            child: Icon(
+                              _isSaved ? Icons.bookmark : Icons.bookmark_border,
+                              size: 28,
+                              color: Colors.black,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -1094,55 +1446,59 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
               ),
             ),
 
-            // 6. 하단 댓글 입력창
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border(top: BorderSide(color: Colors.grey[200]!)),
-              ),
-              child: Row(
-                children: [
-                  const CircleAvatar(
-                    radius: 16,
-                    backgroundColor: Colors.grey,
-                    child: Icon(Icons.person, size: 20, color: Colors.white),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: TextField(
-                        controller: _commentController,
-                        decoration: const InputDecoration(
-                          hintText: "댓글 달기...",
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(vertical: 10),
-                        ),
-                        onSubmitted: (_) => _addComment(),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  TextButton(
-                    onPressed: _addComment,
-                    child: const Text(
-                      "게시",
-                      style: TextStyle(
-                        color: Colors.blue,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+          // 6. 하단 댓글 입력창
+          Container(
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 10,
+              bottom: 10 + MediaQuery.of(context).viewInsets.bottom + MediaQuery.of(context).padding.bottom,
             ),
-          ],
-        ),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border(top: BorderSide(color: Colors.grey[200]!)),
+            ),
+            child: Row(
+              children: [
+                const CircleAvatar(
+                  radius: 16,
+                  backgroundColor: Colors.grey,
+                  child: Icon(Icons.person, size: 20, color: Colors.white),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: TextField(
+                      controller: _commentController,
+                      decoration: const InputDecoration(
+                        hintText: "댓글 달기...",
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(vertical: 10),
+                      ),
+                      onSubmitted: (_) => _addComment(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: _addComment,
+                  child: const Text(
+                    "게시",
+                    style: TextStyle(
+                      color: Colors.blue,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

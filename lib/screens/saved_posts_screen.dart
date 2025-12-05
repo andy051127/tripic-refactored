@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/firestore_service.dart';
 import '../models/post_model.dart';
 import 'post_detail_screen.dart';
+import 'community_detail_screen.dart';
+import 'package:intl/intl.dart';
 
 class SavedPostsScreen extends StatefulWidget {
   const SavedPostsScreen({super.key});
@@ -11,12 +13,50 @@ class SavedPostsScreen extends StatefulWidget {
   State<SavedPostsScreen> createState() => _SavedPostsScreenState();
 }
 
+class SavedItem {
+  final String id;
+  final String type; // 'feed' or 'community'
+  final String imageUrl;
+  final String title;
+  final String userName;
+  final String location;
+  final String content;
+  final String stats;
+  final DateTime createdAt;
+  final String postUid;
+  final String? category;
+  final String? travelPlanId;
+  final String? travelPlanTitle;
+  final String? travelPlanDate;
+  final String? travelPlanCountry;
+  final String? userProfileImage;
+
+  SavedItem({
+    required this.id,
+    required this.type,
+    required this.imageUrl,
+    required this.title,
+    required this.userName,
+    required this.location,
+    required this.content,
+    required this.stats,
+    required this.createdAt,
+    required this.postUid,
+    this.category,
+    this.travelPlanId,
+    this.travelPlanTitle,
+    this.travelPlanDate,
+    this.travelPlanCountry,
+    this.userProfileImage,
+  });
+}
+
 class _SavedPostsScreenState extends State<SavedPostsScreen> {
   final FirestoreService _firestoreService = FirestoreService();
 
-  Future<List<Post>> _getSavedPosts() async {
+  Future<List<SavedItem>> _getSavedPosts() async {
     final savedPostIds = await _firestoreService.getSavedPostIds();
-    List<Post> posts = [];
+    List<SavedItem> items = [];
 
     for (String postId in savedPostIds) {
       try {
@@ -27,28 +67,26 @@ class _SavedPostsScreenState extends State<SavedPostsScreen> {
 
         if (postDoc.exists) {
           final data = postDoc.data()!;
-          posts.add(
-            Post(
+          final category = data['category'] ?? 'feed';
+          
+          items.add(
+            SavedItem(
               id: postDoc.id,
-              uid: data['uid'] ?? '',
-              userName: data['userName'] ?? '',
+              type: category == 'feed' ? 'feed' : 'community',
               imageUrl: data['imageUrl'] ?? '',
-              imageUrls: data['imageUrls'] != null
-                  ? List<String>.from(data['imageUrls'])
-                  : (data['imageUrl'] != null && data['imageUrl'].toString().isNotEmpty
-                      ? [data['imageUrl'].toString()]
-                      : []),
               title: data['title'] ?? '',
-              content: data['content'] ?? '',
+              userName: data['userName'] ?? '',
               location: data['location'] ?? '',
-              latitude: data['latitude']?.toDouble(),
-              longitude: data['longitude']?.toDouble(),
-              locationName: data['locationName'],
-              category: data['category'] ?? 'feed',
-              country: data['country'] as String?,
-              taggedFriend: data['taggedFriend'] as String?,
-              createdAt: data['createdAt'] as Timestamp?,
-              likeCount: data['likeCount'] ?? 0,
+              content: data['content'] ?? '',
+              stats: '${data['likeCount'] ?? 0} · ${data['commentCount'] ?? 0}',
+              createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+              postUid: data['uid'] ?? '',
+              category: category,
+              travelPlanId: data['travelPlanId'],
+              travelPlanTitle: data['travelPlanTitle'],
+              travelPlanDate: data['travelPlanDate'],
+              travelPlanCountry: data['travelPlanCountry'],
+              userProfileImage: data['userProfileImage'],
             ),
           );
         }
@@ -57,7 +95,7 @@ class _SavedPostsScreenState extends State<SavedPostsScreen> {
       }
     }
 
-    return posts;
+    return items;
   }
 
   Future<void> _unsavePost(String postId) async {
@@ -96,7 +134,7 @@ class _SavedPostsScreenState extends State<SavedPostsScreen> {
         ),
       ),
       body: SafeArea(
-        child: FutureBuilder<List<Post>>(
+        child: FutureBuilder<List<SavedItem>>(
           future: _getSavedPosts(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
@@ -119,7 +157,7 @@ class _SavedPostsScreenState extends State<SavedPostsScreen> {
               );
             }
 
-            final savedPosts = snapshot.data!;
+            final savedItems = snapshot.data!;
             return GridView.builder(
               padding: const EdgeInsets.all(2),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -127,25 +165,85 @@ class _SavedPostsScreenState extends State<SavedPostsScreen> {
                 crossAxisSpacing: 2,
                 mainAxisSpacing: 2,
               ),
-              itemCount: savedPosts.length,
+              itemCount: savedItems.length,
               itemBuilder: (context, index) {
-                final post = savedPosts[index];
+                final item = savedItems[index];
                 return GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => PostDetailScreen(post: post),
-                      ),
-                    );
+                  onTap: () async {
+                    if (item.type == 'feed') {
+                      // 일반 게시물인 경우 Post 객체로 변환
+                      final postDoc = await FirebaseFirestore.instance
+                          .collection('posts')
+                          .doc(item.id)
+                          .get();
+                      
+                      if (postDoc.exists) {
+                        final data = postDoc.data()!;
+                        final post = Post(
+                          id: postDoc.id,
+                          uid: data['uid'] ?? '',
+                          userName: data['userName'] ?? '',
+                          imageUrl: data['imageUrl'] ?? '',
+                          imageUrls: data['imageUrls'] != null
+                              ? List<String>.from(data['imageUrls'])
+                              : (data['imageUrl'] != null && data['imageUrl'].toString().isNotEmpty
+                                  ? [data['imageUrl'].toString()]
+                                  : []),
+                          title: data['title'] ?? '',
+                          content: data['content'] ?? '',
+                          location: data['location'] ?? '',
+                          latitude: data['latitude']?.toDouble(),
+                          longitude: data['longitude']?.toDouble(),
+                          locationName: data['locationName'],
+                          category: data['category'] ?? 'feed',
+                          country: data['country'] as String?,
+                          taggedFriend: data['taggedFriend'] as String?,
+                          createdAt: data['createdAt'] as Timestamp?,
+                          likeCount: data['likeCount'] ?? 0,
+                        );
+                        
+                        if (mounted) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => PostDetailScreen(post: post),
+                            ),
+                          );
+                        }
+                      }
+                    } else {
+                      // 커뮤니티 게시물인 경우
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => CommunityDetailScreen(
+                            name: item.userName,
+                            location: item.location,
+                            title: item.title,
+                            content: item.content,
+                            stats: item.stats,
+                            imageUrl: item.imageUrl,
+                            createdAt: item.createdAt,
+                            postUid: item.postUid,
+                            postId: item.id,
+                            category: item.category,
+                            travelPlanId: item.travelPlanId,
+                            travelPlanTitle: item.travelPlanTitle,
+                            travelPlanDate: item.travelPlanDate,
+                            travelPlanCountry: item.travelPlanCountry,
+                            userProfileImage: item.userProfileImage,
+                          ),
+                        ),
+                      );
+                    }
                   },
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
                       // 게시물 이미지
-                      post.imageUrl.isNotEmpty
+                      item.imageUrl.isNotEmpty
                           ? Image.network(
-                              post.imageUrl,
+                              item.imageUrl,
                               fit: BoxFit.cover,
                               errorBuilder: (context, error, stackTrace) {
                                 return Container(
@@ -164,12 +262,33 @@ class _SavedPostsScreenState extends State<SavedPostsScreen> {
                                 color: Colors.white,
                               ),
                             ),
+                      // 타입 표시 배지
+                      if (item.type == 'community')
+                        Positioned(
+                          top: 4,
+                          left: 4,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF4CA1AF),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              '커뮤니티',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
                       // 삭제 버튼
                       Positioned(
                         top: 4,
                         right: 4,
                         child: GestureDetector(
-                          onTap: () => _unsavePost(post.id),
+                          onTap: () => _unsavePost(item.id),
                           child: Container(
                             padding: const EdgeInsets.all(4),
                             decoration: const BoxDecoration(
