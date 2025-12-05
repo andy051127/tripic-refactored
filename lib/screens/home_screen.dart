@@ -792,13 +792,8 @@ class _PostItemState extends State<PostItem> {
     }
   }
 
-  Future<void> _navigateToTaggedProfile(String taggedNames) async {
-    // 여러 이름이 쉼표로 구분되어 있을 수 있으므로 첫 번째 이름만 사용
-    final names = taggedNames.split(',').map((e) => e.trim()).toList();
-    if (names.isEmpty) return;
-
-    // 첫 번째 태그된 사람의 프로필로 이동
-    final targetName = names[0];
+  Future<void> _navigateToTaggedProfile(String targetName) async {
+    if (targetName.isEmpty) return;
 
     try {
       // Firestore에서 userName으로 사용자 정보 조회
@@ -841,6 +836,45 @@ class _PostItemState extends State<PostItem> {
         const SnackBar(content: Text('프로필을 불러올 수 없습니다.')),
       );
     }
+  }
+
+  List<Widget> _buildTaggedFriendWidgets(String taggedFriends) {
+    final names = taggedFriends.split(',').map((e) => e.trim()).toList();
+    final List<Widget> widgets = [];
+
+    for (int i = 0; i < names.length; i++) {
+      final name = names[i];
+      
+      // 각 이름을 클릭 가능한 위젯으로 생성
+      widgets.add(
+        GestureDetector(
+          onTap: () => _navigateToTaggedProfile(name),
+          child: Text(
+            name,
+            style: const TextStyle(
+              fontSize: 12,
+              color: Colors.blue,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      );
+
+      // 마지막 이름이 아니면 쉼표 추가
+      if (i < names.length - 1) {
+        widgets.add(
+          const Text(
+            ", ",
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey,
+            ),
+          ),
+        );
+      }
+    }
+
+    return widgets;
   }
 
   void _showMoreOptions() {
@@ -1125,17 +1159,19 @@ class _PostItemState extends State<PostItem> {
                           ),
                         if (widget.post.taggedFriend != null &&
                             widget.post.taggedFriend!.isNotEmpty)
-                          GestureDetector(
-                            onTap: () => _navigateToTaggedProfile(
-                                widget.post.taggedFriend!),
-                            child: Text(
-                              "함께: ${widget.post.taggedFriend!}",
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.blue,
-                                fontWeight: FontWeight.w500,
+                          Wrap(
+                            spacing: 4,
+                            children: [
+                              const Text(
+                                "함께: ",
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
                               ),
-                            ),
+                              ..._buildTaggedFriendWidgets(
+                                  widget.post.taggedFriend!),
+                            ],
                           ),
                       ],
                     ),
