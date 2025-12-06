@@ -36,7 +36,7 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
   String _userBio = '';
   String? _selectedCountry; // 선택된 국가
   List<String> _userCountries = []; // 사용자가 게시물에 사용한 국가 목록
-  
+
   // 프라이버시 설정
   bool _canViewProfile = true; // 프로필 볼 수 있는지 여부
 
@@ -126,11 +126,11 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
         final data = doc.data();
         final country = data['country'] as String?;
         final category = data['category'] as String?;
-        
+
         // 커뮤니티 게시물 제외하고 국가 정보가 있는 경우만 추가
-        if (country != null && 
-            country.isNotEmpty && 
-            category != 'general' && 
+        if (country != null &&
+            country.isNotEmpty &&
+            category != 'general' &&
             category != 'companion') {
           countries.add(country);
         }
@@ -150,10 +150,10 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
     try {
       // userId를 이용하여 팔로우 상태 확인
       String targetId = widget.userId ?? '';
-      
+
       print('🔍 OtherUserProfile - 초기 userId: $targetId');
       print('🔍 OtherUserProfile - userName: ${widget.userName}');
-      
+
       // userId가 없으면 userName으로 검색
       if (targetId.isEmpty) {
         // userName 필드로 먼저 검색
@@ -162,9 +162,9 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
             .where('userName', isEqualTo: widget.userName)
             .limit(1)
             .get();
-        
+
         print('🔍 userName 검색 결과: ${usersSnapshot.docs.length}개');
-        
+
         // 찾지 못했다면 username 필드로 검색
         if (usersSnapshot.docs.isEmpty) {
           usersSnapshot = await FirebaseFirestore.instance
@@ -174,7 +174,7 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
               .get();
           print('🔍 username 검색 결과: ${usersSnapshot.docs.length}개');
         }
-        
+
         // 그래도 찾지 못했다면 name 필드로 검색
         if (usersSnapshot.docs.isEmpty) {
           usersSnapshot = await FirebaseFirestore.instance
@@ -184,7 +184,7 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
               .get();
           print('🔍 name 검색 결과: ${usersSnapshot.docs.length}개');
         }
-        
+
         if (usersSnapshot.docs.isNotEmpty) {
           targetId = usersSnapshot.docs.first.id;
           print('✅ 사용자 찾음: $targetId');
@@ -199,21 +199,21 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
             _targetUserId = targetId;
           });
         }
-        
+
         print('✅ _targetUserId 설정됨: $_targetUserId');
-        
+
         // 팔로우 상태 확인
         final isFollowing = await _firestoreService.isFollowing(targetId);
-        
+
         // 팔로워/팔로잉 수 가져오기
         final counts = await _firestoreService.getFollowCounts(targetId);
-        
+
         // 게시물 수 가져오기 (커뮤니티 게시물 제외)
         final postsSnapshot = await FirebaseFirestore.instance
             .collection('posts')
             .where('uid', isEqualTo: targetId)
             .get();
-        
+
         // 커뮤니티 게시물 제외한 카운트
         final filteredPostCount = postsSnapshot.docs.where((doc) {
           final data = doc.data();
@@ -226,23 +226,25 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
             .collection('users')
             .doc(targetId)
             .get();
-        
+
         String userBio = '';
         bool canView = true; // 기본값: 볼 수 있음
-        
+
         if (userDoc.exists) {
           final userData = userDoc.data();
           userBio = userData?['bio'] ?? '';
-          
+
           // 프라이버시 설정 확인
           final privacySettings = userData?['privacySettings'];
           if (privacySettings != null) {
-            final isPublicToFollowers = privacySettings['isPublicToFollowers'] ?? true;
-            final isPublicToMutuals = privacySettings['isPublicToMutuals'] ?? false;
+            final isPublicToFollowers =
+                privacySettings['isPublicToFollowers'] ?? true;
+            final isPublicToMutuals =
+                privacySettings['isPublicToMutuals'] ?? false;
             final selectedFriends = List<String>.from(
               privacySettings['selectedFollowingFriends'] ?? [],
             );
-            
+
             final currentUser = FirebaseAuth.instance.currentUser;
             if (currentUser != null && currentUser.uid != targetId) {
               // 1. 모든 팔로워에게 공개
@@ -252,7 +254,9 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
               // 2. 맞팔로우한 사람에게만 공개
               else if (isPublicToMutuals) {
                 // 현재 사용자가 타겟을 팔로우하고 있는지 확인
-                final iFollowTarget = await _firestoreService.isFollowing(targetId);
+                final iFollowTarget = await _firestoreService.isFollowing(
+                  targetId,
+                );
                 // 타겟이 나를 팔로우하고 있는지 확인
                 final targetFollowsMe = await FirebaseFirestore.instance
                     .collection('users')
@@ -261,7 +265,7 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
                     .doc(currentUser.uid)
                     .get()
                     .then((doc) => doc.exists);
-                
+
                 canView = iFollowTarget && targetFollowsMe;
               }
               // 3. 특정 사람에게만 공개
@@ -336,9 +340,9 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
     } catch (e) {
       print('팔로우 토글 실패: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('오류가 발생했습니다: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('오류가 발생했습니다: $e')));
       }
     }
   }
@@ -388,42 +392,56 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                               children: [
-                                _buildStatItem("$_postCount", "게시물", onTap: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text("아래에서 게시물을 확인하세요! ↓"),
-                                      duration: Duration(seconds: 1),
-                                    ),
-                                  );
-                                }),
-                                _buildStatItem("$_followerCount", "팔로워", onTap: () {
-                                  if (_targetUserId != null) {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => FollowListScreen(
-                                          userName: widget.userName,
-                                          initialIndex: 0,
-                                          userId: _targetUserId,
-                                        ),
+                                _buildStatItem(
+                                  "$_postCount",
+                                  "게시물",
+                                  onTap: () {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text("아래에서 게시물을 확인하세요! ↓"),
+                                        duration: Duration(seconds: 1),
                                       ),
                                     );
-                                  }
-                                }),
-                                _buildStatItem("$_followingCount", "팔로잉", onTap: () {
-                                  if (_targetUserId != null) {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => FollowListScreen(
-                                          userName: widget.userName,
-                                          initialIndex: 1,
-                                          userId: _targetUserId,
+                                  },
+                                ),
+                                _buildStatItem(
+                                  "$_followerCount",
+                                  "팔로워",
+                                  onTap: () {
+                                    if (_targetUserId != null) {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              FollowListScreen(
+                                                userName: widget.userName,
+                                                initialIndex: 0,
+                                                userId: _targetUserId,
+                                              ),
                                         ),
-                                      ),
-                                    );
-                                  }
-                                }),
+                                      );
+                                    }
+                                  },
+                                ),
+                                _buildStatItem(
+                                  "$_followingCount",
+                                  "팔로잉",
+                                  onTap: () {
+                                    if (_targetUserId != null) {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              FollowListScreen(
+                                                userName: widget.userName,
+                                                initialIndex: 1,
+                                                userId: _targetUserId,
+                                              ),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                ),
                               ],
                             ),
                           ),
@@ -438,10 +456,7 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
                         ),
                       ),
                       if (_userBio.isNotEmpty)
-                        Text(
-                          _userBio,
-                          style: const TextStyle(fontSize: 14),
-                        ),
+                        Text(_userBio, style: const TextStyle(fontSize: 14)),
                       const SizedBox(height: 16),
                       // 국가 필터 배너
                       if (_userCountries.isNotEmpty)
@@ -505,19 +520,20 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
                             },
                           ),
                         ),
-                      if (_userCountries.isNotEmpty)
-                        const SizedBox(height: 12),
+                      if (_userCountries.isNotEmpty) const SizedBox(height: 12),
                       Row(
                         children: [
                           Expanded(
                             child: GestureDetector(
                               onTap: _toggleFollow,
                               child: Container(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                ),
                                 decoration: BoxDecoration(
-                                  color:
-                                      _isFollowing ? Colors.white : Colors.blue,
+                                  color: _isFollowing
+                                      ? Colors.white
+                                      : Colors.blue,
                                   border: Border.all(
                                     color: _isFollowing
                                         ? Colors.grey.shade300
@@ -546,40 +562,52 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
                                 if (_targetUserId != null) {
                                   // DM 화면으로 이동
                                   try {
-                                    final chatRoomId = await _firestoreService.getOrCreateChatRoom(_targetUserId!);
+                                    final chatRoomId = await _firestoreService
+                                        .getOrCreateChatRoom(_targetUserId!);
                                     if (mounted) {
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (context) => ChatDetailScreen(
-                                            chatRoomId: chatRoomId,
-                                            chatPartnerId: _targetUserId!,
-                                            chatPartnerName: widget.userName,
-                                          ),
+                                          builder: (context) =>
+                                              ChatDetailScreen(
+                                                chatRoomId: chatRoomId,
+                                                chatPartnerId: _targetUserId!,
+                                                chatPartnerName:
+                                                    widget.userName,
+                                              ),
                                         ),
                                       );
                                     }
                                   } catch (e) {
                                     print('채팅방 생성 실패: $e');
                                     if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('채팅방 생성에 실패했습니다: $e')),
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text('채팅방 생성에 실패했습니다: $e'),
+                                        ),
                                       );
                                     }
                                   }
                                 }
                               },
                               child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                ),
                                 decoration: BoxDecoration(
-                                  border:
-                                      Border.all(color: Colors.grey.shade300),
+                                  border: Border.all(
+                                    color: Colors.grey.shade300,
+                                  ),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: const Center(
                                   child: Text(
                                     "메시지",
-                                    style: TextStyle(fontWeight: FontWeight.bold),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -648,14 +676,14 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
         }
 
         var posts = snapshot.data?.docs ?? [];
-        
+
         // 커뮤니티 게시물 제외 (category가 'general' 또는 'companion'인 것 제외)
         posts = posts.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
           final category = data['category'] as String?;
           return category != 'general' && category != 'companion';
         }).toList();
-        
+
         // 클라이언트 측에서 최신순 정렬
         posts.sort((a, b) {
           final aData = a.data() as Map<String, dynamic>;
@@ -674,7 +702,7 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
             return country == _selectedCountry;
           }).toList();
         }
-        
+
         print('📊 로드된 게시물 수 (커뮤니티 제외): ${posts.length}개');
 
         if (posts.isEmpty) {
@@ -693,7 +721,7 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
             final postData = posts[index].data() as Map<String, dynamic>;
             final imageUrl = postData['imageUrl'] ?? '';
             final imageUrls = postData['imageUrls'] as List<dynamic>?;
-            
+
             // 첫 번째 이미지 URL 가져오기
             String displayImage = imageUrl;
             if (imageUrls != null && imageUrls.isNotEmpty) {
@@ -753,9 +781,7 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => TravelRecordMapScreen(
-              userId: _targetUserId,
-            ),
+            builder: (context) => TravelRecordMapScreen(userId: _targetUserId),
           ),
         );
       },
@@ -798,11 +824,7 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        Icons.map,
-                        size: 60,
-                        color: Colors.white,
-                      ),
+                      Icon(Icons.map, size: 60, color: Colors.white),
                       SizedBox(height: 16),
                       Text(
                         '탭하여 전체 지도 보기',
@@ -815,10 +837,7 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
                       SizedBox(height: 8),
                       Text(
                         '이 사용자의 여행 동선과 사진 위치를 확인하세요',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                        ),
+                        style: TextStyle(color: Colors.white70, fontSize: 14),
                       ),
                     ],
                   ),
@@ -836,11 +855,7 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.lock_outline,
-            size: 80,
-            color: Colors.grey[400],
-          ),
+          Icon(Icons.lock_outline, size: 80, color: Colors.grey[400]),
           const SizedBox(height: 24),
           Text(
             "비공개 계정입니다",
@@ -854,10 +869,7 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
           Text(
             "이 계정의 게시물을 보려면\n팔로우 요청이 수락되어야 합니다",
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
           ),
         ],
       ),

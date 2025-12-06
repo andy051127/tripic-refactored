@@ -258,199 +258,200 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
       body: StreamBuilder<QuerySnapshot>(
         stream: firestoreService.getPostsStream(),
         builder: (context, snapshot) {
-          if (snapshot.hasError) return const Center(child: Text("오류 발생"));
-          if (snapshot.connectionState == ConnectionState.waiting)
-            return const Center(child: CircularProgressIndicator());
+            if (snapshot.hasError) return const Center(child: Text("오류 발생"));
+            if (snapshot.connectionState == ConnectionState.waiting)
+              return const Center(child: CircularProgressIndicator());
 
-          final docs = snapshot.data?.docs ?? [];
+            final docs = snapshot.data?.docs ?? [];
 
-          // 전체 데이터를 Post 객체로 변환
-          final allPosts = docs
-              .map(
-                (doc) =>
-                    Post.fromMap(doc.data() as Map<String, dynamic>, doc.id),
-              )
-              .toList();
+            // 전체 데이터를 Post 객체로 변환
+            final allPosts = docs
+                .map(
+                  (doc) =>
+                      Post.fromMap(doc.data() as Map<String, dynamic>, doc.id),
+                )
+                .toList();
 
-          // [수정됨] 홈 화면에는 'feed' 카테고리만 보여주도록 필터링
-          // (커뮤니티 글은 'general' 또는 'companion' 이므로 제외됨)
-          var feedPosts = allPosts
-              .where((post) => post.category == 'feed')
-              .toList();
+            // [수정됨] 홈 화면에는 'feed' 카테고리만 보여주도록 필터링
+            // (커뮤니티 글은 'general' 또는 'companion' 이므로 제외됨)
+            var feedPosts = allPosts
+                .where((post) => post.category == 'feed')
+                .toList();
 
-          // 차단/숨김 필터링 적용
-          return FutureBuilder<List<Post>>(
-            future: _filterBlockedAndHiddenPosts(feedPosts, firestoreService),
-            builder: (context, filterSnapshot) {
-              // 로딩 중이더라도 이전 데이터가 있으면 계속 표시
-              final filteredPosts = filterSnapshot.data ?? feedPosts;
+            // 차단/숨김 필터링 적용
+            return FutureBuilder<List<Post>>(
+              future: _filterBlockedAndHiddenPosts(feedPosts, firestoreService),
+              builder: (context, filterSnapshot) {
+                // 로딩 중이더라도 이전 데이터가 있으면 계속 표시
+                final filteredPosts = filterSnapshot.data ?? feedPosts;
 
-              return ListView.builder(
-                controller: _scrollController,
-                addAutomaticKeepAlives: true, // 자동으로 위젯 상태 유지
-                addRepaintBoundaries: true, // 리페인트 최적화
-                cacheExtent: 500, // 화면 밖 위젯도 캐시
-                itemCount: filteredPosts.length + 1,
-                itemBuilder: (context, index) {
-                  if (index == 0) {
-                    return Column(
-                      children: [
-                        GestureDetector(
-                          onTap: () async {
-                            // 지도 화면으로 이동하여 국가 선택
-                            final selectedCountry = await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const MapScreen(),
-                              ),
-                            );
+                return ListView.builder(
+                  controller: _scrollController,
+                  addAutomaticKeepAlives: true, // 자동으로 위젯 상태 유지
+                  addRepaintBoundaries: true, // 리페인트 최적화
+                  cacheExtent: 500, // 화면 밖 위젯도 캐시
+                  itemCount: filteredPosts.length + 1,
+                  itemBuilder: (context, index) {
+                    if (index == 0) {
+                      return Column(
+                        children: [
+                          GestureDetector(
+                            onTap: () async {
+                              // 지도 화면으로 이동하여 국가 선택
+                              final selectedCountry = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const MapScreen(),
+                                ),
+                              );
 
-                            // 선택된 국가가 있으면 상태 업데이트
-                            if (selectedCountry != null &&
-                                selectedCountry is String) {
-                              setState(() {
-                                _selectedCountry = selectedCountry;
-                              });
-                            }
-                          },
-                          child: Container(
-                            width: double.infinity,
-                            height: 120,
-                            decoration: BoxDecoration(color: Colors.blue[50]),
-                            child: _currentPosition == null
-                                ? const Center(
-                                    child: CircularProgressIndicator(),
-                                  )
-                                : Stack(
-                                    children: [
-                                      GoogleMap(
-                                        initialCameraPosition: CameraPosition(
-                                          target: LatLng(
-                                            _currentPosition!.latitude,
-                                            _currentPosition!.longitude,
+                              // 선택된 국가가 있으면 상태 업데이트
+                              if (selectedCountry != null &&
+                                  selectedCountry is String) {
+                                setState(() {
+                                  _selectedCountry = selectedCountry;
+                                });
+                              }
+                            },
+                            child: Container(
+                              width: double.infinity,
+                              height: 120,
+                              decoration: BoxDecoration(color: Colors.blue[50]),
+                              child: _currentPosition == null
+                                  ? const Center(
+                                      child: CircularProgressIndicator(),
+                                    )
+                                  : Stack(
+                                      children: [
+                                        GoogleMap(
+                                          initialCameraPosition: CameraPosition(
+                                            target: LatLng(
+                                              _currentPosition!.latitude,
+                                              _currentPosition!.longitude,
+                                            ),
+                                            zoom: 14,
                                           ),
-                                          zoom: 14,
+                                          onMapCreated: (controller) {
+                                            _mapController = controller;
+                                          },
+                                          myLocationEnabled: true,
+                                          myLocationButtonEnabled: false,
+                                          zoomControlsEnabled: false,
+                                          mapToolbarEnabled: false,
+                                          compassEnabled: false,
                                         ),
-                                        onMapCreated: (controller) {
-                                          _mapController = controller;
-                                        },
-                                        myLocationEnabled: true,
-                                        myLocationButtonEnabled: false,
-                                        zoomControlsEnabled: false,
-                                        mapToolbarEnabled: false,
-                                        compassEnabled: false,
-                                      ),
-                                      Container(
-                                        decoration: BoxDecoration(
-                                          gradient: LinearGradient(
-                                            begin: Alignment.topCenter,
-                                            end: Alignment.bottomCenter,
-                                            colors: [
-                                              Colors.black.withOpacity(0.3),
-                                              Colors.transparent,
-                                              Colors.black.withOpacity(0.3),
+                                        Container(
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              begin: Alignment.topCenter,
+                                              end: Alignment.bottomCenter,
+                                              colors: [
+                                                Colors.black.withOpacity(0.3),
+                                                Colors.transparent,
+                                                Colors.black.withOpacity(0.3),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                        const Center(
+                                          child: Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.map,
+                                                color: Colors.white,
+                                                size: 30,
+                                              ),
+                                              SizedBox(height: 8),
+                                              Text(
+                                                "내 주변 친구들의 여행 기록 보기",
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.bold,
+                                                  shadows: [
+                                                    Shadow(
+                                                      blurRadius: 4,
+                                                      color: Colors.black,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
                                             ],
                                           ),
                                         ),
-                                      ),
-                                      const Center(
-                                        child: Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Icon(
-                                              Icons.map,
-                                              color: Colors.white,
-                                              size: 30,
-                                            ),
-                                            SizedBox(height: 8),
-                                            Text(
-                                              "내 주변 친구들의 여행 기록 보기",
-                                              style: TextStyle(
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.bold,
-                                                shadows: [
-                                                  Shadow(
-                                                    blurRadius: 4,
-                                                    color: Colors.black,
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                          ),
-                        ),
-                        // 선택된 국가 배너
-                        if (_selectedCountry != null)
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                            color: Colors.blue[50],
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.filter_alt,
-                                  color: Colors.blue,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    '$_selectedCountry 게시물만 보기',
-                                    style: const TextStyle(
-                                      color: Colors.blue,
-                                      fontWeight: FontWeight.w600,
+                                      ],
                                     ),
-                                  ),
-                                ),
-                                TextButton(
-                                  onPressed: () {
-                                    setState(() {
-                                      _selectedCountry = null;
-                                    });
-                                  },
-                                  child: const Text(
-                                    '전체 보기',
-                                    style: TextStyle(
-                                      color: Colors.blue,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ],
                             ),
                           ),
-                        const SizedBox(height: 8),
-                      ],
-                    );
-                  }
+                          // 선택된 국가 배너
+                          if (_selectedCountry != null)
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                              color: Colors.blue[50],
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.filter_alt,
+                                    color: Colors.blue,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      '$_selectedCountry 게시물만 보기',
+                                      style: const TextStyle(
+                                        color: Colors.blue,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () {
+                                      setState(() {
+                                        _selectedCountry = null;
+                                      });
+                                    },
+                                    child: const Text(
+                                      '전체 보기',
+                                      style: TextStyle(
+                                        color: Colors.blue,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          const SizedBox(height: 8),
+                        ],
+                      );
+                    }
 
-                  final post = filteredPosts[index - 1];
-                  return PostItem(
-                    key: ValueKey(post.id),
-                    post: post,
-                    currentUserId: FirebaseAuth.instance.currentUser?.uid ?? '',
-                    onDelete: () {
-                      // 삭제 로직
-                    },
-                    onBlock: () {
-                      setState(() {
-                        // UI 갱신을 위해 setState 호출
-                      });
-                    },
-                  );
-                },
-              );
-            },
-          );
-        },
+                    final post = filteredPosts[index - 1];
+                    return PostItem(
+                      key: ValueKey(post.id),
+                      post: post,
+                      currentUserId:
+                          FirebaseAuth.instance.currentUser?.uid ?? '',
+                      onDelete: () {
+                        // 삭제 로직
+                      },
+                      onBlock: () {
+                        setState(() {
+                          // UI 갱신을 위해 setState 호출
+                        });
+                      },
+                    );
+                  },
+                );
+              },
+            );
+          },
       ),
     );
   }
