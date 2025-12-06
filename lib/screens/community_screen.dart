@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'community_detail_screen.dart';
 import 'community_write_screen.dart';
+import 'community_search_screen.dart';
+import 'profile_screen.dart';
+import 'other_user_profile_screen.dart';
 import '../models/post_model.dart'; // 통합된 Post 모델 사용
 import '../services/firestore_service.dart';
 import 'package:intl/intl.dart'; // 날짜 포맷용
@@ -94,7 +98,14 @@ class _CommunityScreenState extends State<CommunityScreen> {
             icon: const Icon(Icons.add_circle_outline, color: Colors.black),
           ),
           IconButton(
-            onPressed: () {},
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const CommunitySearchScreen(),
+                ),
+              );
+            },
             icon: const Icon(Icons.search, color: Colors.black),
           ),
           const SizedBox(width: 10),
@@ -113,6 +124,16 @@ class _CommunityScreenState extends State<CommunityScreen> {
           // Firestore 데이터를 CommunityPost로 변환
           final allPosts = docs.map((doc) {
             final data = doc.data() as Map<String, dynamic>;
+
+            // userProfileImage가 없거나 빈 문자열인 경우 uid로 프로필 정보 가져오기
+            String? profileImage = data['userProfileImage'];
+            if ((profileImage == null || profileImage.isEmpty) &&
+                data['uid'] != null) {
+              // 비동기 작업을 동기적으로 처리할 수 없으므로
+              // uid를 통해 나중에 가져올 수 있도록 null로 유지
+              profileImage = null;
+            }
+
             return CommunityPost(
               name: data['userName'] ?? 'Unknown',
               location: data['location'] ?? '',
@@ -129,7 +150,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
               travelPlanTitle: data['travelPlanTitle'],
               travelPlanDate: data['travelPlanDate'],
               travelPlanCountry: data['travelPlanCountry'],
-              userProfileImage: data['userProfileImage'],
+              userProfileImage: profileImage,
             );
           }).toList();
 
@@ -329,19 +350,42 @@ class _CommunityScreenState extends State<CommunityScreen> {
                   children: [
                     Row(
                       children: [
-                        const CircleAvatar(
+                        _UserProfileAvatar(
+                          userId: post.uid,
+                          userName: post.name,
+                          profileImage: post.userProfileImage,
                           radius: 12,
-                          backgroundColor: Colors.grey,
-                          child: Icon(
-                            Icons.person,
-                            size: 16,
-                            color: Colors.white,
-                          ),
                         ),
                         const SizedBox(width: 8),
-                        Text(
-                          post.name,
-                          style: const TextStyle(fontWeight: FontWeight.w500),
+                        GestureDetector(
+                          onTap: () {
+                            final currentUser =
+                                FirebaseAuth.instance.currentUser;
+                            if (currentUser != null &&
+                                currentUser.uid == post.uid) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const ProfileScreen(),
+                                ),
+                              );
+                            } else {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => OtherUserProfileScreen(
+                                    userId: post.uid,
+                                    userName: post.name,
+                                    profileImage: post.userProfileImage ?? '',
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                          child: Text(
+                            post.name,
+                            style: const TextStyle(fontWeight: FontWeight.w500),
+                          ),
                         ),
                         if (post.location.isNotEmpty) ...[
                           const SizedBox(width: 6),
@@ -407,6 +451,100 @@ class _CommunityScreenState extends State<CommunityScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// 사용자 프로필 아바타 위젯 - 프로필 이미지가 없으면 Firestore에서 가져옴
+class _UserProfileAvatar extends StatelessWidget {
+  final String userId;
+  final String userName;
+  final String? profileImage;
+  final double radius;
+
+  const _UserProfileAvatar({
+    required this.userId,
+    required this.userName,
+    required this.profileImage,
+    this.radius = 20,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // 프로필 이미지가 이미 있으면 그대로 사용
+    if (profileImage != null && profileImage!.isNotEmpty) {
+      return _buildAvatar(context, profileImage!);
+    }
+
+    // 프로필 이미지가 없으면 Firestore에서 가져오기
+    return FutureBuilder<DocumentSnapshot>(
+      future: FirebaseFirestore.instance.collection('users').doc(userId).get(),
+      builder: (context, snapshot) {
+        String? imageUrl;
+
+        if (snapshot.hasData && snapshot.data!.exists) {
+          final userData = snapshot.data!.data() as Map<String, dynamic>?;
+          imageUrl = userData?['profileImage'] as String?;
+        }
+
+        return _buildAvatar(context, imageUrl);
+      },
+    );
+  }
+
+  Widget _buildAvatar(BuildContext context, String? imageUrl) {
+    return GestureDetector(
+      onTap: () {
+        final currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser != null && currentUser.uid == userId) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const ProfileScreen()),
+          );
+        } else {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => OtherUserProfileScreen(
+                userId: userId,
+                userName: userName,
+                profileImage: imageUrl ?? '',
+              ),
+            ),
+          );
+        }
+      },
+      child: CircleAvatar(
+        radius: radius,
+        backgroundColor: Colors.grey[300],
+        child: imageUrl != null && imageUrl.isNotEmpty
+            ? ClipOval(
+                child: Image.network(
+                  imageUrl,
+                  width: radius * 2,
+                  height: radius * 2,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Icon(
+                      Icons.person,
+                      size: radius,
+                      color: Colors.white,
+                    );
+                  },
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Center(
+                      child: SizedBox(
+                        width: radius,
+                        height: radius,
+                        child: const CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    );
+                  },
+                ),
+              )
+            : Icon(Icons.person, size: radius, color: Colors.white),
       ),
     );
   }

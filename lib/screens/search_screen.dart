@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'other_user_profile_screen.dart'; // 타인 프로필 화면
+import 'profile_screen.dart'; // 내 프로필 화면
 import 'map_screen.dart'; // 지도 검색 화면
 
 class SearchScreen extends StatefulWidget {
@@ -182,18 +184,30 @@ class _SearchScreenState extends State<SearchScreen> {
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                   onTap: () {
-                                    // 사용자 클릭 시 타인 프로필 화면으로 이동
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            OtherUserProfileScreen(
-                                          userName: user['userName'] ?? '알 수 없음',
-                                          profileImage: user['profileImage'] ?? '',
-                                          userId: user['userId'],
+                                    // 현재 사용자 확인 후 프로필 화면으로 이동
+                                    final currentUser = FirebaseAuth.instance.currentUser;
+                                    if (currentUser != null && currentUser.uid == user['userId']) {
+                                      // 내 프로필
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => const ProfileScreen(),
                                         ),
-                                      ),
-                                    );
+                                      );
+                                    } else {
+                                      // 다른 사용자 프로필
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              OtherUserProfileScreen(
+                                            userName: user['userName'] ?? '알 수 없음',
+                                            profileImage: user['profileImage'] ?? '',
+                                            userId: user['userId'],
+                                          ),
+                                        ),
+                                      );
+                                    }
                                   },
                                 );
                               },
