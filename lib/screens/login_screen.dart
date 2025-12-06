@@ -115,7 +115,14 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
                   TextButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("해당 기능은 아직 준비 되지 않았습니다"),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
                     child: const Text(
                       "비밀번호 찾기",
                       style: TextStyle(
@@ -134,45 +141,6 @@ class _LoginScreenState extends State<LoginScreen> {
               _isLoading
                   ? const CircularProgressIndicator()
                   : GradientButton(text: "로그인", onPressed: _handleLogin),
-
-              const SizedBox(height: 30),
-
-              // ... (하단 소셜 로그인, 회원가입 링크 부분은 기존 코드와 동일하게 유지) ...
-              // (너무 길어져서 생략했지만, 실제 파일에는 기존 디자인 코드를 그대로 두시면 됩니다)
-
-              // 간편 로그인 구분선 (디자인 복구)
-              Row(
-                children: [
-                  const Expanded(child: Divider()),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    child: Text(
-                      "간편 로그인",
-                      style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                    ),
-                  ),
-                  const Expanded(child: Divider()),
-                ],
-              ),
-
-              const SizedBox(height: 20),
-
-              // 소셜 로그인 버튼들
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _socialButton(Colors.yellow, "K", Colors.brown),
-                  const SizedBox(width: 15),
-                  _socialButton(const Color(0xFF03C75A), "N", Colors.white),
-                  const SizedBox(width: 15),
-                  _socialButton(
-                    Colors.white,
-                    "G",
-                    Colors.black,
-                    hasBorder: true,
-                  ),
-                ],
-              ),
 
               const SizedBox(height: 30),
 
@@ -205,34 +173,6 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 20),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // 소셜 버튼 헬퍼 함수 (기존 유지)
-  Widget _socialButton(
-    Color bgColor,
-    String letter,
-    Color textColor, {
-    bool hasBorder = false,
-  }) {
-    return Container(
-      width: 50,
-      height: 40,
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(4),
-        border: hasBorder ? Border.all(color: Colors.grey[300]!) : null,
-      ),
-      child: Center(
-        child: Text(
-          letter,
-          style: TextStyle(
-            color: textColor,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
           ),
         ),
       ),
