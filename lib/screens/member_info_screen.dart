@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import '../models/post_model.dart';
+import 'login_screen.dart';
 
 class MemberInfoScreen extends StatefulWidget {
   const MemberInfoScreen({super.key});
@@ -79,6 +81,309 @@ class _MemberInfoScreenState extends State<MemberInfoScreen> {
       ).showSnackBar(SnackBar(content: Text("수정 실패: $e")));
     } finally {
       if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  // 계정 삭제 확인 다이얼로그
+  void _showDeleteAccountDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('계정 삭제'),
+        content: const Text('정말로 계정을 삭제하시겠습니까?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('아니오'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _showPasswordConfirmDialog();
+            },
+            child: const Text('예', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 비밀번호 확인 다이얼로그
+  void _showPasswordConfirmDialog() {
+    final TextEditingController passwordController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('본인 확인'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('본인 확인을 위해 현재 비밀번호 입력'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: passwordController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                hintText: '비밀번호',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _deleteAccount(passwordController.text);
+            },
+            child: const Text('확인', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 계정 삭제 처리
+  Future<void> _deleteAccount(String password) async {
+    if (password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('비밀번호를 입력해주세요')),
+      );
+      return;
+    }
+
+    // 로딩 표시
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) throw Exception('로그인 정보가 없습니다');
+
+      // 1. 비밀번호 재인증
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: password,
+      );
+      await user.reauthenticateWithCredential(credential);
+
+      final uid = user.uid;
+
+      print('계정 삭제 시작 - UID: $uid');
+
+      // 2. Firestore 데이터 삭제
+      
+      // 사용자 게시물 삭제 (댓글, 좋아요도 함께 삭제)
+      print('게시물 검색 중...');
+      final postsSnapshot = await FirebaseFirestore.instance
+          .collection('posts')
+          .where('userName', isEqualTo: globalUserName.value)
+          .get();
+      
+      print('찾은 게시물 수: ${postsSnapshot.docs.length}');
+      
+      for (var postDoc in postsSnapshot.docs) {
+        print('게시물 삭제 중: ${postDoc.id}');
+        final postData = postDoc.data();
+        
+        // 게시물의 댓글 삭제 (서브컬렉션)
+        final commentsSnapshot = await postDoc.reference
+            .collection('comments')
+            .get();
+        print('  댓글 수: ${commentsSnapshot.docs.length}');
+        for (var commentDoc in commentsSnapshot.docs) {
+          await commentDoc.reference.delete();
+        }
+        
+        // 게시물의 좋아요 삭제 (서브컬렉션)
+        final likesSnapshot = await postDoc.reference
+            .collection('likes')
+            .get();
+        print('  좋아요 수: ${likesSnapshot.docs.length}');
+        for (var likeDoc in likesSnapshot.docs) {
+          await likeDoc.reference.delete();
+        }
+        
+        // 게시물 삭제
+        await postDoc.reference.delete();
+        
+        // Storage에서 게시물 이미지 삭제
+        if (postData['imageUrls'] != null) {
+          for (String imageUrl in List<String>.from(postData['imageUrls'])) {
+            try {
+              await FirebaseStorage.instance.refFromURL(imageUrl).delete();
+            } catch (e) {
+              print('이미지 삭제 실패: $e');
+            }
+          }
+        }
+      }
+
+      // 다른 사람 게시물에 작성한 내 댓글 삭제
+      print('다른 사람 게시물 확인 중...');
+      final allPostsSnapshot = await FirebaseFirestore.instance
+          .collection('posts')
+          .get();
+      
+      int deletedComments = 0;
+      int deletedLikes = 0;
+      
+      for (var postDoc in allPostsSnapshot.docs) {
+        // 내 댓글 삭제 (userName 필드 기준)
+        final myCommentsSnapshot = await postDoc.reference
+            .collection('comments')
+            .where('userName', isEqualTo: globalUserName.value)
+            .get();
+        
+        for (var commentDoc in myCommentsSnapshot.docs) {
+          await commentDoc.reference.delete();
+          deletedComments++;
+        }
+        
+        // 내 좋아요 삭제 (uid를 문서 ID로 사용)
+        try {
+          final myLikeDoc = await postDoc.reference
+              .collection('likes')
+              .doc(uid)
+              .get();
+          
+          if (myLikeDoc.exists) {
+            await myLikeDoc.reference.delete();
+            deletedLikes++;
+          }
+        } catch (e) {
+          print('좋아요 삭제 실패: $e');
+        }
+      }
+      
+      print('삭제된 댓글: $deletedComments, 삭제된 좋아요: $deletedLikes');
+
+      // 사용자 북마크(저장된 게시물) 삭제
+      final savedPostsSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('savedPosts')
+          .get();
+      for (var doc in savedPostsSnapshot.docs) {
+        await doc.reference.delete();
+      }
+
+      // 사용자 여행 계획 삭제
+      final travelPlansSnapshot = await FirebaseFirestore.instance
+          .collection('travel_plans')
+          .where('userId', isEqualTo: uid)
+          .get();
+      for (var doc in travelPlansSnapshot.docs) {
+        await doc.reference.delete();
+      }
+
+      // 사용자 채팅방 삭제
+      final chatRoomsSnapshot = await FirebaseFirestore.instance
+          .collection('chatrooms')
+          .where('participants', arrayContains: uid)
+          .get();
+      for (var doc in chatRoomsSnapshot.docs) {
+        await doc.reference.delete();
+      }
+
+      // 사용자 알림 삭제
+      final notificationsSnapshot = await FirebaseFirestore.instance
+          .collection('notifications')
+          .where('userId', isEqualTo: uid)
+          .get();
+      for (var doc in notificationsSnapshot.docs) {
+        await doc.reference.delete();
+      }
+
+      // 팔로우/팔로워 관계 삭제
+      final followsSnapshot = await FirebaseFirestore.instance
+          .collection('follows')
+          .where('followerId', isEqualTo: uid)
+          .get();
+      for (var doc in followsSnapshot.docs) {
+        await doc.reference.delete();
+      }
+      final followedSnapshot = await FirebaseFirestore.instance
+          .collection('follows')
+          .where('followingId', isEqualTo: uid)
+          .get();
+      for (var doc in followedSnapshot.docs) {
+        await doc.reference.delete();
+      }
+
+      // 사용자 프로필 이미지 삭제
+      if (globalProfileImage.value.isNotEmpty) {
+        try {
+          await FirebaseStorage.instance
+              .refFromURL(globalProfileImage.value)
+              .delete();
+        } catch (e) {
+          print('프로필 이미지 삭제 실패: $e');
+        }
+      }
+
+      // 사용자 문서 삭제
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .delete();
+
+      // 3. Firebase Auth 계정 삭제
+      await user.delete();
+
+      // 4. 전역 변수 초기화
+      globalUserName.value = '';
+      globalUserRealName.value = '';
+      globalUserBio.value = '';
+      globalUserEmail.value = '';
+      globalUserPhone.value = '';
+      globalProfileImage.value = '';
+
+      if (!mounted) return;
+
+      // 로딩 다이얼로그 닫기
+      Navigator.pop(context);
+
+      // 로그인 화면으로 이동
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+        (route) => false,
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('계정이 삭제되었습니다')),
+      );
+    } on FirebaseAuthException catch (e) {
+      Navigator.pop(context); // 로딩 다이얼로그 닫기
+      
+      String errorMessage = '계정 삭제 실패';
+      if (e.code == 'wrong-password') {
+        errorMessage = '비밀번호가 일치하지 않습니다';
+      } else if (e.code == 'requires-recent-login') {
+        errorMessage = '보안을 위해 다시 로그인해주세요';
+      }
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(errorMessage)),
+      );
+    } catch (e) {
+      Navigator.pop(context); // 로딩 다이얼로그 닫기
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('오류 발생: $e')),
+      );
     }
   }
 
@@ -183,6 +488,32 @@ class _MemberInfoScreenState extends State<MemberInfoScreen> {
               _emailController,
               isEditable: false, // 이메일은 수정 불가
             ),
+
+            const SizedBox(height: 50),
+            
+            // 계정 삭제 버튼
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _showDeleteAccountDialog,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  '계정 삭제하기',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
