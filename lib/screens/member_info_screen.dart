@@ -15,7 +15,8 @@ class _MemberInfoScreenState extends State<MemberInfoScreen> {
   bool _isSaving = false;
 
   // 컨트롤러
-  late TextEditingController _nameController;
+  late TextEditingController _userIdController;  // 고유 ID
+  late TextEditingController _realNameController; // 실명
   late TextEditingController _bioController;
   late TextEditingController _emailController;
   late TextEditingController _phoneController;
@@ -24,7 +25,8 @@ class _MemberInfoScreenState extends State<MemberInfoScreen> {
   void initState() {
     super.initState();
     // 현재 전역 변수 값으로 초기화
-    _nameController = TextEditingController(text: globalUserName.value);
+    _userIdController = TextEditingController(text: globalUserName.value);
+    _realNameController = TextEditingController(text: globalUserRealName.value);
     _bioController = TextEditingController(text: globalUserBio.value);
     _emailController = TextEditingController(text: globalUserEmail.value);
     _phoneController = TextEditingController(text: globalUserPhone.value);
@@ -32,7 +34,8 @@ class _MemberInfoScreenState extends State<MemberInfoScreen> {
 
   @override
   void dispose() {
-    _nameController.dispose();
+    _userIdController.dispose();
+    _realNameController.dispose();
     _bioController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
@@ -51,16 +54,16 @@ class _MemberInfoScreenState extends State<MemberInfoScreen> {
             .collection('users')
             .doc(user.uid)
             .update({
-              'userName': _nameController.text,
+              'userName': _userIdController.text,
+              'realName': _realNameController.text,
               'bio': _bioController.text,
-              'email': _emailController.text,
               'phoneNumber': _phoneController.text,
             });
 
         // 2. 전역 변수 업데이트 (앱 내 반영)
-        globalUserName.value = _nameController.text;
+        globalUserName.value = _userIdController.text;
+        globalUserRealName.value = _realNameController.text;
         globalUserBio.value = _bioController.text;
-        globalUserEmail.value = _emailController.text;
         globalUserPhone.value = _phoneController.text;
 
         if (!mounted) return;
@@ -140,8 +143,14 @@ class _MemberInfoScreenState extends State<MemberInfoScreen> {
             const SizedBox(height: 10),
             _buildInfoTile(
               Icons.person_outline,
+              "고유 ID",
+              _userIdController,
+              isEditable: _isEditing,
+            ),
+            _buildInfoTile(
+              Icons.badge_outlined,
               "이름",
-              _nameController,
+              _realNameController,
               isEditable: _isEditing,
             ),
             _buildInfoTile(
@@ -163,31 +172,17 @@ class _MemberInfoScreenState extends State<MemberInfoScreen> {
             ),
             const SizedBox(height: 10),
             _buildInfoTile(
-              Icons.email_outlined,
-              "이메일",
-              _emailController,
-              isEditable: _isEditing,
-            ),
-            _buildInfoTile(
               Icons.phone_android,
               "전화번호",
               _phoneController,
               isEditable: _isEditing,
             ),
-
-            const SizedBox(height: 30),
-            const Text(
-              "활동 정보",
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
-                fontWeight: FontWeight.bold,
-              ),
+            _buildInfoTile(
+              Icons.email_outlined,
+              "이메일",
+              _emailController,
+              isEditable: false, // 이메일은 수정 불가
             ),
-            const SizedBox(height: 10),
-            // 활동 정보는 수정 불가 (읽기 전용)
-            _buildStaticTile(Icons.grade_outlined, "회원 등급", "일반 회원"),
-            _buildStaticTile(Icons.location_on_outlined, "주 활동 지역", "서울, 대한민국"),
           ],
         ),
       ),
@@ -254,38 +249,6 @@ class _MemberInfoScreenState extends State<MemberInfoScreen> {
                       color: Colors.black87,
                     ),
                   ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 수정 불가능한 고정 타일
-  Widget _buildStaticTile(IconData icon, String title, String content) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: Colors.grey[600], size: 22),
-          const SizedBox(width: 16),
-          Text(
-            title,
-            style: const TextStyle(fontSize: 16, color: Colors.black54),
-          ),
-          const Spacer(),
-          Text(
-            content,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
           ),
         ],
       ),

@@ -66,6 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 data['username'] ??
                 data['name'] ??
                 'Unknown';
+            globalUserRealName.value = data['realName'] ?? '';
             globalUserBio.value = data['bio'] ?? 'Traveler ✈️';
             globalUserEmail.value = data['email'] ?? user.email ?? '';
             globalUserPhone.value = data['phoneNumber'] ?? '';

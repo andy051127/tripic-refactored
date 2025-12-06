@@ -123,6 +123,7 @@ final ValueNotifier<List<String>> blockedUsersNotifier =
     ValueNotifier<List<String>>([]);
 
 final ValueNotifier<String> globalUserName = ValueNotifier<String>("leeeee_kh");
+final ValueNotifier<String> globalUserRealName = ValueNotifier<String>("이강현");
 final ValueNotifier<String> globalUserBio = ValueNotifier<String>(
   "Traveler ✈️",
 );

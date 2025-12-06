@@ -158,11 +158,13 @@ class _SignupScreenState extends State<SignupScreen> {
     // 결과 처리
     if (error == null) {
       if (!mounted) return;
-      // ProfileCreationScreen으로 이동
+      // ProfileCreationScreen으로 이동 (이름 전달)
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => const ProfileCreationScreen(),
+          builder: (context) => ProfileCreationScreen(
+            realName: _nameController.text.trim(),
+          ),
         ),
       );
     } else {

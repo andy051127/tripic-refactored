@@ -5,7 +5,9 @@ import '../models/post_model.dart'; // 전역 변수 업데이트용
 import 'home_screen.dart';
 
 class ProfileCreationScreen extends StatefulWidget {
-  const ProfileCreationScreen({super.key});
+  final String realName; // 회원가입 시 입력한 이름
+  
+  const ProfileCreationScreen({super.key, required this.realName});
 
   @override
   State<ProfileCreationScreen> createState() => _ProfileCreationScreenState();
@@ -19,6 +21,7 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
   final TextEditingController _bioController = TextEditingController();
 
   bool _isSaving = false;
+  bool _isValidId = true; // 고유 ID 유효성 검사
 
   @override
   void dispose() {
@@ -29,11 +32,27 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
     super.dispose();
   }
 
+  // 고유 ID 유효성 검사 (영어와 특수기호만 허용)
+  void _validateId(String value) {
+    // 영어 대소문자, 숫자, 특수기호만 허용 (한글, 일본어, 중국어 등 제외)
+    final validPattern = RegExp(r'^[a-zA-Z0-9!@#$%^&*()_+=\[\]{};:,.<>?/\\|`~-]*$');
+    setState(() {
+      _isValidId = validPattern.hasMatch(value);
+    });
+  }
+
   Future<void> _saveProfile() async {
     if (_nameController.text.isEmpty) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text("이름을 입력해주세요.")));
+      ).showSnackBar(const SnackBar(content: Text("고유 ID를 입력해주세요.")));
+      return;
+    }
+
+    if (!_isValidId) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("영어와 특수기호만 사용 가능합니다.")));
       return;
     }
 
@@ -49,6 +68,7 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
             .set({
               'uid': user.uid,
               'email': user.email ?? '',
+              'realName': widget.realName,
               'userName': _nameController.text,
               'phoneNumber': _phoneController.text,
               'birthDate': _birthController.text, // 가입일 또는 생년월일
@@ -59,6 +79,7 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
             }, SetOptions(merge: true));
 
         // 2. 앱 내 전역 변수 업데이트 (즉시 반영)
+        globalUserRealName.value = widget.realName;
         globalUserName.value = _nameController.text;
         globalUserPhone.value = _phoneController.text;
         globalUserBio.value = _bioController.text;
@@ -106,7 +127,57 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
             ),
             const SizedBox(height: 30),
 
-            _buildTextField("이름 (닉네임)", _nameController, "예: 여행러_김철수"),
+            // 고유 ID 입력 필드
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "고유 ID",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _nameController,
+                  onChanged: _validateId,
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: Colors.grey[100],
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: _isValidId ? Colors.transparent : Colors.red,
+                        width: 2,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: _isValidId ? Colors.transparent : Colors.red,
+                        width: 2,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: _isValidId ? const Color(0xFF4CA1AF) : Colors.red,
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                ),
+                if (!_isValidId)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8, left: 4),
+                    child: Text(
+                      "영어와 특수기호만 사용 가능합니다",
+                      style: TextStyle(
+                        color: Colors.red,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
             const SizedBox(height: 20),
             _buildTextField(
               "전화번호",

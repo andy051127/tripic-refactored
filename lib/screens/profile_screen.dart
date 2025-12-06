@@ -160,6 +160,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 data['username'] ??
                 data['name'] ??
                 'Unknown';
+            globalUserRealName.value = data['realName'] ?? '';
             globalUserBio.value = data['bio'] ?? 'Traveler ✈️';
             globalUserEmail.value = data['email'] ?? user.email ?? '';
             globalUserPhone.value = data['phoneNumber'] ?? '';

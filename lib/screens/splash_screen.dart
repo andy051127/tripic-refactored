@@ -43,6 +43,7 @@ class _SplashScreenState extends State<SplashScreen> {
           final data = doc.data()!;
           // 전역 변수에 사용자 정보 업데이트 (프로필 화면에 반영됨)
           globalUserName.value = data['userName'] ?? 'Unknown';
+          globalUserRealName.value = data['realName'] ?? '';
           globalUserBio.value = data['bio'] ?? '';
           // 필요하다면 나이, 성별 등도 가져올 수 있음
         }
