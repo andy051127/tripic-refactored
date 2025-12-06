@@ -3,7 +3,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../models/post_model.dart';
+import '../models/notification_model.dart';
 import '../services/firestore_service.dart';
+import '../services/notification_service.dart';
 import 'travel_record_map_screen.dart';
 import 'other_user_posts_detail_screen.dart';
 import 'chat_detail_screen.dart';
@@ -329,6 +331,13 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
         }
       } else {
         await _firestoreService.followUser(_targetUserId!);
+        
+        // 팔로우 알림 생성
+        await NotificationService().createNotification(
+          userId: _targetUserId!,
+          type: NotificationType.follow,
+        );
+        
         if (mounted) {
           setState(() {
             _isFollowing = true;

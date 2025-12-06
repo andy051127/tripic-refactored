@@ -5,7 +5,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../services/firestore_service.dart';
+import '../services/notification_service.dart';
 import '../models/message_model.dart';
+import '../models/notification_model.dart';
 import '../models/post_model.dart';
 import '../models/travel_plan_model.dart';
 import 'map_screen.dart';
@@ -87,6 +89,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         content: _messageController.text.trim(),
       );
 
+      // DM 알림 생성
+      await NotificationService().createNotification(
+        userId: widget.chatPartnerId,
+        type: NotificationType.dm,
+        chatRoomId: _currentChatRoomId,
+      );
+
       _messageController.clear();
       Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
     } catch (e) {
@@ -108,6 +117,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           chatRoomId: _currentChatRoomId!,
           receiverId: widget.chatPartnerId,
           localImagePath: image.path,
+        );
+
+        // DM 알림 생성
+        await NotificationService().createNotification(
+          userId: widget.chatPartnerId,
+          type: NotificationType.dm,
+          chatRoomId: _currentChatRoomId,
         );
 
         Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);

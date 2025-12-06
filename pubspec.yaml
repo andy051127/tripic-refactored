@@ -51,6 +51,7 @@ dependencies:
   shared_preferences: ^2.3.3
   exif: ^3.3.0
   translator: ^1.0.0
+  timeago: ^3.7.0
 
 dev_dependencies:
   flutter_test:

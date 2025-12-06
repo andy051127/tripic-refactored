@@ -14,7 +14,6 @@ class SignupScreen extends StatefulWidget {
 
 class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
@@ -24,8 +23,6 @@ class _SignupScreenState extends State<SignupScreen> {
   // 검증 상태
   ValidationState _emailValidation = ValidationState.none;
   String _emailMessage = '';
-  ValidationState _usernameValidation = ValidationState.none;
-  String _usernameMessage = '';
   ValidationState _passwordValidation = ValidationState.none;
   String _passwordMessage = '';
   ValidationState _nameValidation = ValidationState.none;
@@ -33,16 +30,13 @@ class _SignupScreenState extends State<SignupScreen> {
 
   // 디바운스를 위한 타이머
   Timer? _emailDebounce;
-  Timer? _usernameDebounce;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     _nameController.dispose();
-    _usernameController.dispose();
     _emailDebounce?.cancel();
-    _usernameDebounce?.cancel();
     super.dispose();
   }
 
@@ -79,35 +73,6 @@ class _SignupScreenState extends State<SignupScreen> {
           } else {
             _emailValidation = ValidationState.error;
             _emailMessage = '이미 존재하는 이메일입니다';
-          }
-        });
-      }
-    });
-  }
-
-  // 사용자명 중복 체크
-  void _checkUsernameAvailability(String username) {
-    if (_usernameDebounce?.isActive ?? false) _usernameDebounce!.cancel();
-    
-    if (username.isEmpty) {
-      setState(() {
-        _usernameValidation = ValidationState.none;
-        _usernameMessage = '';
-      });
-      return;
-    }
-
-    // 500ms 후에 체크
-    _usernameDebounce = Timer(const Duration(milliseconds: 500), () async {
-      final isAvailable = await _authService.isUsernameAvailable(username);
-      if (mounted) {
-        setState(() {
-          if (isAvailable) {
-            _usernameValidation = ValidationState.success;
-            _usernameMessage = '중복되지 않는 ID입니다';
-          } else {
-            _usernameValidation = ValidationState.error;
-            _usernameMessage = '이미 존재하는 ID입니다';
           }
         });
       }
@@ -156,7 +121,6 @@ class _SignupScreenState extends State<SignupScreen> {
   void _handleSignUp() async {
     // 유효성 검사
     if (_emailController.text.isEmpty ||
-        _usernameController.text.isEmpty ||
         _nameController.text.isEmpty ||
         _passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -169,14 +133,6 @@ class _SignupScreenState extends State<SignupScreen> {
     if (_emailValidation != ValidationState.success) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("이메일을 확인해주세요.")),
-      );
-      return;
-    }
-
-    // 사용자명 중복 체크 확인
-    if (_usernameValidation != ValidationState.success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("사용자 이름(ID) 중복을 확인해주세요.")),
       );
       return;
     }
@@ -265,15 +221,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 validationMessage: _emailMessage,
                 onChanged: _checkEmailAvailability,
               ),
-              // 2. 사용자 이름 (ID)
-              CustomTextField(
-                hintText: "사용자 이름 (ID)",
-                controller: _usernameController,
-                validationState: _usernameValidation,
-                validationMessage: _usernameMessage,
-                onChanged: _checkUsernameAvailability,
-              ),
-              // 3. 이름
+              // 2. 이름
               CustomTextField(
                 hintText: "이름",
                 controller: _nameController,
@@ -281,7 +229,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 validationMessage: _nameMessage,
                 onChanged: _checkNameInput,
               ),
-              // 4. 비밀번호
+              // 3. 비밀번호
               CustomTextField(
                 hintText: "비밀번호 (6자리 이상)",
                 isPassword: true,

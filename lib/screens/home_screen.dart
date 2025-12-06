@@ -13,11 +13,14 @@ import 'profile_screen.dart';
 import 'other_user_profile_screen.dart';
 import 'search_screen.dart';
 import 'share_post_screen.dart';
+import 'notification_screen.dart';
 import '../models/post_model.dart';
+import '../models/notification_model.dart';
 import '../widgets/comment_modal.dart';
 import '../models/activity_model.dart';
 import '../models/travel_plan_model.dart';
 import '../services/firestore_service.dart';
+import '../services/notification_service.dart';
 import 'travel_plan_detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -238,6 +241,57 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
               MaterialPageRoute(builder: (context) => const SearchScreen()),
             ),
             icon: const Icon(Icons.search, color: Colors.black, size: 28),
+          ),
+          // 알림 아이콘 with badge
+          Stack(
+            children: [
+              IconButton(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const NotificationScreen(),
+                  ),
+                ),
+                icon: const Icon(
+                  Icons.notifications_none,
+                  color: Colors.black,
+                  size: 28,
+                ),
+              ),
+              // 읽지 않은 알림 개수 배지
+              StreamBuilder<int>(
+                stream: NotificationService().getUnreadCountStream(),
+                builder: (context, snapshot) {
+                  final unreadCount = snapshot.data ?? 0;
+                  if (unreadCount == 0) return const SizedBox.shrink();
+                  
+                  return Positioned(
+                    right: 8,
+                    top: 8,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      child: Text(
+                        unreadCount > 99 ? '99+' : '$unreadCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
           IconButton(
             onPressed: () => Navigator.push(
@@ -826,6 +880,14 @@ class _PostItemState extends State<PostItem>
           "게시물에 좋아요를 눌렀습니다.",
           widget.post.imageUrl,
           postId: widget.post.id,
+        );
+        
+        // 알림 생성 (게시물 작성자에게)
+        await NotificationService().createNotification(
+          userId: widget.post.uid,
+          type: NotificationType.like,
+          postId: widget.post.id,
+          postImageUrl: widget.post.imageUrl,
         );
       } else {
         await _firestoreService.unlikePost(widget.post.id);
@@ -1876,6 +1938,7 @@ class _PostItemState extends State<PostItem>
                               postId: widget.post.id,
                               postTitle: widget.post.title,
                               postImage: widget.post.imageUrl,
+                              postAuthorId: widget.post.uid,
                             ),
                           );
                         },

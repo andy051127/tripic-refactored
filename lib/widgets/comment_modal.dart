@@ -2,18 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/activity_model.dart';
+import '../models/notification_model.dart';
 import '../services/firestore_service.dart';
+import '../services/notification_service.dart';
 
 class CommentModal extends StatefulWidget {
   final String postId; // 게시물 ID (필수)
   final String postTitle;
   final String? postImage;
+  final String? postAuthorId; // 게시물 작성자 ID 추가
 
   const CommentModal({
     super.key,
     required this.postId,
     this.postTitle = "게시물",
     this.postImage,
+    this.postAuthorId,
   });
 
   @override
@@ -23,6 +27,7 @@ class CommentModal extends StatefulWidget {
 class _CommentModalState extends State<CommentModal> {
   final TextEditingController _controller = TextEditingController();
   final FirestoreService _firestoreService = FirestoreService();
+  final NotificationService _notificationService = NotificationService();
   bool _isSubmitting = false;
 
   Future<void> _addComment() async {
@@ -46,6 +51,17 @@ class _CommentModalState extends State<CommentModal> {
         widget.postImage,
         postId: widget.postId,
       );
+
+      // 알림 생성 (게시물 작성자에게)
+      if (widget.postAuthorId != null) {
+        await _notificationService.createNotification(
+          userId: widget.postAuthorId!,
+          type: NotificationType.comment,
+          postId: widget.postId,
+          postImageUrl: widget.postImage,
+          commentText: _controller.text,
+        );
+      }
 
       _controller.clear();
 

@@ -124,21 +124,7 @@ class AuthService {
     }
   }
 
-  // 6. 사용자명(ID) 중복 체크
-  Future<bool> isUsernameAvailable(String username) async {
-    try {
-      final querySnapshot = await _firestore
-          .collection('users')
-          .where('username', isEqualTo: username)
-          .limit(1)
-          .get();
-      return querySnapshot.docs.isEmpty; // 비어있으면 사용 가능
-    } catch (e) {
-      return false; // 에러 발생 시 사용 불가로 처리
-    }
-  }
-
-  // 7. 닉네임 중복 체크
+  // 6. 닉네임 중복 체크
   Future<bool> isNicknameAvailable(String nickname) async {
     try {
       final querySnapshot = await _firestore
