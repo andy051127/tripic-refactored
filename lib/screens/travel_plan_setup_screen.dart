@@ -564,187 +564,324 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
   void _showCountryModal(BuildContext context) {
     String? tempCountry;
     String? tempCity;
+    String searchQuery = '';
+    final TextEditingController searchController = TextEditingController();
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) => Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: Container(
-            height: MediaQuery.of(context).size.height * 0.9,
-            padding: EdgeInsets.only(
-              left: 20,
-              right: 20,
-              top: 20,
-              bottom:
-                  MediaQuery.of(context).viewInsets.bottom +
-                  MediaQuery.of(context).padding.bottom +
-                  20,
-            ),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildModalHeader(context, "국가 설정"),
-                const SizedBox(height: 20),
-                const Text(
-                  "국가 및 도시 선택",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                ),
-                const SizedBox(height: 16),
-                Expanded(
-                  child: Column(
-                    children: [
-                      // 국가 선택 드롭다운
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey.shade300),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            isExpanded: true,
-                            hint: const Text("국가 선택"),
-                            value: tempCountry,
-                            items: _countriesAndCities.keys.map((country) {
-                              final flag = _countryFlags[country] ?? '🌍';
-                              return DropdownMenuItem(
-                                value: country,
-                                child: Row(
-                                  children: [
-                                    Text(
-                                      flag,
-                                      style: const TextStyle(fontSize: 20),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(country),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
-                            onChanged: (value) {
-                              setModalState(() {
-                                tempCountry = value;
-                                tempCity = null;
-                              });
-                            },
-                          ),
-                        ),
+        builder: (context, setModalState) => GestureDetector(
+          onTap: () {
+            FocusScope.of(context).unfocus();
+          },
+          child: DraggableScrollableSheet(
+            initialChildSize: 0.9,
+            minChildSize: 0.5,
+            maxChildSize: 0.95,
+            builder: (_, controller) => Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 20),
+                  _buildModalHeader(context, "국가 설정"),
+                  const SizedBox(height: 20),
+                  const Text(
+                    "국가 및 도시 선택",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                  const SizedBox(height: 16),
+                  // 검색창 추가
+                  TextField(
+                    controller: searchController,
+                    decoration: InputDecoration(
+                      hintText: '국가 또는 도시 검색',
+                      prefixIcon: const Icon(Icons.search, color: Color(0xFF4CA1AF)),
+                      suffixIcon: searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                searchController.clear();
+                                setModalState(() {
+                                  searchQuery = '';
+                                });
+                              },
+                            )
+                          : null,
+                      filled: true,
+                      fillColor: Colors.grey[100],
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
                       ),
-                      const SizedBox(height: 16),
-                      // 도시 선택 드롭다운
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        decoration: BoxDecoration(
-                          color: tempCountry == null
-                              ? Colors.grey.shade200
-                              : Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey.shade300),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            isExpanded: true,
-                            hint: const Text("도시 선택"),
-                            value: tempCity,
-                            items: tempCountry != null
-                                ? _countriesAndCities[tempCountry]!.map((city) {
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFF4CA1AF), width: 2),
+                      ),
+                    ),
+                    onChanged: (value) {
+                      setModalState(() {
+                        searchQuery = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  // 스크롤 가능한 콘텐츠
+                  Expanded(
+                    child: SingleChildScrollView(
+                      controller: controller,
+                      child: Column(
+                        children: [
+                          // 검색 결과 또는 드롭다운
+                          if (searchQuery.isEmpty) ...[
+                            // 기존 드롭다운 방식
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.grey.shade300),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  isExpanded: true,
+                                  hint: const Text("국가 선택"),
+                                  value: tempCountry,
+                                  items: _countriesAndCities.keys.map((country) {
+                                    final flag = _countryFlags[country] ?? '🌍';
                                     return DropdownMenuItem(
-                                      value: city,
-                                      child: Text(city),
+                                      value: country,
+                                      child: Row(
+                                        children: [
+                                          Text(
+                                            flag,
+                                            style: const TextStyle(fontSize: 20),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(country),
+                                        ],
+                                      ),
                                     );
-                                  }).toList()
-                                : [],
-                            onChanged: tempCountry != null
-                                ? (value) {
+                                  }).toList(),
+                                  onChanged: (value) {
                                     setModalState(() {
-                                      tempCity = value;
+                                      tempCountry = value;
+                                      tempCity = null;
                                     });
+                                  },
+                                ),
+                              ),
+                            ),
+                          ] else ...[
+                            // 검색 결과 리스트
+                            Builder(
+                              builder: (context) {
+                                // 검색어로 필터링
+                                final filteredResults = <Map<String, String>>[];
+                                final lowerQuery = searchQuery.toLowerCase();
+                                
+                                for (var entry in _countriesAndCities.entries) {
+                                  final country = entry.key;
+                                  final cities = entry.value;
+                                  
+                                  // 국가명 검색
+                                  if (country.toLowerCase().contains(lowerQuery)) {
+                                    for (var city in cities) {
+                                      filteredResults.add({
+                                        'country': country,
+                                        'city': city,
+                                      });
+                                    }
+                                  } else {
+                                    // 도시명 검색
+                                    for (var city in cities) {
+                                      if (city.toLowerCase().contains(lowerQuery)) {
+                                        filteredResults.add({
+                                          'country': country,
+                                          'city': city,
+                                        });
+                                      }
+                                    }
                                   }
-                                : null,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      // 선택된 국가/도시 표시
-                      if (tempCountry != null && tempCity != null)
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.green.shade50,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.green.shade200),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.check_circle,
-                                color: Colors.green.shade700,
+                                }
+                                
+                                if (filteredResults.isEmpty) {
+                                  return Center(
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(40.0),
+                                      child: Column(
+                                        children: [
+                                          Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+                                          const SizedBox(height: 16),
+                                          Text(
+                                            '검색 결과가 없습니다',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              color: Colors.grey[600],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                }
+                                
+                                return Column(
+                                  children: filteredResults.map((result) {
+                                    final country = result['country']!;
+                                    final city = result['city']!;
+                                    final flag = _countryFlags[country] ?? '🌍';
+                                    
+                                    return ListTile(
+                                      leading: Text(flag, style: const TextStyle(fontSize: 24)),
+                                      title: Text(
+                                        city,
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      subtitle: Text(country),
+                                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                                      onTap: () {
+                                        setModalState(() {
+                                          tempCountry = country;
+                                          tempCity = city;
+                                          searchController.clear();
+                                          searchQuery = '';
+                                        });
+                                      },
+                                    );
+                                  }).toList(),
+                                );
+                              },
+                            ),
+                          ],
+                          const SizedBox(height: 16),
+                          // 도시 선택 드롭다운
+                          if (searchQuery.isEmpty) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              decoration: BoxDecoration(
+                                color: tempCountry == null
+                                    ? Colors.grey.shade200
+                                    : Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.grey.shade300),
                               ),
-                              const SizedBox(width: 12),
-                              Text(
-                                _countryFlags[tempCountry] ?? '🌍',
-                                style: const TextStyle(fontSize: 20),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  isExpanded: true,
+                                  hint: const Text("도시 선택"),
+                                  value: tempCity,
+                                  items: tempCountry != null
+                                      ? _countriesAndCities[tempCountry]!.map((city) {
+                                          return DropdownMenuItem(
+                                            value: city,
+                                            child: Text(city),
+                                          );
+                                        }).toList()
+                                      : [],
+                                  onChanged: tempCountry != null
+                                      ? (value) {
+                                          setModalState(() {
+                                            tempCity = value;
+                                          });
+                                        }
+                                      : null,
+                                ),
                               ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  "$tempCountry, $tempCity",
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                          // 선택된 국가/도시 표시
+                          if (tempCountry != null && tempCity != null)
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.green.shade200),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.check_circle,
                                     color: Colors.green.shade700,
                                   ),
-                                ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    _countryFlags[tempCountry] ?? '🌍',
+                                    style: const TextStyle(fontSize: 20),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      "$tempCountry, $tempCity",
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.green.shade700,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
+                            ),
+                          const SizedBox(height: 20),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // 선택 버튼
+                  Padding(
+                    padding: EdgeInsets.only(
+                      bottom: MediaQuery.of(context).padding.bottom + 20,
+                    ),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: (tempCountry != null && tempCity != null)
+                            ? () {
+                                final flag = _countryFlags[tempCountry] ?? '🌍';
+                                setState(() {
+                                  _selectedCountry =
+                                      "$flag $tempCountry, $tempCity";
+                                });
+                                Navigator.pop(context);
+                              }
+                            : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF4CA1AF),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          disabledBackgroundColor: Colors.grey.shade300,
+                        ),
+                        child: const Text(
+                          "이 지역으로 선택하기",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
                           ),
                         ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: (tempCountry != null && tempCity != null)
-                        ? () {
-                            final flag = _countryFlags[tempCountry] ?? '🌍';
-                            setState(() {
-                              _selectedCountry =
-                                  "$flag $tempCountry, $tempCity";
-                            });
-                            Navigator.pop(context);
-                          }
-                        : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4CA1AF),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      disabledBackgroundColor: Colors.grey.shade300,
-                    ),
-                    child: const Text(
-                      "이 지역으로 선택하기",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
