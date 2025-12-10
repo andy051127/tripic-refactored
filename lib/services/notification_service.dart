@@ -22,6 +22,51 @@ class NotificationService {
         return;
       }
 
+      // 사용자의 알림 설정 확인
+      final settingsDoc = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('settings')
+          .doc('notifications')
+          .get();
+
+      if (settingsDoc.exists) {
+        final settings = settingsDoc.data()!;
+        final pauseAll = settings['pauseAll'] ?? false;
+
+        // 모든 알림이 중지되어 있으면 알림 생성 안 함
+        if (pauseAll) {
+          print('알림 중지 상태: 알림 생성 건너뜀');
+          return;
+        }
+
+        // 타입별 알림 설정 확인
+        switch (type) {
+          case NotificationType.like:
+          case NotificationType.comment:
+            final postCommentAlert = settings['postCommentAlert'] ?? true;
+            if (!postCommentAlert) {
+              print('게시물/댓글 알림 꺼짐: 알림 생성 건너뜀');
+              return;
+            }
+            break;
+          case NotificationType.follow:
+            final followAlert = settings['followAlert'] ?? true;
+            if (!followAlert) {
+              print('팔로우 알림 꺼짐: 알림 생성 건너뜀');
+              return;
+            }
+            break;
+          case NotificationType.dm:
+            final messageAlert = settings['messageAlert'] ?? true;
+            if (!messageAlert) {
+              print('메시지 알림 꺼짐: 알림 생성 건너뜀');
+              return;
+            }
+            break;
+        }
+      }
+
       // 현재 사용자 정보 가져오기
       final userDoc = await _firestore.collection('users').doc(currentUser.uid).get();
       final userData = userDoc.data();
@@ -42,6 +87,7 @@ class NotificationService {
       );
 
       await _firestore.collection('notifications').add(notification.toFirestore());
+      print('알림 생성 완료: $type');
     } catch (e) {
       print('알림 생성 실패: $e');
     }

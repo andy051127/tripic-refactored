@@ -32,7 +32,7 @@ class InformationScreen extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(20),
                 image: const DecorationImage(
-                  image: AssetImage('assets/logo.png'), // 로고 이미지
+                  image: AssetImage('assets/tripicIcon.png'), // 로고 이미지
                   fit: BoxFit.cover,
                 ),
                 boxShadow: [
@@ -51,15 +51,15 @@ class InformationScreen extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             const Text(
-              "현재 버전 1.0.2",
+              "현재 버전 1.0.0ㄴㄴ",
               style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
             const SizedBox(height: 40),
 
             // 정보 리스트
             _buildInfoRow("개발사", "Tripic Corp."),
-            _buildInfoRow("업데이트 날짜", "2025. 11. 20"),
-            _buildInfoRow("문의", "support@tripic.com"),
+            _buildInfoRow("업데이트 날짜", "2025. 12. 10"),
+            _buildInfoRow("문의", "support-tripic.com"),
 
             const Spacer(),
             const Text(
