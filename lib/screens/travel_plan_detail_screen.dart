@@ -211,7 +211,15 @@ class TravelPlanDetailScreen extends StatelessWidget {
                   ],
                 ),
                 child: ElevatedButton(
-                  onPressed: () => _showShareOptions(context),
+                  onPressed: () {
+                    // 바로 DM 공유 화면으로 이동
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ShareTravelPlanScreen(plan: plan),
+                      ),
+                    );
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue,
                     foregroundColor: Colors.white,
@@ -308,118 +316,6 @@ class TravelPlanDetailScreen extends StatelessWidget {
             child: const Text("삭제", style: TextStyle(color: Colors.red)),
           ),
         ],
-      ),
-    );
-  }
-
-  // 공유 옵션 모달 표시
-  void _showShareOptions(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 20,
-          bottom: MediaQuery.of(context).padding.bottom + 20,
-        ),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // 제목
-            const Text(
-              '공유하기',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 20),
-            // DM으로 공유하기
-            _buildShareOption(
-              context,
-              icon: Icons.chat_bubble,
-              title: 'DM으로 공유하기',
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ShareTravelPlanScreen(plan: plan),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 12),
-            // 게시물에 올리기
-            _buildShareOption(
-              context,
-              icon: Icons.photo_library,
-              title: '게시물에 올리기',
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('게시물 작성 화면에서 여행 계획을 선택할 수 있습니다'),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 12),
-            // 커뮤니티에 올리기
-            _buildShareOption(
-              context,
-              icon: Icons.groups,
-              title: '커뮤니티에 올리기',
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('커뮤니티 작성 화면에서 여행 계획을 선택할 수 있습니다'),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildShareOption(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-        decoration: BoxDecoration(
-          color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: Colors.blue, size: 24),
-            const SizedBox(width: 16),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
