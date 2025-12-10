@@ -67,8 +67,10 @@ class _AdminInquiryManagementScreenState
             itemBuilder: (context, index) {
               final doc = docs[index];
               final data = doc.data() as Map<String, dynamic>;
-              final participants = List<String>.from(data['participants'] ?? []);
-              
+              final participants = List<String>.from(
+                data['participants'] ?? [],
+              );
+
               // 상대방 ID 찾기
               final otherUserId = participants.firstWhere(
                 (uid) => uid != currentUser.uid,
@@ -94,7 +96,7 @@ class _AdminInquiryManagementScreenState
                       userSnapshot.data!.data() as Map<String, dynamic>?;
                   final userName = userData?['userName'] ?? '알 수 없음';
                   final userProfile = userData?['profileImage'] ?? '';
-                  
+
                   final lastMessage = data['lastMessage'] ?? '';
                   final lastMessageTime =
                       (data['lastMessageTime'] as Timestamp?)?.toDate();

@@ -47,10 +47,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
             icon: Icon(Icons.report_problem),
             label: '신고 관리',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.chat),
-            label: '1:1 문의',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.chat), label: '1:1 문의'),
         ],
       ),
     );
