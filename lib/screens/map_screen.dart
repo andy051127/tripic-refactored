@@ -161,6 +161,7 @@ class _MapScreenState extends State<MapScreen> {
       final QuerySnapshot snapshot = await query.get();
 
       Set<Marker> markers = {};
+      List<Post> postsWithLocation = []; // 위치 정보가 있는 모든 게시물 저장
 
       for (var doc in snapshot.docs) {
         final data = doc.data() as Map<String, dynamic>;
@@ -170,16 +171,15 @@ class _MapScreenState extends State<MapScreen> {
           final post = Post.fromMap(data, doc.id);
 
           // 국가 필터링 적용
-          bool shouldShow = false;
+          bool shouldShow = true; // 기본적으로 모두 표시
           if (_selectedCountry != null) {
             // 국가가 선택되었을 때: 해당 국가의 게시물만 표시
             shouldShow = post.country == _selectedCountry;
-          } else {
-            // 국가가 선택되지 않았을 때: country가 null이거나 비어있는 게시물만 표시
-            shouldShow = post.country == null || post.country!.isEmpty;
           }
 
           if (shouldShow) {
+            postsWithLocation.add(post); // 리스트에 추가
+            
             markers.add(
               Marker(
                 markerId: MarkerId(post.id),
@@ -198,9 +198,19 @@ class _MapScreenState extends State<MapScreen> {
       if (mounted) {
         setState(() {
           _markers = markers;
+          _userPosts = postsWithLocation; // 모든 게시물 저장
+          _currentPostIndex = 0;
         });
 
         print('✅ 마커 로드 성공: ${markers.length}개의 마커 생성됨');
+        
+        // 디버그: 총 게시물 수와 위치 정보가 있는 게시물 수 출력
+        print('총 게시물 수: ${snapshot.docs.length}');
+        int postsWithLocationCount = snapshot.docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          return data['latitude'] != null && data['longitude'] != null;
+        }).length;
+        print('위치 정보가 있는 게시물 수: $postsWithLocationCount');
       }
     } catch (e) {
       print('❌ 게시물 마커 로드 실패: $e');
@@ -490,7 +500,9 @@ class _MapScreenState extends State<MapScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            "📍 $_searchedUserName님의 게시물 (${_currentPostIndex + 1}/${_userPosts.length})",
+            _searchedUserName != null
+                ? "📍 $_searchedUserName님의 게시물 (${_currentPostIndex + 1}/${_userPosts.length})"
+                : "📍 게시물 (${_currentPostIndex + 1}/${_userPosts.length})",
           ),
           duration: const Duration(seconds: 1),
         ),
@@ -523,7 +535,9 @@ class _MapScreenState extends State<MapScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            "📍 $_searchedUserName님의 게시물 (${_currentPostIndex + 1}/${_userPosts.length})",
+            _searchedUserName != null
+                ? "📍 $_searchedUserName님의 게시물 (${_currentPostIndex + 1}/${_userPosts.length})"
+                : "📍 게시물 (${_currentPostIndex + 1}/${_userPosts.length})",
           ),
           duration: const Duration(seconds: 1),
         ),
