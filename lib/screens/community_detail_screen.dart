@@ -60,6 +60,8 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
 
   // 댓글 상태
   final TextEditingController _commentController = TextEditingController();
+  String? _replyToCommentId; // 답글 달 댓글 ID
+  String? _replyToUserName; // 답글 달 사용자 이름
 
   // 팔로우 상태
   bool _isFollowing = false;
@@ -528,7 +530,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
     }
   }
 
-  // 댓글 추가 함수 (Firestore 저장)
+  // 댓글 추가 함수 (FirestoreService 사용)
   Future<void> _addComment() async {
     if (_commentController.text.isEmpty || widget.postId == null) return;
 
@@ -541,35 +543,13 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
     }
 
     try {
-      // 사용자 정보 가져오기
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser.uid)
-          .get();
-
-      final userName =
-          userDoc.data()?['userName'] ??
-          userDoc.data()?['username'] ??
-          userDoc.data()?['name'] ??
-          'Unknown';
-      final userProfileImage = userDoc.data()?['profileImage'] ?? '';
-
-      print('댓글 작성자 정보: userName=$userName, profileImage=$userProfileImage');
-
       final commentText = _commentController.text.trim();
 
-      // Firestore에 댓글 저장
-      await FirebaseFirestore.instance
-          .collection('posts')
-          .doc(widget.postId)
-          .collection('comments')
-          .add({
-            'uid': currentUser.uid,
-            'userName': userName,
-            'userProfileImage': userProfileImage,
-            'content': commentText,
-            'createdAt': FieldValue.serverTimestamp(),
-          });
+      await _firestoreService.addComment(
+        postId: widget.postId!,
+        content: commentText,
+        parentId: _replyToCommentId,
+      );
 
       // 활동 내역에 댓글 저장
       addActivity(
@@ -581,6 +561,10 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
       );
 
       _commentController.clear();
+      setState(() {
+        _replyToCommentId = null;
+        _replyToUserName = null;
+      });
       FocusScope.of(context).unfocus();
 
       if (mounted) {
@@ -1337,9 +1321,9 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                     );
                                   }
 
-                                  final comments = snapshot.data?.docs ?? [];
+                                  final allComments = snapshot.data?.docs ?? [];
 
-                                  if (comments.isEmpty) {
+                                  if (allComments.isEmpty) {
                                     return const Padding(
                                       padding: EdgeInsets.symmetric(
                                         vertical: 20,
@@ -1353,216 +1337,43 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                     );
                                   }
 
+                                  // 부모 댓글과 답글 분리
+                                  final parentComments = allComments.where((
+                                    doc,
+                                  ) {
+                                    final data =
+                                        doc.data() as Map<String, dynamic>;
+                                    return data['parentId'] == null;
+                                  }).toList();
+
                                   return ListView.builder(
                                     shrinkWrap: true,
                                     physics:
                                         const NeverScrollableScrollPhysics(),
-                                    itemCount: comments.length,
+                                    itemCount: parentComments.length,
                                     itemBuilder: (context, index) {
-                                      final commentDoc = comments[index];
-                                      final commentData =
-                                          commentDoc.data()
-                                              as Map<String, dynamic>;
-                                      final commentId = commentDoc.id;
-                                      final commentUid =
-                                          commentData['uid'] ?? '';
-                                      final userName =
-                                          commentData['userName'] ?? 'Unknown';
-                                      final content =
-                                          commentData['content'] ?? '';
-                                      final createdAt =
-                                          commentData['createdAt']
-                                              as Timestamp?;
-                                      final userProfileImage =
-                                          commentData['userProfileImage'] ?? '';
+                                      final parentDoc = parentComments[index];
+                                      final parentId = parentDoc.id;
 
-                                      print(
-                                        '댓글 표시: userName=$userName, profileImage=$userProfileImage, isEmpty=${userProfileImage.isEmpty}',
-                                      );
+                                      // 해당 부모 댓글의 답글 찾기
+                                      final replies = allComments.where((doc) {
+                                        final data =
+                                            doc.data() as Map<String, dynamic>;
+                                        return data['parentId'] == parentId;
+                                      }).toList();
 
-                                      // 시간 포맷
-                                      String timeAgo = '방금 전';
-                                      if (createdAt != null) {
-                                        final now = DateTime.now();
-                                        final date = createdAt.toDate();
-                                        final difference = now.difference(date);
-
-                                        if (difference.inDays > 0) {
-                                          timeAgo = '${difference.inDays}일 전';
-                                        } else if (difference.inHours > 0) {
-                                          timeAgo = '${difference.inHours}시간 전';
-                                        } else if (difference.inMinutes > 0) {
-                                          timeAgo =
-                                              '${difference.inMinutes}분 전';
-                                        }
-                                      }
-
-                                      return Padding(
-                                        padding: const EdgeInsets.only(
-                                          bottom: 16.0,
-                                        ),
-                                        child: Row(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            GestureDetector(
-                                              onTap: () {
-                                                final currentUser = FirebaseAuth
-                                                    .instance
-                                                    .currentUser;
-                                                if (currentUser?.uid ==
-                                                    commentUid) {
-                                                  // 내 프로필
-                                                  Navigator.push(
-                                                    context,
-                                                    MaterialPageRoute(
-                                                      builder: (context) =>
-                                                          const ProfileScreen(),
-                                                    ),
-                                                  );
-                                                } else {
-                                                  // 다른 사용자 프로필
-                                                  Navigator.push(
-                                                    context,
-                                                    MaterialPageRoute(
-                                                      builder: (context) =>
-                                                          OtherUserProfileScreen(
-                                                            userId: commentUid,
-                                                            userName: userName,
-                                                            profileImage:
-                                                                userProfileImage,
-                                                          ),
-                                                    ),
-                                                  );
-                                                }
-                                              },
-                                              child: CircleAvatar(
-                                                radius: 18,
-                                                backgroundColor:
-                                                    Colors.grey[300],
-                                                backgroundImage:
-                                                    userProfileImage.isNotEmpty
-                                                    ? NetworkImage(
-                                                            userProfileImage,
-                                                          )
-                                                          as ImageProvider
-                                                    : null,
-                                                onBackgroundImageError:
-                                                    userProfileImage.isNotEmpty
-                                                    ? (exception, stackTrace) {
-                                                        print(
-                                                          '프로필 이미지 로드 실패: $userProfileImage',
-                                                        );
-                                                      }
-                                                    : null,
-                                                child: userProfileImage.isEmpty
-                                                    ? const Icon(
-                                                        Icons.person,
-                                                        size: 20,
-                                                        color: Colors.white,
-                                                      )
-                                                    : null,
-                                              ),
+                                      return Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          _buildCommentItem(parentDoc, false),
+                                          ...replies.map(
+                                            (replyDoc) => _buildCommentItem(
+                                              replyDoc,
+                                              true,
                                             ),
-                                            const SizedBox(width: 10),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Row(
-                                                    children: [
-                                                      GestureDetector(
-                                                        onTap: () {
-                                                          final currentUser =
-                                                              FirebaseAuth
-                                                                  .instance
-                                                                  .currentUser;
-                                                          if (currentUser
-                                                                  ?.uid ==
-                                                              commentUid) {
-                                                            // 내 프로필
-                                                            Navigator.push(
-                                                              context,
-                                                              MaterialPageRoute(
-                                                                builder:
-                                                                    (context) =>
-                                                                        const ProfileScreen(),
-                                                              ),
-                                                            );
-                                                          } else {
-                                                            // 다른 사용자 프로필
-                                                            Navigator.push(
-                                                              context,
-                                                              MaterialPageRoute(
-                                                                builder: (context) => OtherUserProfileScreen(
-                                                                  userId:
-                                                                      commentUid,
-                                                                  userName:
-                                                                      userName,
-                                                                  profileImage:
-                                                                      userProfileImage,
-                                                                ),
-                                                              ),
-                                                            );
-                                                          }
-                                                        },
-                                                        child: Text(
-                                                          userName,
-                                                          style:
-                                                              const TextStyle(
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .bold,
-                                                                fontSize: 14,
-                                                              ),
-                                                        ),
-                                                      ),
-                                                      const SizedBox(width: 8),
-                                                      Text(
-                                                        timeAgo,
-                                                        style: const TextStyle(
-                                                          fontSize: 12,
-                                                          color: Colors.grey,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  const SizedBox(height: 4),
-                                                  Text(
-                                                    content,
-                                                    style: const TextStyle(
-                                                      fontSize: 14,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            // 본인 댓글이면 수정/삭제 버튼
-                                            if (FirebaseAuth
-                                                    .instance
-                                                    .currentUser
-                                                    ?.uid ==
-                                                commentUid)
-                                              IconButton(
-                                                icon: const Icon(
-                                                  Icons.more_vert,
-                                                  size: 18,
-                                                  color: Colors.grey,
-                                                ),
-                                                onPressed: () {
-                                                  _showCommentOptions(
-                                                    commentId,
-                                                    commentUid,
-                                                    content,
-                                                  );
-                                                },
-                                                padding: EdgeInsets.zero,
-                                                constraints:
-                                                    const BoxConstraints(),
-                                              ),
-                                          ],
-                                        ),
+                                          ),
+                                        ],
                                       );
                                     },
                                   );
@@ -1600,47 +1411,85 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
               color: Colors.white,
               border: Border(top: BorderSide(color: Colors.grey[200]!)),
             ),
-            child: Row(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                CircleAvatar(
-                  radius: 16,
-                  backgroundColor: Colors.grey,
-                  backgroundImage: _currentUserProfileImage.isNotEmpty
-                      ? NetworkImage(_currentUserProfileImage)
-                      : null,
-                  child: _currentUserProfileImage.isEmpty
-                      ? const Icon(Icons.person, size: 20, color: Colors.white)
-                      : null,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(20),
+                if (_replyToCommentId != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8.0, left: 42),
+                    child: Row(
+                      children: [
+                        Text(
+                          "$_replyToUserName님에게 답글 작성 중...",
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 12,
+                          ),
+                        ),
+                        const Spacer(),
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _replyToCommentId = null;
+                              _replyToUserName = null;
+                            });
+                          },
+                          child: const Icon(
+                            Icons.close,
+                            size: 16,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
                     ),
-                    child: TextField(
-                      controller: _commentController,
-                      decoration: const InputDecoration(
-                        hintText: "댓글 달기...",
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(vertical: 10),
+                  ),
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 16,
+                      backgroundColor: Colors.grey,
+                      backgroundImage: _currentUserProfileImage.isNotEmpty
+                          ? NetworkImage(_currentUserProfileImage)
+                          : null,
+                      child: _currentUserProfileImage.isEmpty
+                          ? const Icon(
+                              Icons.person,
+                              size: 20,
+                              color: Colors.white,
+                            )
+                          : null,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: TextField(
+                          controller: _commentController,
+                          decoration: const InputDecoration(
+                            hintText: "댓글 달기...",
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(vertical: 10),
+                          ),
+                          onSubmitted: (_) => _addComment(),
+                        ),
                       ),
-                      onSubmitted: (_) => _addComment(),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                TextButton(
-                  onPressed: _addComment,
-                  child: const Text(
-                    "게시",
-                    style: TextStyle(
-                      color: Colors.blue,
-                      fontWeight: FontWeight.bold,
+                    const SizedBox(width: 8),
+                    TextButton(
+                      onPressed: _addComment,
+                      child: const Text(
+                        "게시",
+                        style: TextStyle(
+                          color: Colors.blue,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),
@@ -1705,6 +1554,167 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
         ).showSnackBar(SnackBar(content: Text("신고 중 오류가 발생했습니다: $e")));
       }
     }
+  }
+
+  Widget _buildCommentItem(QueryDocumentSnapshot commentDoc, bool isReply) {
+    final commentData = commentDoc.data() as Map<String, dynamic>;
+    final commentId = commentDoc.id;
+    final commentUid = commentData['uid'] ?? '';
+    final userName = commentData['userName'] ?? 'Unknown';
+    final content = commentData['content'] ?? '';
+    final createdAt = commentData['createdAt'] as Timestamp?;
+    final userProfileImage = commentData['userProfileImage'] ?? '';
+    final likes = List<String>.from(commentData['likes'] ?? []);
+    final isLiked = likes.contains(FirebaseAuth.instance.currentUser?.uid);
+
+    // 시간 포맷
+    String timeAgo = '방금 전';
+    if (createdAt != null) {
+      final now = DateTime.now();
+      final date = createdAt.toDate();
+      final difference = now.difference(date);
+
+      if (difference.inDays > 0) {
+        timeAgo = '${difference.inDays}일 전';
+      } else if (difference.inHours > 0) {
+        timeAgo = '${difference.inHours}시간 전';
+      } else if (difference.inMinutes > 0) {
+        timeAgo = '${difference.inMinutes}분 전';
+      }
+    }
+
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: 16.0,
+        left: isReply ? 40.0 : 0, // 답글 들여쓰기
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          GestureDetector(
+            onTap: () {
+              final currentUser = FirebaseAuth.instance.currentUser;
+              if (currentUser?.uid == commentUid) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ProfileScreen(),
+                  ),
+                );
+              } else {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => OtherUserProfileScreen(
+                      userId: commentUid,
+                      userName: userName,
+                      profileImage: userProfileImage,
+                    ),
+                  ),
+                );
+              }
+            },
+            child: CircleAvatar(
+              radius: 18,
+              backgroundColor: Colors.grey[300],
+              backgroundImage: userProfileImage.isNotEmpty
+                  ? NetworkImage(userProfileImage)
+                  : null,
+              child: userProfileImage.isEmpty
+                  ? const Icon(Icons.person, size: 20, color: Colors.white)
+                  : null,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      userName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      timeAgo,
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(content, style: const TextStyle(fontSize: 14)),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    // 좋아요 버튼
+                    GestureDetector(
+                      onTap: () {
+                        _firestoreService.toggleCommentLike(
+                          widget.postId!,
+                          commentId,
+                        );
+                      },
+                      child: Row(
+                        children: [
+                          Icon(
+                            isLiked ? Icons.favorite : Icons.favorite_border,
+                            size: 16,
+                            color: isLiked ? Colors.red : Colors.grey,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            likes.length.toString(),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // 답글 달기 버튼
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _replyToCommentId = isReply
+                              ? commentData['parentId']
+                              : commentId;
+                          _replyToUserName = userName;
+                        });
+                      },
+                      child: const Text(
+                        "답글 달기",
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          // 본인 댓글이면 수정/삭제 버튼
+          if (FirebaseAuth.instance.currentUser?.uid == commentUid)
+            IconButton(
+              icon: const Icon(Icons.more_vert, size: 18, color: Colors.grey),
+              onPressed: () {
+                _showCommentOptions(commentId, commentUid, content);
+              },
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+        ],
+      ),
+    );
   }
 }
 

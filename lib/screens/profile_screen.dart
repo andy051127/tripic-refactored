@@ -210,11 +210,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final data = doc.data();
         final country = data['country'] as String?;
         final category = data['category'] as String?;
-        
+
         // 커뮤니티 게시물 제외하고 국가 정보가 있는 경우만 추가
-        if (country != null && 
-            country.isNotEmpty && 
-            category != 'general' && 
+        if (country != null &&
+            country.isNotEmpty &&
+            category != 'general' &&
             category != 'companion') {
           countries.add(country);
         }
@@ -372,6 +372,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
               "로그아웃",
               style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditBioDialog(BuildContext context) {
+    final TextEditingController bioController = TextEditingController(
+      text: globalUserBio.value,
+    );
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("자기소개 수정"),
+        content: TextField(
+          controller: bioController,
+          decoration: const InputDecoration(
+            hintText: "자기소개를 입력하세요",
+            border: OutlineInputBorder(),
+          ),
+          maxLines: 3,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("취소"),
+          ),
+          TextButton(
+            onPressed: () async {
+              final newBio = bioController.text.trim();
+              // 빈 문자열도 허용 (삭제 가능)
+              try {
+                final user = FirebaseAuth.instance.currentUser;
+                if (user != null) {
+                  await FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(user.uid)
+                      .update({'bio': newBio});
+
+                  globalUserBio.value = newBio;
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("자기소개가 수정되었습니다")),
+                    );
+                  }
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text("수정 실패: $e")));
+                }
+              }
+            },
+            child: const Text("저장"),
           ),
         ],
       ),
@@ -613,8 +670,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           ValueListenableBuilder<String>(
             valueListenable: globalUserBio,
-            builder: (context, bio, _) =>
-                Text(bio, style: const TextStyle(fontSize: 14)),
+            builder: (context, bio, _) => GestureDetector(
+              onTap: () => _showEditBioDialog(context),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      bio.isEmpty ? "자기소개를 입력해주세요" : bio,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: bio.isEmpty ? Colors.grey : Colors.black,
+                      ),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.edit, size: 14, color: Colors.grey),
+                ],
+              ),
+            ),
           ),
           const SizedBox(height: 12),
           // 국기 필터 버튼
@@ -667,9 +743,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
-                              color: isSelected
-                                  ? Colors.white
-                                  : Colors.black87,
+                              color: isSelected ? Colors.white : Colors.black87,
                             ),
                           ),
                         ],
