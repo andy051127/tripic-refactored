@@ -6,7 +6,7 @@ import '../models/post_model.dart';
 import '../models/notification_model.dart';
 import '../services/firestore_service.dart';
 import '../services/notification_service.dart';
-import 'travel_record_map_screen.dart';
+import 'map_screen.dart';
 import 'other_user_posts_detail_screen.dart';
 import 'chat_detail_screen.dart';
 import 'follow_list_screen.dart';
@@ -786,11 +786,11 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
 
     return GestureDetector(
       onTap: () {
-        // 전체 화면 지도로 이동 (해당 사용자의 여행 동선과 사진 위치 표시)
+        // 전체 화면 지도로 이동 (해당 사용자의 게시물 위치 표시)
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => TravelRecordMapScreen(userId: _targetUserId),
+            builder: (context) => MapScreen(userId: _targetUserId),
           ),
         );
       },
