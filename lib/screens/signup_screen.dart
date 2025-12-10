@@ -16,6 +16,8 @@ class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _passwordConfirmController =
+      TextEditingController();
 
   final AuthService _authService = AuthService();
   bool _isLoading = false;
@@ -25,6 +27,8 @@ class _SignupScreenState extends State<SignupScreen> {
   String _emailMessage = '';
   ValidationState _passwordValidation = ValidationState.none;
   String _passwordMessage = '';
+  ValidationState _passwordConfirmValidation = ValidationState.none;
+  String _passwordConfirmMessage = '';
   ValidationState _nameValidation = ValidationState.none;
   String _nameMessage = '';
 
@@ -35,6 +39,7 @@ class _SignupScreenState extends State<SignupScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _passwordConfirmController.dispose();
     _nameController.dispose();
     _emailDebounce?.cancel();
     super.dispose();
@@ -43,7 +48,7 @@ class _SignupScreenState extends State<SignupScreen> {
   // 이메일 중복 체크 및 형식 검증
   void _checkEmailAvailability(String email) {
     if (_emailDebounce?.isActive ?? false) _emailDebounce!.cancel();
-    
+
     if (email.isEmpty) {
       setState(() {
         _emailValidation = ValidationState.none;
@@ -100,6 +105,33 @@ class _SignupScreenState extends State<SignupScreen> {
         _passwordMessage = '';
       });
     }
+    // 비밀번호가 변경되면 확인 필드도 다시 검사
+    if (_passwordConfirmController.text.isNotEmpty) {
+      _checkPasswordConfirm(_passwordConfirmController.text);
+    }
+  }
+
+  // 비밀번호 확인 검증
+  void _checkPasswordConfirm(String passwordConfirm) {
+    if (passwordConfirm.isEmpty) {
+      setState(() {
+        _passwordConfirmValidation = ValidationState.none;
+        _passwordConfirmMessage = '';
+      });
+      return;
+    }
+
+    if (passwordConfirm != _passwordController.text) {
+      setState(() {
+        _passwordConfirmValidation = ValidationState.error;
+        _passwordConfirmMessage = '비밀번호가 일치하지 않습니다';
+      });
+    } else {
+      setState(() {
+        _passwordConfirmValidation = ValidationState.success;
+        _passwordConfirmMessage = '비밀번호가 일치합니다';
+      });
+    }
   }
 
   // 이름 검증
@@ -122,26 +154,35 @@ class _SignupScreenState extends State<SignupScreen> {
     // 유효성 검사
     if (_emailController.text.isEmpty ||
         _nameController.text.isEmpty ||
-        _passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("모든 항목을 입력해주세요.")),
-      );
+        _passwordController.text.isEmpty ||
+        _passwordConfirmController.text.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("모든 항목을 입력해주세요.")));
       return;
     }
 
     // 이메일 중복 체크 확인
     if (_emailValidation != ValidationState.success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("이메일을 확인해주세요.")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("이메일을 확인해주세요.")));
       return;
     }
 
     // 비밀번호 길이 검증
     if (_passwordValidation != ValidationState.success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("비밀번호를 6자리 이상 입력해주세요.")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("비밀번호를 6자리 이상 입력해주세요.")));
+      return;
+    }
+
+    // 비밀번호 확인 검증
+    if (_passwordConfirmValidation != ValidationState.success) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("비밀번호가 일치하지 않습니다.")));
       return;
     }
 
@@ -162,16 +203,15 @@ class _SignupScreenState extends State<SignupScreen> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => ProfileCreationScreen(
-            realName: _nameController.text.trim(),
-          ),
+          builder: (context) =>
+              ProfileCreationScreen(realName: _nameController.text.trim()),
         ),
       );
     } else {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("오류: $error")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("오류: $error")));
     }
   }
 
@@ -216,12 +256,43 @@ class _SignupScreenState extends State<SignupScreen> {
               ),
               const SizedBox(height: 30),
               // 1. 이메일 주소
-              CustomTextField(
-                hintText: "이메일 주소",
-                controller: _emailController,
-                validationState: _emailValidation,
-                validationMessage: _emailMessage,
-                onChanged: _checkEmailAvailability,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: CustomTextField(
+                      hintText: "이메일 주소",
+                      controller: _emailController,
+                      validationState: _emailValidation,
+                      validationMessage: _emailMessage,
+                      onChanged: _checkEmailAvailability,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Padding(
+                    padding: const EdgeInsets.only(
+                      top: 8.0,
+                    ), // 텍스트 필드 높이와 맞추기 위해 조정
+                    child: SizedBox(
+                      height: 48, // CustomTextField의 대략적인 높이
+                      child: ElevatedButton(
+                        onPressed: () {
+                          // 인증하기 기능 구현 (현재는 비워둠)
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text(
+                          "인증하기",
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
               // 2. 이름
               CustomTextField(
@@ -239,6 +310,15 @@ class _SignupScreenState extends State<SignupScreen> {
                 validationState: _passwordValidation,
                 validationMessage: _passwordMessage,
                 onChanged: _checkPasswordStrength,
+              ),
+              // 4. 비밀번호 확인
+              CustomTextField(
+                hintText: "비밀번호 확인",
+                isPassword: true,
+                controller: _passwordConfirmController,
+                validationState: _passwordConfirmValidation,
+                validationMessage: _passwordConfirmMessage,
+                onChanged: _checkPasswordConfirm,
               ),
               const SizedBox(height: 20),
               _isLoading

@@ -99,17 +99,36 @@ class AuthService {
     }
   }
 
-  // 3. 로그아웃
+  // 3. 비밀번호 재설정 이메일 발송
+  Future<String?> sendPasswordResetEmail(String email) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+      return null; // 성공
+    } on FirebaseAuthException catch (e) {
+      switch (e.code) {
+        case 'user-not-found':
+          return '가입되지 않은 이메일입니다';
+        case 'invalid-email':
+          return '유효하지 않은 이메일 형식입니다';
+        default:
+          return e.message ?? '이메일 발송에 실패했습니다';
+      }
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
+  // 4. 로그아웃
   Future<void> signOut() async {
     await _auth.signOut();
   }
 
-  // 4. 현재 로그인된 사용자 확인
+  // 5. 현재 사용자 가져오기
   User? getCurrentUser() {
     return _auth.currentUser;
   }
 
-  // 5. 이메일 중복 체크
+  // 6. 이메일 중복 체크
   Future<bool> isEmailAvailable(String email) async {
     try {
       // Firestore에서 이메일 확인
@@ -118,13 +137,13 @@ class AuthService {
           .where('email', isEqualTo: email)
           .limit(1)
           .get();
-      return querySnapshot.docs.isEmpty; // 비어있으면 사용 가능
+      return querySnapshot.docs.isEmpty;
     } catch (e) {
-      return false; // 에러 발생 시 사용 불가로 처리
+      return false;
     }
   }
 
-  // 6. 닉네임 중복 체크
+  // 7. 닉네임 중복 체크
   Future<bool> isNicknameAvailable(String nickname) async {
     try {
       final querySnapshot = await _firestore

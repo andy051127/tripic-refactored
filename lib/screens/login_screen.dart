@@ -5,6 +5,7 @@ import '../widgets/gradient_button.dart';
 import '../services/auth_service.dart'; // 인증 서비스 import
 import 'signup_screen.dart';
 import 'home_screen.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -49,7 +50,7 @@ class _LoginScreenState extends State<LoginScreen> {
       // 로그인 성공: "로그인 상태 유지" 체크박스 상태를 SharedPreferences에 저장
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('keepLoggedIn', _isChecked);
-      
+
       // 성공: 홈 화면으로 이동 (뒤로가기 불가하도록 pushReplacement 사용)
       if (!mounted) return;
       Navigator.pushReplacement(
@@ -63,6 +64,18 @@ class _LoginScreenState extends State<LoginScreen> {
         context,
       ).showSnackBar(SnackBar(content: Text(error)));
     }
+  }
+
+  void _handleGoogleLogin() async {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text("구글 로그인은 준비 중입니다.")));
+  }
+
+  void _handleAppleLogin() async {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text("애플 로그인은 준비 중입니다.")));
   }
 
   @override
@@ -116,10 +129,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   TextButton(
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("해당 기능은 아직 준비 되지 않았습니다"),
-                          duration: Duration(seconds: 2),
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ForgotPasswordScreen(),
                         ),
                       );
                     },
@@ -172,7 +185,135 @@ class _LoginScreenState extends State<LoginScreen> {
                 ],
               ),
               const SizedBox(height: 20),
+
+              // SNS 로그인 구분선
+              const Row(
+                children: [
+                  Expanded(child: Divider(color: Colors.grey, thickness: 0.5)),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      "SNS 계정으로 로그인",
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                  ),
+                  Expanded(child: Divider(color: Colors.grey, thickness: 0.5)),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // 소셜 로그인 버튼들
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildSocialButton(
+                    onTap: _handleGoogleLogin,
+                    iconPath: 'assets/icons/google.png',
+                    backgroundColor: Colors.white,
+                    borderColor: Colors.grey[300],
+                    padding: 12,
+                  ),
+                  const SizedBox(width: 16),
+                  _buildSocialButton(
+                    onTap: _handleAppleLogin,
+                    iconPath: 'assets/icons/apple.png',
+                    backgroundColor: Colors.black,
+                    iconColor: Colors.white,
+                    padding: 12,
+                  ),
+                  const SizedBox(width: 16),
+                  _buildSocialButton(
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("카카오 로그인은 준비 중입니다.")),
+                      );
+                    },
+                    iconPath: 'assets/icons/kakao.png',
+                    backgroundColor: const Color(0xFFFEE500),
+                    padding: 4, // 이미지 크기 조금 줄임
+                  ),
+                  const SizedBox(width: 16),
+                  _buildSocialButton(
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("네이버 로그인은 준비 중입니다.")),
+                      );
+                    },
+                    iconPath: 'assets/icons/naver.png',
+                    backgroundColor: const Color(0xFF03C75A),
+                    iconColor: Colors.white,
+                    padding: 14, // 이미지 크기 조금 줄임
+                  ),
+                ],
+              ),
+              const SizedBox(height: 40),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSocialButton({
+    required VoidCallback onTap,
+    required String iconPath,
+    required Color backgroundColor,
+    Color? borderColor,
+    Color? iconColor,
+    double padding = 12.0,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          shape: BoxShape.circle,
+          border: borderColor != null ? Border.all(color: borderColor) : null,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: ClipOval(
+          child: Padding(
+            padding: EdgeInsets.all(padding),
+            child: Image.asset(
+              iconPath,
+              color: iconColor,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) {
+                String text = '';
+                Color textColor = Colors.black;
+
+                if (iconPath.contains('google')) {
+                  text = 'G';
+                } else if (iconPath.contains('apple')) {
+                  text = 'A';
+                  textColor = Colors.white;
+                } else if (iconPath.contains('kakao')) {
+                  text = 'K';
+                } else if (iconPath.contains('naver')) {
+                  text = 'N';
+                  textColor = Colors.white;
+                }
+
+                return Center(
+                  child: Text(
+                    text,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                      color: textColor,
+                    ),
+                  ),
+                );
+              },
+            ),
           ),
         ),
       ),

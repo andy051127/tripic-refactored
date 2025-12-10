@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart'; // 날짜 로케일 데이터
 import 'package:firebase_core/firebase_core.dart'; // [추가] 파이어베이스 코어
 import 'package:firebase_auth/firebase_auth.dart'; // [추가] 로그인 관리용
+import 'package:shared_preferences/shared_preferences.dart'; // [추가] 온보딩 확인용
 import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart'; // [추가] 로그인 화면
 import 'screens/home_screen.dart'; // [추가] 홈 화면
+import 'screens/onboarding_screen.dart'; // [추가] 온보딩 화면
 import 'services/travel_tracker_service.dart'; // [추가] 여행 추적 서비스
 
 void main() async {
@@ -14,15 +16,21 @@ void main() async {
   await Firebase.initializeApp();
 
   await initializeDateFormatting(); // 날짜 데이터 초기화
-  
+
   // [추가] 이전 여행 기록 세션 복구
   await TravelTrackerService().restoreTrackingSession();
 
-  runApp(const TripicApp());
+  // [추가] 온보딩 확인 여부 체크
+  final prefs = await SharedPreferences.getInstance();
+  final bool hasSeenOnboarding = prefs.getBool('seenOnboarding') ?? false;
+
+  runApp(TripicApp(hasSeenOnboarding: hasSeenOnboarding));
 }
 
 class TripicApp extends StatelessWidget {
-  const TripicApp({super.key});
+  final bool hasSeenOnboarding;
+
+  const TripicApp({super.key, required this.hasSeenOnboarding});
 
   @override
   Widget build(BuildContext context) {
@@ -59,7 +67,11 @@ class TripicApp extends StatelessWidget {
             return const HomeScreen();
           }
 
-          // 3. 로그인 정보가 없음 (로그아웃됨) -> 로그인 화면으로
+          // 3. 로그인 정보가 없음 (로그아웃됨) -> 온보딩 확인 후 로그인 화면으로
+          if (!hasSeenOnboarding) {
+            return const OnboardingScreen();
+          }
+
           return const LoginScreen();
         },
       ),

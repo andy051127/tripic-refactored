@@ -13,7 +13,7 @@ import 'package:my_app/main.dart'; // TripicApp이 정의된 파일 import
 void main() {
   testWidgets('App smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const TripicApp());
+    await tester.pumpWidget(const TripicApp(hasSeenOnboarding: false));
 
     // 스플래시 화면이 잘 뜨는지 확인 (Tripic 텍스트가 있는지)
     expect(find.text('Tripic'), findsWidgets); // Tripic 텍스트가 하나 이상 있는지 확인

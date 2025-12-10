@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/post_model.dart'; // 전역 변수 업데이트용
@@ -6,7 +7,7 @@ import 'home_screen.dart';
 
 class ProfileCreationScreen extends StatefulWidget {
   final String realName; // 회원가입 시 입력한 이름
-  
+
   const ProfileCreationScreen({super.key, required this.realName});
 
   @override
@@ -35,7 +36,9 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
   // 고유 ID 유효성 검사 (영어와 특수기호만 허용)
   void _validateId(String value) {
     // 영어 대소문자, 숫자, 특수기호만 허용 (한글, 일본어, 중국어 등 제외)
-    final validPattern = RegExp(r'^[a-zA-Z0-9!@#$%^&*()_+=\[\]{};:,.<>?/\\|`~-]*$');
+    final validPattern = RegExp(
+      r'^[a-zA-Z0-9!@#$%^&*()_+=\[\]{};:,.<>?/\\|`~-]*$',
+    );
     setState(() {
       _isValidId = validPattern.hasMatch(value);
     });
@@ -62,21 +65,18 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         // 1. Firestore에 사용자 정보 저장 (set with merge를 사용하여 기존 데이터 유지)
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .set({
-              'uid': user.uid,
-              'email': user.email ?? '',
-              'realName': widget.realName,
-              'userName': _nameController.text,
-              'phoneNumber': _phoneController.text,
-              'birthDate': _birthController.text, // 가입일 또는 생년월일
-              'bio': _bioController.text,
-              'profileImage': '',
-              'isProfileSetup': true, // 설정 완료 표시
-              'createdAt': FieldValue.serverTimestamp(),
-            }, SetOptions(merge: true));
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'uid': user.uid,
+          'email': user.email ?? '',
+          'realName': widget.realName,
+          'userName': _nameController.text,
+          'phoneNumber': _phoneController.text,
+          'birthDate': _birthController.text, // 가입일 또는 생년월일
+          'bio': _bioController.text,
+          'profileImage': '',
+          'isProfileSetup': true, // 설정 완료 표시
+          'createdAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
 
         // 2. 앱 내 전역 변수 업데이트 (즉시 반영)
         globalUserRealName.value = widget.realName;
@@ -159,7 +159,9 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
-                        color: _isValidId ? const Color(0xFF4CA1AF) : Colors.red,
+                        color: _isValidId
+                            ? const Color(0xFF4CA1AF)
+                            : Colors.red,
                         width: 2,
                       ),
                     ),
@@ -170,10 +172,7 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
                     padding: EdgeInsets.only(top: 8, left: 4),
                     child: Text(
                       "영어와 특수기호만 사용 가능합니다",
-                      style: TextStyle(
-                        color: Colors.red,
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: Colors.red, fontSize: 12),
                     ),
                   ),
               ],
@@ -184,9 +183,16 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
               _phoneController,
               "010-1234-5678",
               inputType: TextInputType.phone,
+              inputFormatters: [PhoneNumberFormatter()],
             ),
             const SizedBox(height: 20),
-            _buildTextField("생년월일 (또는 가입일)", _birthController, "2000.01.01"),
+            _buildTextField(
+              "생년월일 (또는 가입일)",
+              _birthController,
+              "2000.01.01",
+              inputType: TextInputType.number,
+              inputFormatters: [DateFormatter()],
+            ),
             const SizedBox(height: 20),
             _buildTextField("자기소개", _bioController, "나를 표현하는 한마디", maxLines: 3),
 
@@ -227,6 +233,7 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
     String hint, {
     TextInputType inputType = TextInputType.text,
     int maxLines = 1,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -240,6 +247,7 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
           controller: controller,
           keyboardType: inputType,
           maxLines: maxLines,
+          inputFormatters: inputFormatters,
           decoration: InputDecoration(
             hintText: hint,
             filled: true,
@@ -251,6 +259,64 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class PhoneNumberFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text.replaceAll(RegExp(r'\D'), '');
+    final buffer = StringBuffer();
+    for (int i = 0; i < text.length; i++) {
+      buffer.write(text[i]);
+      if (i == 2 && text.length > 3) {
+        buffer.write('-');
+      } else if (i == 6 && text.length > 7) {
+        buffer.write('-');
+      }
+    }
+
+    final formatted = buffer.toString();
+    if (formatted.length > 13) {
+      return oldValue;
+    }
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
+class DateFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text.replaceAll(RegExp(r'\D'), '');
+    final buffer = StringBuffer();
+    for (int i = 0; i < text.length; i++) {
+      buffer.write(text[i]);
+      if (i == 3 && text.length > 4) {
+        buffer.write('.');
+      } else if (i == 5 && text.length > 6) {
+        buffer.write('.');
+      }
+    }
+
+    final formatted = buffer.toString();
+    if (formatted.length > 10) {
+      return oldValue;
+    }
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 }

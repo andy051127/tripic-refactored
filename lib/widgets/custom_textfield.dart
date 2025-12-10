@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 enum ValidationState { none, success, error }
 
-class CustomTextField extends StatelessWidget {
+class CustomTextField extends StatefulWidget {
   final String hintText;
   final bool isPassword;
   final TextEditingController? controller;
@@ -20,8 +20,21 @@ class CustomTextField extends StatelessWidget {
     this.onChanged,
   });
 
+  @override
+  State<CustomTextField> createState() => _CustomTextFieldState();
+}
+
+class _CustomTextFieldState extends State<CustomTextField> {
+  late bool _obscureText;
+
+  @override
+  void initState() {
+    super.initState();
+    _obscureText = widget.isPassword;
+  }
+
   Color _getBorderColor() {
-    switch (validationState) {
+    switch (widget.validationState) {
       case ValidationState.success:
         return Colors.green;
       case ValidationState.error:
@@ -32,7 +45,7 @@ class CustomTextField extends StatelessWidget {
   }
 
   Color _getMessageColor() {
-    switch (validationState) {
+    switch (widget.validationState) {
       case ValidationState.success:
         return Colors.green;
       case ValidationState.error:
@@ -50,11 +63,11 @@ class CustomTextField extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           TextField(
-            controller: controller,
-            obscureText: isPassword,
-            onChanged: onChanged,
+            controller: widget.controller,
+            obscureText: _obscureText,
+            onChanged: widget.onChanged,
             decoration: InputDecoration(
-              hintText: hintText,
+              hintText: widget.hintText,
               hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
@@ -70,17 +83,28 @@ class CustomTextField extends StatelessWidget {
               ),
               filled: true,
               fillColor: Colors.white,
+              suffixIcon: widget.isPassword
+                  ? IconButton(
+                      icon: Icon(
+                        _obscureText ? Icons.visibility_off : Icons.visibility,
+                        color: Colors.grey,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscureText = !_obscureText;
+                        });
+                      },
+                    )
+                  : null,
             ),
           ),
-          if (validationMessage != null && validationMessage!.isNotEmpty)
+          if (widget.validationMessage != null &&
+              widget.validationMessage!.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 4, left: 4),
               child: Text(
-                validationMessage!,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: _getMessageColor(),
-                ),
+                widget.validationMessage!,
+                style: TextStyle(fontSize: 12, color: _getMessageColor()),
               ),
             ),
         ],
