@@ -881,8 +881,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => MapScreen(
-                userId: user.uid, // 현재 사용자의 게시물만 표시
+              builder: (context) => TravelRecordMapScreen(
+                userId: user.uid, // 현재 사용자의 여행 기록 표시
               ),
             ),
           );

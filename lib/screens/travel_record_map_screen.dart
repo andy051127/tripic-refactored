@@ -36,10 +36,18 @@ class _TravelRecordMapScreenState extends State<TravelRecordMapScreen> {
   @override
   void initState() {
     super.initState();
+    print('🚀 TravelRecordMapScreen initState 호출됨');
+    print('   - userId: ${widget.userId}');
+    print('   - travelRecord: ${widget.travelRecord?.id}');
+    
+    // 항상 실시간 업데이트 리스너 등록
+    _trackerService.addListener(_updateMap);
+    
     if (widget.userId != null) {
+      print('   → 사용자 여행 기록 로드 모드 (실시간 업데이트 활성화)');
       _loadUserTravelRecords();
     } else {
-      _trackerService.addListener(_updateMap);
+      print('   → 현재 추적 중인 기록 표시 모드');
     }
     _getCurrentLocation();
     _initializeMap();
@@ -149,9 +157,8 @@ class _TravelRecordMapScreenState extends State<TravelRecordMapScreen> {
 
   @override
   void dispose() {
-    if (widget.userId == null) {
-      _trackerService.removeListener(_updateMap);
-    }
+    // 항상 리스너 제거
+    _trackerService.removeListener(_updateMap);
     _mapController?.dispose();
     super.dispose();
   }
@@ -159,6 +166,18 @@ class _TravelRecordMapScreenState extends State<TravelRecordMapScreen> {
   void _updateMap() {
     if (mounted) {
       setState(() {
+        // userId 모드이고 현재 활성 기록이 있으면 즉시 반영
+        if (widget.userId != null && _trackerService.currentRecord != null) {
+          // 기존 리스트에서 활성 기록 찾아서 업데이트
+          final activeRecordId = _trackerService.currentRecord!.id;
+          final index = _userTravelRecords.indexWhere((r) => r.id == activeRecordId);
+          if (index != -1) {
+            _userTravelRecords[index] = _trackerService.currentRecord!;
+          } else {
+            // 새로운 기록이면 추가
+            _userTravelRecords.add(_trackerService.currentRecord!);
+          }
+        }
         _buildMapElements();
       });
     }
@@ -181,14 +200,14 @@ class _TravelRecordMapScreenState extends State<TravelRecordMapScreen> {
     final record = _currentRecord;
     if (record == null) return;
 
-    // 경로 선 생성 (부드럽게)
+    // 경로 선 생성 (부드럽고 두껍게)
     if (record.routePoints.isNotEmpty) {
       _polylines = {
         Polyline(
           polylineId: const PolylineId('travel_route'),
           points: record.routePoints.map((p) => p.latLng).toList(),
-          color: Colors.blue,
-          width: 4,
+          color: Colors.blue.withOpacity(0.8),
+          width: 8,
           geodesic: true,
           jointType: JointType.round,
           startCap: Cap.roundCap,
@@ -271,8 +290,8 @@ class _TravelRecordMapScreenState extends State<TravelRecordMapScreen> {
           Polyline(
             polylineId: PolylineId('route_$recordIndex'),
             points: points,
-            color: color,
-            width: 4,
+            color: color.withOpacity(0.8),
+            width: 8,
             geodesic: true,
             jointType: JointType.round,
             startCap: Cap.roundCap,

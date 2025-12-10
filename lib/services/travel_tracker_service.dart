@@ -259,8 +259,8 @@ class TravelTrackerService extends ChangeNotifier {
         position.longitude,
       );
       
-      // 7m 미만 이동시에는 기록하지 않음
-      if (distance < 7.0) {
+      // 3m 미만 이동시에는 기록하지 않음
+      if (distance < 3.0) {
         print('⏭️ 이동 거리 ${distance.toStringAsFixed(1)}m - 기록 생략');
         return;
       }
