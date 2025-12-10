@@ -150,36 +150,50 @@ class _MapScreenState extends State<MapScreen> {
   // Firestore에서 게시물 불러와서 마커 생성
   Future<void> _loadPostMarkers() async {
     try {
+      print('🗺️ 게시물 마커 로드 시작');
+      print('  userId 필터: ${widget.userId}');
+      
       // Firestore에서 위치 정보가 있는 게시물만 가져오기
       Query query = FirebaseFirestore.instance.collection('posts');
 
       // userId가 지정되어 있으면 해당 사용자의 게시물만 필터링
       if (widget.userId != null) {
         query = query.where('uid', isEqualTo: widget.userId);
+        print('  ✅ uid 필터 적용됨');
       }
 
       final QuerySnapshot snapshot = await query.get();
+      print('  📊 Firestore에서 ${snapshot.docs.length}개 게시물 조회됨');
 
       Set<Marker> markers = {};
+      List<Post> postsWithLocation = []; // 위치 정보가 있는 모든 게시물 저장
 
       for (var doc in snapshot.docs) {
         final data = doc.data() as Map<String, dynamic>;
+        
+        // 디버그: 각 게시물의 위치 정보 확인
+        if (widget.userId != null) {
+          print('  게시물 ${doc.id}:');
+          print('    - userName: ${data['userName']}');
+          print('    - latitude: ${data['latitude']}');
+          print('    - longitude: ${data['longitude']}');
+          print('    - title: ${data['title']}');
+        }
 
         // latitude와 longitude가 모두 존재하는지 확인
         if (data['latitude'] != null && data['longitude'] != null) {
           final post = Post.fromMap(data, doc.id);
 
           // 국가 필터링 적용
-          bool shouldShow = false;
+          bool shouldShow = true; // 기본적으로 모두 표시
           if (_selectedCountry != null) {
             // 국가가 선택되었을 때: 해당 국가의 게시물만 표시
             shouldShow = post.country == _selectedCountry;
-          } else {
-            // 국가가 선택되지 않았을 때: country가 null이거나 비어있는 게시물만 표시
-            shouldShow = post.country == null || post.country!.isEmpty;
           }
 
           if (shouldShow) {
+            postsWithLocation.add(post); // 리스트에 추가
+            
             markers.add(
               Marker(
                 markerId: MarkerId(post.id),
@@ -198,9 +212,36 @@ class _MapScreenState extends State<MapScreen> {
       if (mounted) {
         setState(() {
           _markers = markers;
+          _userPosts = postsWithLocation; // 모든 게시물 저장
+          _currentPostIndex = 0;
         });
 
         print('✅ 마커 로드 성공: ${markers.length}개의 마커 생성됨');
+        
+        // 디버그: 총 게시물 수와 위치 정보가 있는 게시물 수 출력
+        print('총 게시물 수: ${snapshot.docs.length}');
+        print('위치 정보가 있는 게시물 수: ${postsWithLocation.length}');
+        
+        // userId 필터가 있고 게시물이 있으면 첫 번째 게시물로 카메라 이동
+        if (widget.userId != null && postsWithLocation.isNotEmpty) {
+          final firstPost = postsWithLocation[0];
+          print('📍 첫 번째 게시물로 카메라 이동: ${firstPost.latitude}, ${firstPost.longitude}');
+          
+          // 지도 컨트롤러가 준비될 때까지 기다렸다가 이동
+          Future.delayed(const Duration(milliseconds: 500), () async {
+            if (mounted && _controller.isCompleted) {
+              final controller = await _controller.future;
+              controller.animateCamera(
+                CameraUpdate.newCameraPosition(
+                  CameraPosition(
+                    target: LatLng(firstPost.latitude!, firstPost.longitude!),
+                    zoom: 15,
+                  ),
+                ),
+              );
+            }
+          });
+        }
       }
     } catch (e) {
       print('❌ 게시물 마커 로드 실패: $e');
@@ -490,7 +531,9 @@ class _MapScreenState extends State<MapScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            "📍 $_searchedUserName님의 게시물 (${_currentPostIndex + 1}/${_userPosts.length})",
+            _searchedUserName != null
+                ? "📍 $_searchedUserName님의 게시물 (${_currentPostIndex + 1}/${_userPosts.length})"
+                : "📍 게시물 (${_currentPostIndex + 1}/${_userPosts.length})",
           ),
           duration: const Duration(seconds: 1),
         ),
@@ -523,7 +566,9 @@ class _MapScreenState extends State<MapScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            "📍 $_searchedUserName님의 게시물 (${_currentPostIndex + 1}/${_userPosts.length})",
+            _searchedUserName != null
+                ? "📍 $_searchedUserName님의 게시물 (${_currentPostIndex + 1}/${_userPosts.length})"
+                : "📍 게시물 (${_currentPostIndex + 1}/${_userPosts.length})",
           ),
           duration: const Duration(seconds: 1),
         ),

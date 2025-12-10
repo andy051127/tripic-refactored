@@ -875,14 +875,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return GestureDetector(
       onTap: () {
-        // 여행 기록 지도로 이동 (현재 사용자의 모든 여행 기록 표시)
+        // 지도 화면으로 이동 (현재 사용자의 게시물만 표시)
         final user = FirebaseAuth.instance.currentUser;
         if (user != null) {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => TravelRecordMapScreen(
-                userId: user.uid, // 현재 사용자의 모든 여행 기록 표시
+              builder: (context) => MapScreen(
+                userId: user.uid, // 현재 사용자의 게시물만 표시
               ),
             ),
           );
