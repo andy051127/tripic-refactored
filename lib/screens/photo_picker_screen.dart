@@ -231,26 +231,37 @@ class _PhotoPickerScreenState extends State<PhotoPickerScreen> {
                     onPressed: _pickImages,
                     icon: const Icon(Icons.photo_library, color: Colors.black),
                     label: const Text(
-                      "갤러리에서 선택",
+                      "갤러리",
                       style: TextStyle(color: Colors.black),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.grey[200],
                       elevation: 0,
                       padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 10),
-                ElevatedButton(
-                  onPressed: _takePhoto,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.grey[200],
-                    elevation: 0,
-                    shape: const CircleBorder(),
-                    padding: const EdgeInsets.all(12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _takePhoto,
+                    icon: const Icon(Icons.camera_alt, color: Colors.black),
+                    label: const Text(
+                      "카메라",
+                      style: TextStyle(color: Colors.black),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey[200],
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
                   ),
-                  child: const Icon(Icons.camera_alt, color: Colors.black),
                 ),
               ],
             ),

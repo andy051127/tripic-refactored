@@ -44,17 +44,6 @@ class _TravelPlanScreenState extends State<TravelPlanScreen> {
         actions: [
           IconButton(
             icon: const Icon(
-              Icons.translate,
-              color: Colors.black,
-              size: 26,
-            ),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const TranslatorScreen()),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(
               Icons.add_circle_outline,
               color: Colors.black,
               size: 26,

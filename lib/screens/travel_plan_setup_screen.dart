@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart'; // [추가] 쿠퍼티노 피커 사용
 import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart';
 import '../models/travel_plan_model.dart';
@@ -1132,14 +1133,138 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 10),
-                _buildTextInputBox("체크인 날짜/시간", (v) => hCheckIn = v),
+                GestureDetector(
+                  onTap: () {
+                    DateTime initialDate = _startDate ?? DateTime.now();
+                    showCupertinoModalPopup(
+                      context: context,
+                      builder: (context) => Container(
+                        height: 280,
+                        color: Colors.white,
+                        child: Column(
+                          children: [
+                            Container(
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                              color: Colors.grey[100],
+                              child: CupertinoButton(
+                                padding: EdgeInsets.zero,
+                                minSize: 0,
+                                child: const Text("완료"),
+                                onPressed: () => Navigator.pop(context),
+                              ),
+                            ),
+                            Expanded(
+                              child: CupertinoDatePicker(
+                                mode: CupertinoDatePickerMode.dateAndTime,
+                                initialDateTime: initialDate,
+                                use24hFormat: true,
+                                onDateTimeChanged: (DateTime newDate) {
+                                  setModalState(() {
+                                    hCheckIn = DateFormat(
+                                      'MM.dd HH:mm',
+                                    ).format(newDate);
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 16,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      hCheckIn.isEmpty ? "체크인 시간 선택" : hCheckIn,
+                      style: TextStyle(
+                        color:
+                            hCheckIn.isEmpty ? Colors.grey[600] : Colors.black,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 20),
                 const Text(
                   "4. 체크아웃 (선택)",
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 10),
-                _buildTextInputBox("체크아웃 날짜/시간", (v) => hCheckOut = v),
+                GestureDetector(
+                  onTap: () {
+                    DateTime initialDate = _startDate ?? DateTime.now();
+                    showCupertinoModalPopup(
+                      context: context,
+                      builder: (context) => Container(
+                        height: 280,
+                        color: Colors.white,
+                        child: Column(
+                          children: [
+                            Container(
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                              color: Colors.grey[100],
+                              child: CupertinoButton(
+                                padding: EdgeInsets.zero,
+                                minSize: 0,
+                                child: const Text("완료"),
+                                onPressed: () => Navigator.pop(context),
+                              ),
+                            ),
+                            Expanded(
+                              child: CupertinoDatePicker(
+                                mode: CupertinoDatePickerMode.dateAndTime,
+                                initialDateTime: initialDate,
+                                use24hFormat: true,
+                                onDateTimeChanged: (DateTime newDate) {
+                                  setModalState(() {
+                                    hCheckOut = DateFormat(
+                                      'MM.dd HH:mm',
+                                    ).format(newDate);
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 16,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      hCheckOut.isEmpty ? "체크아웃 시간 선택" : hCheckOut,
+                      style: TextStyle(
+                        color:
+                            hCheckOut.isEmpty ? Colors.grey[600] : Colors.black,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 30),
                 const Text(
                   "숙소 추가하기",

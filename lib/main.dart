@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'; // [추가] 다국어 지원
 import 'package:intl/date_symbol_data_local.dart'; // 날짜 로케일 데이터
 import 'package:firebase_core/firebase_core.dart'; // [추가] 파이어베이스 코어
 import 'package:firebase_auth/firebase_auth.dart'; // [추가] 로그인 관리용
@@ -37,6 +38,15 @@ class TripicApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Tripic',
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('ko', 'KR'), // 한국어
+        Locale('en', 'US'), // 영어
+      ],
       theme: ThemeData(
         primarySwatch: Colors.blue,
         scaffoldBackgroundColor: Colors.white,
