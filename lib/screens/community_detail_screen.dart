@@ -53,6 +53,7 @@ class CommunityDetailScreen extends StatefulWidget {
 }
 
 class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
+  final FirestoreService _firestoreService = FirestoreService();
   // 좋아요 상태
   bool _isLiked = false;
   int _likeCount = 0;
@@ -62,7 +63,6 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
 
   // 팔로우 상태
   bool _isFollowing = false;
-  final FirestoreService _firestoreService = FirestoreService();
 
   // 저장 상태
   bool _isSaved = false;
@@ -827,9 +827,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                     isDestructive: true,
                     onTap: () {
                       Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("신고가 접수되었습니다.")),
-                      );
+                      _showReportDialog();
                     },
                   ),
                 ],
@@ -1378,7 +1376,9 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                       final userProfileImage =
                                           commentData['userProfileImage'] ?? '';
 
-                                      print('댓글 표시: userName=$userName, profileImage=$userProfileImage, isEmpty=${userProfileImage.isEmpty}');
+                                      print(
+                                        '댓글 표시: userName=$userName, profileImage=$userProfileImage, isEmpty=${userProfileImage.isEmpty}',
+                                      );
 
                                       // 시간 포맷
                                       String timeAgo = '방금 전';
@@ -1407,13 +1407,17 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                           children: [
                                             GestureDetector(
                                               onTap: () {
-                                                final currentUser = FirebaseAuth.instance.currentUser;
-                                                if (currentUser?.uid == commentUid) {
+                                                final currentUser = FirebaseAuth
+                                                    .instance
+                                                    .currentUser;
+                                                if (currentUser?.uid ==
+                                                    commentUid) {
                                                   // 내 프로필
                                                   Navigator.push(
                                                     context,
                                                     MaterialPageRoute(
-                                                      builder: (context) => const ProfileScreen(),
+                                                      builder: (context) =>
+                                                          const ProfileScreen(),
                                                     ),
                                                   );
                                                 } else {
@@ -1421,27 +1425,34 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                                   Navigator.push(
                                                     context,
                                                     MaterialPageRoute(
-                                                      builder: (context) => OtherUserProfileScreen(
-                                                        userId: commentUid,
-                                                        userName: userName,
-                                                        profileImage: userProfileImage,
-                                                      ),
+                                                      builder: (context) =>
+                                                          OtherUserProfileScreen(
+                                                            userId: commentUid,
+                                                            userName: userName,
+                                                            profileImage:
+                                                                userProfileImage,
+                                                          ),
                                                     ),
                                                   );
                                                 }
                                               },
                                               child: CircleAvatar(
                                                 radius: 18,
-                                                backgroundColor: Colors.grey[300],
+                                                backgroundColor:
+                                                    Colors.grey[300],
                                                 backgroundImage:
                                                     userProfileImage.isNotEmpty
                                                     ? NetworkImage(
-                                                        userProfileImage,
-                                                      ) as ImageProvider
+                                                            userProfileImage,
+                                                          )
+                                                          as ImageProvider
                                                     : null,
-                                                onBackgroundImageError: userProfileImage.isNotEmpty
+                                                onBackgroundImageError:
+                                                    userProfileImage.isNotEmpty
                                                     ? (exception, stackTrace) {
-                                                        print('프로필 이미지 로드 실패: $userProfileImage');
+                                                        print(
+                                                          '프로필 이미지 로드 실패: $userProfileImage',
+                                                        );
                                                       }
                                                     : null,
                                                 child: userProfileImage.isEmpty
@@ -1463,13 +1474,20 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                                     children: [
                                                       GestureDetector(
                                                         onTap: () {
-                                                          final currentUser = FirebaseAuth.instance.currentUser;
-                                                          if (currentUser?.uid == commentUid) {
+                                                          final currentUser =
+                                                              FirebaseAuth
+                                                                  .instance
+                                                                  .currentUser;
+                                                          if (currentUser
+                                                                  ?.uid ==
+                                                              commentUid) {
                                                             // 내 프로필
                                                             Navigator.push(
                                                               context,
                                                               MaterialPageRoute(
-                                                                builder: (context) => const ProfileScreen(),
+                                                                builder:
+                                                                    (context) =>
+                                                                        const ProfileScreen(),
                                                               ),
                                                             );
                                                           } else {
@@ -1478,9 +1496,12 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                                               context,
                                                               MaterialPageRoute(
                                                                 builder: (context) => OtherUserProfileScreen(
-                                                                  userId: commentUid,
-                                                                  userName: userName,
-                                                                  profileImage: userProfileImage,
+                                                                  userId:
+                                                                      commentUid,
+                                                                  userName:
+                                                                      userName,
+                                                                  profileImage:
+                                                                      userProfileImage,
                                                                 ),
                                                               ),
                                                             );
@@ -1488,11 +1509,13 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                                         },
                                                         child: Text(
                                                           userName,
-                                                          style: const TextStyle(
-                                                            fontWeight:
-                                                                FontWeight.bold,
-                                                            fontSize: 14,
-                                                          ),
+                                                          style:
+                                                              const TextStyle(
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                                fontSize: 14,
+                                                              ),
                                                         ),
                                                       ),
                                                       const SizedBox(width: 8),
@@ -1625,6 +1648,63 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
         ],
       ),
     );
+  }
+
+  void _showReportDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("신고 사유 선택"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildReportOption("스팸 또는 홍보성"),
+            _buildReportOption("부적절한 콘텐츠"),
+            _buildReportOption("욕설 또는 비방"),
+            _buildReportOption("기타"),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("취소"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReportOption(String reason) {
+    return ListTile(
+      title: Text(reason),
+      onTap: () {
+        Navigator.pop(context);
+        _submitReport(reason);
+      },
+    );
+  }
+
+  Future<void> _submitReport(String reason) async {
+    if (widget.postId == null) return;
+
+    try {
+      await _firestoreService.reportPost(
+        postId: widget.postId!,
+        reason: reason,
+        targetUserId: widget.postUid,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("신고가 접수되었습니다.")));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("신고 중 오류가 발생했습니다: $e")));
+      }
+    }
   }
 }
 

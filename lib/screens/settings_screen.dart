@@ -6,9 +6,35 @@ import 'activity_screen.dart';
 import 'notification_settings_screen.dart';
 import 'information_screen.dart';
 import 'help_screen.dart';
+import '../services/firestore_service.dart';
+import 'admin_main_screen.dart';
+import 'chat_detail_screen.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  bool _isAdmin = false;
+  final FirestoreService _firestoreService = FirestoreService();
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAdminRole();
+  }
+
+  Future<void> _checkAdminRole() async {
+    final role = await _firestoreService.getUserRole();
+    if (mounted) {
+      setState(() {
+        _isAdmin = role == 'admin';
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,6 +89,55 @@ class SettingsScreen extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 children: [
+                  if (_isAdmin)
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const AdminMainScreen(),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1A237E), // Dark Navy
+                          borderRadius: BorderRadius.circular(30),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF1A237E).withOpacity(0.3),
+                              spreadRadius: 1,
+                              blurRadius: 5,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: const ListTile(
+                          leading: Icon(
+                            Icons.admin_panel_settings,
+                            color: Colors.white,
+                          ),
+                          title: Text(
+                            "관리자 대시보드 입장",
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 0,
+                          ),
+                          trailing: Icon(
+                            Icons.arrow_forward_ios,
+                            size: 16,
+                            color: Colors.white70,
+                          ),
+                        ),
+                      ),
+                    ),
                   _buildSettingItem(
                     context,
                     Icons.lock_outline,
@@ -146,6 +221,13 @@ class SettingsScreen extends StatelessWidget {
 
                   _buildSettingItem(
                     context,
+                    Icons.support_agent,
+                    "1:1 문의하기",
+                    onTap: _contactAdmin,
+                  ),
+
+                  _buildSettingItem(
+                    context,
                     Icons.info_outline,
                     "정보",
                     onTap: () {
@@ -175,6 +257,38 @@ class SettingsScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _contactAdmin() async {
+    try {
+      final adminUser = await _firestoreService.getAdminUser();
+      if (adminUser != null && mounted) {
+        final adminUid = adminUser['uid'];
+        final adminName = adminUser['userName'] ?? '관리자';
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChatDetailScreen(
+              chatPartnerId: adminUid,
+              chatPartnerName: adminName,
+            ),
+          ),
+        );
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('관리자를 찾을 수 없습니다.')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('오류 발생: $e')),
+        );
+      }
+    }
   }
 
   Widget _buildSettingItem(

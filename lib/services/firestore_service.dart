@@ -208,6 +208,63 @@ class FirestoreService {
     }
   }
 
+  // [추가] 관리자용 게시물 삭제 (본인 확인 없음)
+  Future<void> deletePostByAdmin(String postId) async {
+    try {
+      // 게시물 정보 가져오기
+      final postDoc = await _db.collection('posts').doc(postId).get();
+
+      if (!postDoc.exists) {
+        throw Exception("게시물을 찾을 수 없습니다.");
+      }
+
+      final postData = postDoc.data();
+
+      // Storage에서 이미지 삭제
+      final imageUrls = postData?['imageUrls'] as List<dynamic>?;
+      if (imageUrls != null && imageUrls.isNotEmpty) {
+        for (var imageUrl in imageUrls) {
+          try {
+            if (imageUrl is String && imageUrl.isNotEmpty) {
+              final ref = _storage.refFromURL(imageUrl);
+              await ref.delete();
+            }
+          } catch (e) {
+            print('⚠️ 이미지 삭제 실패 (계속 진행): $e');
+          }
+        }
+      }
+
+      // 게시물의 하위 컬렉션 삭제 (좋아요)
+      final likesSnapshot = await _db
+          .collection('posts')
+          .doc(postId)
+          .collection('likes')
+          .get();
+
+      for (var doc in likesSnapshot.docs) {
+        await doc.reference.delete();
+      }
+
+      // 댓글 삭제
+      final commentsSnapshot = await _db
+          .collection('posts')
+          .doc(postId)
+          .collection('comments')
+          .get();
+
+      for (var doc in commentsSnapshot.docs) {
+        await doc.reference.delete();
+      }
+
+      // 게시물 문서 삭제
+      await _db.collection('posts').doc(postId).delete();
+    } catch (e) {
+      print('❌ deletePostByAdmin 실패: $e');
+      rethrow;
+    }
+  }
+
   // --- [여행 계획 관련 코드] ---
 
   // 1. 여행 계획 저장 (생성)
@@ -1297,6 +1354,243 @@ class FirestoreService {
     } catch (e) {
       print('보관 상태 확인 실패: $e');
       return false;
+    }
+  }
+
+  // --- [Admin Features] ---
+
+  // 1. Dashboard Stats
+  Future<Map<String, int>> getDashboardStats() async {
+    try {
+      // 1. Users Count
+      final usersCount = await _db.collection('users').count().get();
+
+      // 2. Total Posts Count
+      final postsCount = await _db.collection('posts').count().get();
+
+      // 3. Community Posts Count (category != 'feed')
+      // Note: This requires an index if we use notEqualTo.
+      // Alternatively, we can count specific community categories if known (general, companion).
+      // For now, let's try counting where category is 'general' or 'companion'.
+      final communityGeneralCount = await _db
+          .collection('posts')
+          .where('category', isEqualTo: 'general')
+          .count()
+          .get();
+      final communityCompanionCount = await _db
+          .collection('posts')
+          .where('category', isEqualTo: 'companion')
+          .count()
+          .get();
+      final totalCommunityCount =
+          (communityGeneralCount.count ?? 0) +
+          (communityCompanionCount.count ?? 0);
+
+      // 4. Comments Count (using collectionGroup)
+      final commentsCount = await _db.collectionGroup('comments').count().get();
+
+      // 5. Travel Plans Count
+      final plansCount = await _db.collection('travel_plans').count().get();
+
+      // 6. Reports Count
+      final reportsCount = await _db.collection('reports').count().get();
+
+      // 7. Image Count (Calculate by reading posts - potentially expensive)
+      int totalImages = 0;
+      final postsSnapshot = await _db.collection('posts').get();
+      for (var doc in postsSnapshot.docs) {
+        final data = doc.data();
+        final List<dynamic>? urls = data['imageUrls'] as List<dynamic>?;
+        if (urls != null) {
+          totalImages += urls.length;
+        } else if (data['imageUrl'] != null &&
+            data['imageUrl'].toString().isNotEmpty) {
+          totalImages += 1;
+        }
+      }
+
+      return {
+        'users': usersCount.count ?? 0,
+        'posts': postsCount.count ?? 0,
+        'communityPosts': totalCommunityCount,
+        'comments': commentsCount.count ?? 0,
+        'images': totalImages,
+        'plans': plansCount.count ?? 0,
+        'reports': reportsCount.count ?? 0,
+      };
+    } catch (e) {
+      print('Error fetching dashboard stats: $e');
+      return {
+        'users': 0,
+        'posts': 0,
+        'communityPosts': 0,
+        'comments': 0,
+        'images': 0,
+        'plans': 0,
+        'reports': 0,
+      };
+    }
+  }
+
+  // 2. All Users Stream
+  Stream<QuerySnapshot> getAllUsersStream() {
+    return _db
+        .collection('users')
+        .orderBy('createdAt', descending: true)
+        .snapshots();
+  }
+
+  // 3. Delete User (Soft Delete & Schedule)
+  Future<void> deleteUser(String userId) async {
+    try {
+      // 7일 후 삭제 예정일 설정
+      final deletionDueAt = DateTime.now().add(const Duration(days: 7));
+
+      // 사용자 문서를 업데이트하여 삭제 예정 상태로 변경
+      await _db.collection('users').doc(userId).update({
+        'isBanned': true, // 로그인 차단
+        'status': 'scheduled_for_deletion', // 상태 표시
+        'deletionDueAt': Timestamp.fromDate(deletionDueAt), // 삭제 예정 시간
+        'deletedAt': FieldValue.serverTimestamp(), // 삭제 요청 시간
+      });
+
+      // 참고: 실제 데이터 삭제는 Firebase Cloud Functions를 통해 deletionDueAt이 지난 문서를 주기적으로 정리해야 합니다.
+    } catch (e) {
+      print('Error deleting user: $e');
+      rethrow;
+    }
+  }
+
+  // [추가] Ban User
+  Future<void> banUser(String userId, String reason) async {
+    try {
+      await _db.collection('users').doc(userId).update({
+        'isBanned': true,
+        'banReason': reason,
+        'bannedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print('Error banning user: $e');
+      rethrow;
+    }
+  }
+
+  // [추가] Unban User
+  Future<void> unbanUser(String userId) async {
+    try {
+      await _db.collection('users').doc(userId).update({
+        'isBanned': false,
+        'banReason': FieldValue.delete(),
+        'bannedAt': FieldValue.delete(),
+      });
+    } catch (e) {
+      print('Error unbanning user: $e');
+      rethrow;
+    }
+  }
+
+  // [추가] Check Ban Status
+  Future<Map<String, dynamic>?> checkBanStatus(String userId) async {
+    try {
+      final doc = await _db.collection('users').doc(userId).get();
+      if (doc.exists) {
+        final data = doc.data();
+        if (data != null && data['isBanned'] == true) {
+          return {
+            'isBanned': true,
+            'banReason': data['banReason'] ?? 'No reason provided',
+          };
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Error checking ban status: $e');
+      return null;
+    }
+  }
+
+  // 4. Reports Stream
+  Stream<QuerySnapshot> getReportsStream() {
+    return _db
+        .collection('reports')
+        .orderBy('createdAt', descending: true)
+        .snapshots();
+  }
+
+  // 5. Update Report Status
+  Future<void> updateReportStatus(String reportId, String status) async {
+    try {
+      await _db.collection('reports').doc(reportId).update({
+        'status': status,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print('Error updating report status: $e');
+      rethrow;
+    }
+  }
+
+  // [추가] Report Post
+  Future<void> reportPost({
+    required String postId,
+    required String reason,
+    required String targetUserId,
+  }) async {
+    User? user = _auth.currentUser;
+    if (user == null) throw Exception("로그인이 필요합니다.");
+
+    try {
+      await _db.collection('reports').add({
+        'reporterId': user.uid,
+        'targetId': postId, // 게시물 ID
+        'targetUserId': targetUserId, // 게시물 작성자 ID
+        'reason': reason,
+        'type': 'post',
+        'status': 'pending',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print('Error reporting post: $e');
+      rethrow;
+    }
+  }
+
+  // 6. Get Current User Role
+  Future<String?> getUserRole() async {
+    User? user = _auth.currentUser;
+    if (user == null) return null;
+
+    try {
+      final doc = await _db.collection('users').doc(user.uid).get();
+      if (doc.exists) {
+        return doc.data()?['role'] as String?;
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching user role: $e');
+      return null;
+    }
+  }
+
+  // [추가] Get Admin User
+  Future<Map<String, dynamic>?> getAdminUser() async {
+    try {
+      final querySnapshot = await _db
+          .collection('users')
+          .where('role', isEqualTo: 'admin')
+          .limit(1)
+          .get();
+
+      if (querySnapshot.docs.isNotEmpty) {
+        final doc = querySnapshot.docs.first;
+        final data = doc.data();
+        data['uid'] = doc.id; // 문서 ID를 uid로 추가
+        return data;
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching admin user: $e');
+      return null;
     }
   }
 }

@@ -76,7 +76,26 @@ class AuthService {
     required String password,
   }) async {
     try {
-      await _auth.signInWithEmailAndPassword(email: email, password: password);
+      UserCredential userCredential = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      // [추가] 정지된 계정인지 확인
+      if (userCredential.user != null) {
+        final userDoc = await _firestore
+            .collection('users')
+            .doc(userCredential.user!.uid)
+            .get();
+        if (userDoc.exists) {
+          final userData = userDoc.data();
+          if (userData != null && userData['isBanned'] == true) {
+            await _auth.signOut(); // 로그아웃 처리
+            return "정지된 계정입니다.";
+          }
+        }
+      }
+
       return null; // 성공
     } on FirebaseAuthException catch (e) {
       // Firebase 에러 코드에 따른 한글 메시지 반환
