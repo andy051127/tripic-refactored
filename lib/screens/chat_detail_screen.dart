@@ -13,6 +13,7 @@ import '../models/travel_plan_model.dart';
 import 'map_screen.dart';
 import 'post_detail_screen.dart';
 import 'travel_plan_detail_screen.dart';
+import 'other_user_profile_screen.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final String chatPartnerName;
@@ -36,11 +37,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final ScrollController _scrollController = ScrollController();
   String? _currentChatRoomId;
   bool _isLoading = true;
+  String _partnerProfileImage = '';
+  String _partnerUserName = '';
 
   @override
   void initState() {
     super.initState();
     _initializeChatRoom();
+    _loadPartnerInfo();
   }
 
   @override
@@ -67,6 +71,33 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       print("채팅방 초기화 실패: $e");
       setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _loadPartnerInfo() async {
+    try {
+      final userInfo = await _firestoreService.getUserInfo(widget.chatPartnerId);
+      if (userInfo != null && mounted) {
+        setState(() {
+          _partnerProfileImage = userInfo['profileImage'] ?? '';
+          _partnerUserName = userInfo['userName'] ?? widget.chatPartnerName;
+        });
+      }
+    } catch (e) {
+      print('상대방 정보 로드 실패: $e');
+    }
+  }
+
+  void _navigateToPartnerProfile() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => OtherUserProfileScreen(
+          userName: _partnerUserName.isNotEmpty ? _partnerUserName : widget.chatPartnerName,
+          profileImage: _partnerProfileImage,
+          userId: widget.chatPartnerId,
+        ),
+      ),
+    );
   }
 
   void _scrollToBottom() {
@@ -207,12 +238,32 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         centerTitle: true,
-        title: Text(
-          widget.chatPartnerName,
-          style: const TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
+        title: GestureDetector(
+          onTap: _navigateToPartnerProfile,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_partnerProfileImage.isNotEmpty)
+                CircleAvatar(
+                  radius: 16,
+                  backgroundImage: NetworkImage(_partnerProfileImage),
+                )
+              else
+                const CircleAvatar(
+                  radius: 16,
+                  backgroundColor: Colors.grey,
+                  child: Icon(Icons.person, size: 18, color: Colors.white),
+                ),
+              const SizedBox(width: 8),
+              Text(
+                _partnerUserName.isNotEmpty ? _partnerUserName : widget.chatPartnerName,
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+            ],
           ),
         ),
       ),
