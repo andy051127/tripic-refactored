@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'dart:ui'; // [추가] 이미지 블러 처리를 위해 필요
 import 'package:shared_preferences/shared_preferences.dart';
-import 'login_screen.dart';
+import 'home_screen.dart'; // [변경] 로그인 화면 대신 홈 화면으로 이동
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -15,19 +16,29 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   final List<Map<String, String>> _onboardingData = [
     {
-      "title": "여행의 모든 순간을 기록하세요",
-      "description": "사진, 위치, 그리고 그 순간의 감정까지.\nTripic이 당신의 여행을 완벽하게 기록해드립니다.",
-      "image": "assets/tripicLogo.png", // 임시 이미지
+      "title": "친구들의 여행 기록",
+      "description": "지도 위에서 친구들의 여행을 확인하고\n피드에서 생생한 이야기를 만나보세요.",
+      "image": "assets/onboarding/share.png",
     },
     {
-      "title": "지도 위에 그려지는 나만의 발자취",
-      "description": "이동 경로를 자동으로 추적하여\n지도 위에 당신만의 여행 지도를 그려보세요.",
-      "image": "assets/tripicLogo.png", // 임시 이미지
+      "title": "완벽한 여행 계획",
+      "description": "항공권부터 숙소, 준비물 체크리스트까지\n여행의 모든 것을 한곳에서 관리하세요.",
+      "image": "assets/onboarding/plan.png",
     },
     {
-      "title": "소중한 추억을 영원히",
-      "description": "여행이 끝나도 추억은 영원합니다.\n언제든지 꺼내볼 수 있는 나만의 여행 앨범.",
-      "image": "assets/tripicLogo.png", // 임시 이미지
+      "title": "함께하는 즐거움",
+      "description": "여행 꿀팁을 나누고\n마음이 맞는 동행을 찾아보세요.",
+      "image": "assets/onboarding/community.png",
+    },
+    {
+      "title": "나만의 여행 여권",
+      "description": "방문한 국가들의 국기를 수집하고\n나만의 여행 지도를 채워보세요.",
+      "image": "assets/onboarding/write.png",
+    },
+    {
+      "title": "발자취 기록",
+      "description": "내가 이동한 경로와 추억이 담긴 장소를\n지도 위에 생생하게 남겨보세요.",
+      "image": "assets/onboarding/map.png",
     },
   ];
 
@@ -36,105 +47,108 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     await prefs.setBool('seenOnboarding', true);
 
     if (!mounted) return;
+    // [변경] 회원가입 -> 프로필 생성 -> 온보딩 -> 홈 화면 순서이므로 홈으로 이동
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => const LoginScreen()),
+      MaterialPageRoute(builder: (context) => const HomeScreen()),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // 상단 건너뛰기 버튼
-            Align(
-              alignment: Alignment.topRight,
-              child: TextButton(
-                onPressed: _completeOnboarding,
-                child: const Text("건너뛰기", style: TextStyle(color: Colors.grey)),
-              ),
+      body: Stack(
+        children: [
+          // 1. 전체 화면 페이지 뷰 (배경 이미지 + 텍스트)
+          PageView.builder(
+            controller: _pageController,
+            onPageChanged: (value) {
+              setState(() {
+                _currentPage = value;
+              });
+            },
+            itemCount: _onboardingData.length,
+            itemBuilder: (context, index) => OnboardingContent(
+              title: _onboardingData[index]["title"]!,
+              description: _onboardingData[index]["description"]!,
+              image: _onboardingData[index]["image"]!,
             ),
+          ),
 
-            // 페이지 뷰 (이미지 및 텍스트)
-            Expanded(
-              child: PageView.builder(
-                controller: _pageController,
-                onPageChanged: (value) {
-                  setState(() {
-                    _currentPage = value;
-                  });
-                },
-                itemCount: _onboardingData.length,
-                itemBuilder: (context, index) => OnboardingContent(
-                  title: _onboardingData[index]["title"]!,
-                  description: _onboardingData[index]["description"]!,
-                  image: _onboardingData[index]["image"]!,
+          // 2. 상단 건너뛰기 버튼 (SafeArea 적용)
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 10,
+            right: 20,
+            child: TextButton(
+              onPressed: _completeOnboarding,
+              child: const Text(
+                "건너뛰기",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ),
+          ),
 
-            // 하단 인디케이터 및 버튼
-            Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // 페이지 인디케이터
-                  Row(
-                    children: List.generate(
-                      _onboardingData.length,
-                      (index) => AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        margin: const EdgeInsets.only(right: 5),
-                        height: 8,
-                        width: _currentPage == index ? 24 : 8,
-                        decoration: BoxDecoration(
-                          color: _currentPage == index
-                              ? Colors.blue
-                              : Colors.grey[300],
-                          borderRadius: BorderRadius.circular(4),
-                        ),
+          // 3. 하단 인디케이터 및 버튼
+          Positioned(
+            bottom: 40,
+            left: 24,
+            right: 24,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // 페이지 인디케이터
+                Row(
+                  children: List.generate(
+                    _onboardingData.length,
+                    (index) => AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      margin: const EdgeInsets.only(right: 5),
+                      height: 8,
+                      width: _currentPage == index ? 24 : 8,
+                      decoration: BoxDecoration(
+                        color: _currentPage == index
+                            ? Colors.blue
+                            : Colors.white.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(4),
                       ),
                     ),
                   ),
+                ),
 
-                  // 다음 / 시작하기 버튼
-                  ElevatedButton(
-                    onPressed: () {
-                      if (_currentPage == _onboardingData.length - 1) {
-                        _completeOnboarding();
-                      } else {
-                        _pageController.nextPage(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.ease,
-                        );
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
-                      ),
+                // 다음 / 시작하기 버튼
+                ElevatedButton(
+                  onPressed: () {
+                    if (_currentPage == _onboardingData.length - 1) {
+                      _completeOnboarding();
+                    } else {
+                      _pageController.nextPage(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.ease,
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
                     ),
-                    child: Text(
-                      _currentPage == _onboardingData.length - 1
-                          ? "시작하기"
-                          : "다음",
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
                     ),
                   ),
-                ],
-              ),
+                  child: Text(
+                    _currentPage == _onboardingData.length - 1 ? "시작하기" : "다음",
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -154,41 +168,80 @@ class OnboardingContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Spacer(),
-          Image.asset(
-            image,
-            height: 250,
-            errorBuilder: (context, error, stackTrace) =>
-                const Icon(Icons.image, size: 100, color: Colors.grey),
-          ),
-          const Spacer(),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // 1. 배경 이미지
+        Image.asset(
+          image,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: double.infinity,
+          errorBuilder: (context, error, stackTrace) => Container(
+            color: Colors.grey[300],
+            child: const Center(
+              child: Icon(
+                Icons.image_not_supported,
+                size: 50,
+                color: Colors.grey,
+              ),
             ),
           ),
-          const SizedBox(height: 16),
-          Text(
-            description,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 16,
-              color: Colors.grey,
-              height: 1.5,
+        ),
+
+        // 2. 블러 및 어두운 오버레이 효과
+        ClipRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5), // 블러 강도 조절
+            child: Container(
+              color: Colors.black.withOpacity(0.4), // 어둡게 처리하여 텍스트 가독성 확보
             ),
           ),
-          const Spacer(),
-        ],
-      ),
+        ),
+
+        // 3. 중앙 텍스트
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  shadows: [
+                    Shadow(
+                      blurRadius: 10.0,
+                      color: Colors.black45,
+                      offset: Offset(2.0, 2.0),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                description,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: Colors.white,
+                  height: 1.6,
+                  shadows: [
+                    Shadow(
+                      blurRadius: 8.0,
+                      color: Colors.black45,
+                      offset: Offset(1.0, 1.0),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

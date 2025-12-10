@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/cupertino.dart'; // [추가] 날짜 선택기 사용을 위해 추가
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/post_model.dart'; // 전역 변수 업데이트용
 import 'home_screen.dart';
+import 'onboarding_screen.dart'; // [추가] 온보딩 화면
 
 class ProfileCreationScreen extends StatefulWidget {
   final String realName; // 회원가입 시 입력한 이름
@@ -23,6 +25,13 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
 
   bool _isSaving = false;
   bool _isValidId = true; // 고유 ID 유효성 검사
+
+  @override
+  void initState() {
+    super.initState();
+    // 전화번호 초기값 설정 (010-)
+    _phoneController.text = "010-";
+  }
 
   @override
   void dispose() {
@@ -87,10 +96,10 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
 
         if (!mounted) return;
 
-        // 3. 홈 화면으로 이동
+        // 3. 온보딩 화면으로 이동 (회원가입 후 첫 진입이므로)
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          MaterialPageRoute(builder: (context) => const OnboardingScreen()),
           (route) => false,
         );
       }
@@ -187,11 +196,48 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
             ),
             const SizedBox(height: 20),
             _buildTextField(
-              "생년월일 (또는 가입일)",
+              "생년월일",
               _birthController,
               "2000.01.01",
-              inputType: TextInputType.number,
-              inputFormatters: [DateFormatter()],
+              readOnly: true,
+              onTap: () {
+                FocusScope.of(context).unfocus();
+                showCupertinoModalPopup(
+                  context: context,
+                  builder: (context) => Container(
+                    height: 280,
+                    color: Colors.white,
+                    child: Column(
+                      children: [
+                        Container(
+                          color: Colors.grey[100],
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          alignment: Alignment.centerRight,
+                          child: CupertinoButton(
+                            padding: EdgeInsets.zero,
+                            child: const Text("확인"),
+                            onPressed: () => Navigator.of(context).pop(),
+                          ),
+                        ),
+                        Expanded(
+                          child: CupertinoDatePicker(
+                            mode: CupertinoDatePickerMode.date,
+                            initialDateTime: DateTime(2000, 1, 1),
+                            minimumYear: 1950,
+                            maximumYear: DateTime.now().year,
+                            onDateTimeChanged: (DateTime newDate) {
+                              setState(() {
+                                _birthController.text =
+                                    "${newDate.year}.${newDate.month.toString().padLeft(2, '0')}.${newDate.day.toString().padLeft(2, '0')}";
+                              });
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 20),
             _buildTextField("자기소개", _bioController, "나를 표현하는 한마디", maxLines: 3),
@@ -234,6 +280,8 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
     TextInputType inputType = TextInputType.text,
     int maxLines = 1,
     List<TextInputFormatter>? inputFormatters,
+    bool readOnly = false,
+    VoidCallback? onTap,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -248,6 +296,8 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
           keyboardType: inputType,
           maxLines: maxLines,
           inputFormatters: inputFormatters,
+          readOnly: readOnly,
+          onTap: onTap,
           decoration: InputDecoration(
             hintText: hint,
             filled: true,

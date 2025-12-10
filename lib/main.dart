@@ -67,11 +67,7 @@ class TripicApp extends StatelessWidget {
             return const HomeScreen();
           }
 
-          // 3. 로그인 정보가 없음 (로그아웃됨) -> 온보딩 확인 후 로그인 화면으로
-          if (!hasSeenOnboarding) {
-            return const OnboardingScreen();
-          }
-
+          // 3. 로그인 정보가 없음 (로그아웃됨) -> 로그인 화면으로
           return const LoginScreen();
         },
       ),

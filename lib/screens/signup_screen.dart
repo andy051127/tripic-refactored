@@ -84,7 +84,7 @@ class _SignupScreenState extends State<SignupScreen> {
     });
   }
 
-  // 비밀번호 길이 검증
+  // 비밀번호 강도 검증
   void _checkPasswordStrength(String password) {
     if (password.isEmpty) {
       setState(() {
@@ -94,17 +94,32 @@ class _SignupScreenState extends State<SignupScreen> {
       return;
     }
 
+    // 1. 길이 검사
     if (password.length < 6) {
       setState(() {
         _passwordValidation = ValidationState.error;
         _passwordMessage = '비밀번호를 6자리 이상 입력해주세요';
       });
+      return;
+    }
+
+    // 2. 영문, 숫자, 특수문자 포함 여부 검사
+    bool hasLetter = RegExp(r'[a-zA-Z]').hasMatch(password);
+    bool hasDigit = RegExp(r'[0-9]').hasMatch(password);
+    bool hasSpecial = RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(password);
+
+    if (!hasLetter || !hasDigit || !hasSpecial) {
+      setState(() {
+        _passwordValidation = ValidationState.error;
+        _passwordMessage = '영문, 숫자, 특수문자를 모두 포함해야 합니다';
+      });
     } else {
       setState(() {
         _passwordValidation = ValidationState.success;
-        _passwordMessage = '';
+        _passwordMessage = '사용 가능한 비밀번호입니다';
       });
     }
+
     // 비밀번호가 변경되면 확인 필드도 다시 검사
     if (_passwordConfirmController.text.isNotEmpty) {
       _checkPasswordConfirm(_passwordConfirmController.text);
@@ -170,11 +185,13 @@ class _SignupScreenState extends State<SignupScreen> {
       return;
     }
 
-    // 비밀번호 길이 검증
+    // 비밀번호 강도 검증
     if (_passwordValidation != ValidationState.success) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("비밀번호를 6자리 이상 입력해주세요.")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("비밀번호 조건을 확인해주세요 (영문, 숫자, 특수문자 포함 6자리 이상)."),
+        ),
+      );
       return;
     }
 
