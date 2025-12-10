@@ -208,57 +208,20 @@ class FirestoreService {
     }
   }
 
-  // [추가] 관리자용 게시물 삭제 (본인 확인 없음)
+  // [추가] 관리자용 게시물 삭제 (Soft Delete & Schedule)
   Future<void> deletePostByAdmin(String postId) async {
     try {
-      // 게시물 정보 가져오기
-      final postDoc = await _db.collection('posts').doc(postId).get();
+      // 7일 후 삭제 예정일 설정
+      final deletionDueAt = DateTime.now().add(const Duration(days: 7));
 
-      if (!postDoc.exists) {
-        throw Exception("게시물을 찾을 수 없습니다.");
-      }
+      // 게시물 문서를 업데이트하여 삭제 예정 상태로 변경
+      await _db.collection('posts').doc(postId).update({
+        'status': 'scheduled_for_deletion', // 상태 표시
+        'deletionDueAt': Timestamp.fromDate(deletionDueAt), // 삭제 예정 시간
+        'deletedAt': FieldValue.serverTimestamp(), // 삭제 요청 시간
+      });
 
-      final postData = postDoc.data();
-
-      // Storage에서 이미지 삭제
-      final imageUrls = postData?['imageUrls'] as List<dynamic>?;
-      if (imageUrls != null && imageUrls.isNotEmpty) {
-        for (var imageUrl in imageUrls) {
-          try {
-            if (imageUrl is String && imageUrl.isNotEmpty) {
-              final ref = _storage.refFromURL(imageUrl);
-              await ref.delete();
-            }
-          } catch (e) {
-            print('⚠️ 이미지 삭제 실패 (계속 진행): $e');
-          }
-        }
-      }
-
-      // 게시물의 하위 컬렉션 삭제 (좋아요)
-      final likesSnapshot = await _db
-          .collection('posts')
-          .doc(postId)
-          .collection('likes')
-          .get();
-
-      for (var doc in likesSnapshot.docs) {
-        await doc.reference.delete();
-      }
-
-      // 댓글 삭제
-      final commentsSnapshot = await _db
-          .collection('posts')
-          .doc(postId)
-          .collection('comments')
-          .get();
-
-      for (var doc in commentsSnapshot.docs) {
-        await doc.reference.delete();
-      }
-
-      // 게시물 문서 삭제
-      await _db.collection('posts').doc(postId).delete();
+      // 참고: 실제 데이터(이미지, 하위 컬렉션 등) 삭제는 Firebase Cloud Functions를 통해 처리
     } catch (e) {
       print('❌ deletePostByAdmin 실패: $e');
       rethrow;

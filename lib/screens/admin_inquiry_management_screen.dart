@@ -36,7 +36,7 @@ class _AdminInquiryManagementScreenState
         stream: FirebaseFirestore.instance
             .collection('chatRooms')
             .where('participants', arrayContains: currentUser.uid)
-            .orderBy('lastMessageTime', descending: true)
+            // .orderBy('lastMessageTime', descending: true) // 인덱스 오류 방지를 위해 제거하고 클라이언트 정렬 사용
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
@@ -47,7 +47,19 @@ class _AdminInquiryManagementScreenState
             return const Center(child: CircularProgressIndicator());
           }
 
-          final docs = snapshot.data?.docs ?? [];
+          // 클라이언트 측 정렬 (최신 메시지 순)
+          final docs = snapshot.data?.docs.toList() ?? [];
+          docs.sort((a, b) {
+            final aData = a.data() as Map<String, dynamic>;
+            final bData = b.data() as Map<String, dynamic>;
+            final aTime = aData['lastMessageTime'] as Timestamp?;
+            final bTime = bData['lastMessageTime'] as Timestamp?;
+
+            if (aTime == null && bTime == null) return 0;
+            if (aTime == null) return 1;
+            if (bTime == null) return -1;
+            return bTime.compareTo(aTime); // 내림차순
+          });
 
           if (docs.isEmpty) {
             return const Center(

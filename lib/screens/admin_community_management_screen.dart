@@ -78,10 +78,19 @@ class _AdminCommunityManagementScreenState
                       ),
                     ],
                   ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () => _confirmDeletePost(doc.id),
-                  ),
+                  trailing: data['status'] == 'scheduled_for_deletion'
+                      ? const Text(
+                          '7일 후 삭제',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        )
+                      : IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () => _confirmDeletePost(doc.id),
+                        ),
                 ),
               );
             },

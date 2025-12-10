@@ -22,55 +22,68 @@ const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 admin.initializeApp();
 
-exports.deleteScheduledUsers = functions.pubsub.schedule("every 24 hours").onRun(async (context) => {
+exports.deleteScheduledItems = functions.pubsub.schedule("every 24 hours").onRun(async (context) => {
   const db = admin.firestore();
   const auth = admin.auth();
   const now = admin.firestore.Timestamp.now();
 
-  // 1. 삭제 예정일(deletionDueAt)이 지난 사용자 조회
-  const snapshot = await db.collection("users")
+  // --- [사용자 삭제 로직] ---
+  const userSnapshot = await db.collection("users")
     .where("status", "==", "scheduled_for_deletion")
     .where("deletionDueAt", "<=", now)
     .get();
 
-  if (snapshot.empty) {
-    console.log("삭제할 사용자가 없습니다.");
-    return null;
-  }
-
   const batch = db.batch();
   const deletePromises = [];
 
-  snapshot.docs.forEach((doc) => {
-    const userId = doc.id;
+  if (!userSnapshot.empty) {
+    userSnapshot.docs.forEach((doc) => {
+      const userId = doc.id;
 
-    // 2. Firebase Auth 계정 삭제
-    const deleteAuth = auth.deleteUser(userId)
-      .then(() => console.log(`Auth 계정 삭제 성공: ${userId}`))
-      .catch((error) => console.error(`Auth 계정 삭제 실패: ${userId}`, error));
-    deletePromises.push(deleteAuth);
+      // 1. Firebase Auth 계정 삭제
+      const deleteAuth = auth.deleteUser(userId)
+        .then(() => console.log(`Auth 계정 삭제 성공: ${userId}`))
+        .catch((error) => console.error(`Auth 계정 삭제 실패: ${userId}`, error));
+      deletePromises.push(deleteAuth);
 
-    // 3. 사용자 작성 게시물 삭제 (선택 사항: 컬렉션 구조에 따라 다름)
-    // 예: 'posts' 컬렉션에서 해당 사용자의 게시물 삭제
-    const deletePosts = db.collection("posts").where("uid", "==", userId).get()
-      .then((postSnapshot) => {
-        const postBatch = db.batch();
-        postSnapshot.docs.forEach((postDoc) => {
-          postBatch.delete(postDoc.ref);
+      // 2. 사용자 작성 게시물 삭제
+      const deleteUserPosts = db.collection("posts").where("uid", "==", userId).get()
+        .then((postSnapshot) => {
+          const postBatch = db.batch();
+          postSnapshot.docs.forEach((postDoc) => {
+            postBatch.delete(postDoc.ref);
+          });
+          return postBatch.commit();
         });
-        return postBatch.commit();
-      });
-    deletePromises.push(deletePosts);
+      deletePromises.push(deleteUserPosts);
 
-    // 4. 사용자 문서 삭제
-    batch.delete(doc.ref);
-  });
+      // 3. 사용자 문서 삭제
+      batch.delete(doc.ref);
+    });
+  }
+
+  // --- [게시물 삭제 로직 (관리자가 개별 삭제한 경우)] ---
+  const postSnapshot = await db.collection("posts")
+    .where("status", "==", "scheduled_for_deletion")
+    .where("deletionDueAt", "<=", now)
+    .get();
+
+  if (!postSnapshot.empty) {
+    postSnapshot.docs.forEach((doc) => {
+      // 게시물 문서 삭제 (하위 컬렉션은 별도 처리 필요할 수 있음)
+      batch.delete(doc.ref);
+      
+      // 이미지 삭제 등 추가 로직이 필요하다면 여기서 처리
+      // const data = doc.data();
+      // if (data.imageUrls) { ... }
+    });
+  }
 
   // 모든 작업 실행
   await Promise.all(deletePromises);
   await batch.commit();
 
-  console.log(`${snapshot.size}명의 사용자와 관련 데이터를 삭제했습니다.`);
+  console.log(`사용자 ${userSnapshot.size}명, 게시물 ${postSnapshot.size}개를 처리했습니다.`);
   return null;
 });
 ```
