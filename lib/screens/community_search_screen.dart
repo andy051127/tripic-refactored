@@ -56,6 +56,20 @@ class _CommunitySearchScreenState extends State<CommunitySearchScreen> {
   bool _hasSearched = false;
 
   @override
+  void initState() {
+    super.initState();
+    // 검색어 변경 리스너 추가 (실시간 검색)
+    _searchController.addListener(() {
+      if (_searchController.text.isEmpty) {
+        setState(() {
+          _searchResults = [];
+          _hasSearched = false;
+        });
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
@@ -76,73 +90,113 @@ class _CommunitySearchScreenState extends State<CommunitySearchScreen> {
     });
 
     try {
-      // Firestore에서 general 또는 companion 카테고리의 게시물 가져오기
-      final generalSnapshot = await FirebaseFirestore.instance
+      final searchLower = query.toLowerCase().trim();
+      final List<CommunityPost> allPosts = [];
+
+      print('검색 시작: "$searchLower"');
+
+      // posts 컬렉션에서 모든 커뮤니티 게시물 가져오기
+      final querySnapshot = await FirebaseFirestore.instance
           .collection('posts')
-          .where('category', isEqualTo: 'general')
-          .orderBy('createdAt', descending: true)
-          .limit(100)
           .get();
 
-      final companionSnapshot = await FirebaseFirestore.instance
-          .collection('posts')
-          .where('category', isEqualTo: 'companion')
-          .orderBy('createdAt', descending: true)
-          .limit(100)
-          .get();
+      print('전체 게시물 수: ${querySnapshot.docs.length}');
 
-      final allDocs = [...generalSnapshot.docs, ...companionSnapshot.docs];
-      
-      // 검색어로 필터링 (userName 또는 title에 포함되면 결과에 추가)
-      final searchLower = query.toLowerCase();
-      final filteredPosts = allDocs.where((doc) {
+      int generalCount = 0;
+      int companionCount = 0;
+      int matchCount = 0;
+
+      for (var doc in querySnapshot.docs) {
         final data = doc.data();
+        final category = data['category'] ?? '';
+        
+        // general 또는 companion 카테고리만 검색
+        if (category != 'general' && category != 'companion') {
+          continue;
+        }
+
+        if (category == 'general') generalCount++;
+        if (category == 'companion') companionCount++;
+
         final userName = (data['userName'] ?? '').toString().toLowerCase();
         final title = (data['title'] ?? '').toString().toLowerCase();
-        return userName.contains(searchLower) || title.contains(searchLower);
-      }).map((doc) {
-        final data = doc.data();
-        final likesCount = data['likesCount'] ?? 0;
-        final commentsCount = data['commentsCount'] ?? 0;
-        final views = data['views'] ?? 0;
-        final stats = '$likesCount · $commentsCount · $views';
+        final content = (data['content'] ?? '').toString().toLowerCase();
         
-        return CommunityPost(
-          id: doc.id,
-          uid: data['uid'] ?? '',
-          name: data['userName'] ?? '',
-          location: data['location'] ?? '',
-          title: data['title'] ?? '',
-          content: data['content'] ?? '',
-          stats: stats,
-          imageUrl: data['imageUrl'],
-          createdAt: data['createdAt'] != null
-              ? (data['createdAt'] as Timestamp).toDate()
-              : DateTime.now(),
-          category: data['category'] ?? '',
-          travelPlanId: data['travelPlanId'],
-          travelPlanTitle: data['travelPlanTitle'],
-          travelPlanDate: data['travelPlanDate'],
-          travelPlanCountry: data['travelPlanCountry'],
-          userProfileImage: data['userProfileImage'],
-        );
-      }).toList();
+        // 검색어가 userName, title, content 중 하나에라도 포함되면 결과에 추가
+        if (userName.contains(searchLower) || 
+            title.contains(searchLower) || 
+            content.contains(searchLower)) {
+          
+          matchCount++;
+          
+          final likesCount = data['likesCount'] ?? 0;
+          final commentsCount = data['commentsCount'] ?? 0;
+          final views = data['views'] ?? 0;
+          final stats = '$likesCount · $commentsCount · $views';
+          
+          // 게시물에서 userProfileImage가 없으면 users 컬렉션에서 가져오기
+          String? userProfileImage = data['userProfileImage'];
+          final postUid = data['uid'] ?? '';
+          
+          if ((userProfileImage == null || userProfileImage.isEmpty) && postUid.isNotEmpty) {
+            try {
+              final userDoc = await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(postUid)
+                  .get();
+              
+              if (userDoc.exists) {
+                userProfileImage = userDoc.data()?['profileImage'] ?? '';
+                print('사용자 $userName의 프로필 이미지: $userProfileImage');
+              }
+            } catch (e) {
+              print('프로필 이미지 로드 실패: $e');
+            }
+          }
+          
+          allPosts.add(CommunityPost(
+            id: doc.id,
+            uid: postUid,
+            name: data['userName'] ?? '알 수 없음',
+            location: data['location'] ?? '',
+            title: data['title'] ?? '',
+            content: data['content'] ?? '',
+            stats: stats,
+            imageUrl: data['imageUrl'],
+            createdAt: data['createdAt'] != null
+                ? (data['createdAt'] as Timestamp).toDate()
+                : DateTime.now(),
+            category: category,
+            travelPlanId: data['travelPlanId'],
+            travelPlanTitle: data['travelPlanTitle'],
+            travelPlanDate: data['travelPlanDate'],
+            travelPlanCountry: data['travelPlanCountry'],
+            userProfileImage: userProfileImage,
+          ));
+        }
+      }
+
+      print('카테고리별 게시물 수 - general: $generalCount, companion: $companionCount');
+      print('검색 결과: $matchCount개 매칭');
 
       // createdAt 기준 내림차순 정렬
-      filteredPosts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      allPosts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
       setState(() {
-        _searchResults = filteredPosts;
+        _searchResults = allPosts;
         _isSearching = false;
       });
-    } catch (e) {
+
+    } catch (e, stackTrace) {
       print('검색 오류: $e');
+      print('스택 트레이스: $stackTrace');
       setState(() {
         _isSearching = false;
+        _searchResults = [];
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('검색 중 오류가 발생했습니다')),
+          SnackBar(content: Text('검색 중 오류: $e')),
         );
       }
     }
@@ -168,38 +222,61 @@ class _CommunitySearchScreenState extends State<CommunitySearchScreen> {
                 bottom: BorderSide(color: Color(0xFFEEEEEE)),
               ),
             ),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: '사용자명 또는 게시물 제목으로 검색',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          _performSearch('');
-                        },
-                      )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Color(0xFFEEEEEE)),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: '사용자명, 제목, 내용으로 검색',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _searchController.clear();
+                                _performSearch('');
+                              },
+                            )
+                          : null,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: Color(0xFFEEEEEE)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: Color(0xFFEEEEEE)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: Colors.blue),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    onChanged: (value) {
+                      setState(() {});
+                    },
+                    onSubmitted: _performSearch,
+                  ),
                 ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Color(0xFFEEEEEE)),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: () {
+                    if (_searchController.text.isNotEmpty) {
+                      _performSearch(_searchController.text);
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text('검색'),
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Colors.blue),
-                ),
-                contentPadding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-              onChanged: (value) {
-                setState(() {});
-              },
-              onSubmitted: _performSearch,
+              ],
             ),
           ),
 
@@ -331,10 +408,16 @@ class _CommunitySearchScreenState extends State<CommunitySearchScreen> {
                           },
                           child: CircleAvatar(
                             radius: 12,
-                            backgroundColor: Colors.grey,
+                            backgroundColor: Colors.grey[300],
                             backgroundImage: post.userProfileImage != null &&
                                     post.userProfileImage!.isNotEmpty
-                                ? NetworkImage(post.userProfileImage!)
+                                ? NetworkImage(post.userProfileImage!) as ImageProvider
+                                : null,
+                            onBackgroundImageError: post.userProfileImage != null &&
+                                    post.userProfileImage!.isNotEmpty
+                                ? (exception, stackTrace) {
+                                    print('프로필 이미지 로드 실패: ${post.userProfileImage}');
+                                  }
                                 : null,
                             child: post.userProfileImage == null ||
                                     post.userProfileImage!.isEmpty

@@ -5,6 +5,8 @@ import '../models/activity_model.dart';
 import '../models/notification_model.dart';
 import '../services/firestore_service.dart';
 import '../services/notification_service.dart';
+import '../screens/profile_screen.dart';
+import '../screens/other_user_profile_screen.dart';
 
 class CommentModal extends StatefulWidget {
   final String postId; // 게시물 ID (필수)
@@ -177,23 +179,35 @@ class _CommentModalState extends State<CommentModal> {
                           onTap: () {
                             if (currentUserId == commentUserId) {
                               // 내 프로필
-                              Navigator.pushNamed(context, '/profile');
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const ProfileScreen(),
+                                ),
+                              );
                             } else {
                               // 다른 사용자 프로필
-                              Navigator.pushNamed(
+                              Navigator.push(
                                 context,
-                                '/other_user_profile',
-                                arguments: {
-                                  'userId': commentUserId,
-                                  'userName': userName,
-                                },
+                                MaterialPageRoute(
+                                  builder: (context) => OtherUserProfileScreen(
+                                    userId: commentUserId,
+                                    userName: userName,
+                                    profileImage: profileImage,
+                                  ),
+                                ),
                               );
                             }
                           },
                           child: CircleAvatar(
                             backgroundColor: Colors.grey,
                             backgroundImage: profileImage.isNotEmpty
-                                ? NetworkImage(profileImage)
+                                ? NetworkImage(profileImage) as ImageProvider
+                                : null,
+                            onBackgroundImageError: profileImage.isNotEmpty
+                                ? (exception, stackTrace) {
+                                    print('프로필 이미지 로드 실패: $profileImage');
+                                  }
                                 : null,
                             child: profileImage.isEmpty
                                 ? const Icon(
@@ -210,16 +224,23 @@ class _CommentModalState extends State<CommentModal> {
                               onTap: () {
                                 if (currentUserId == commentUserId) {
                                   // 내 프로필
-                                  Navigator.pushNamed(context, '/profile');
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const ProfileScreen(),
+                                    ),
+                                  );
                                 } else {
                                   // 다른 사용자 프로필
-                                  Navigator.pushNamed(
+                                  Navigator.push(
                                     context,
-                                    '/other_user_profile',
-                                    arguments: {
-                                      'userId': commentUserId,
-                                      'userName': userName,
-                                    },
+                                    MaterialPageRoute(
+                                      builder: (context) => OtherUserProfileScreen(
+                                        userId: commentUserId,
+                                        userName: userName,
+                                        profileImage: profileImage,
+                                      ),
+                                    ),
                                   );
                                 }
                               },

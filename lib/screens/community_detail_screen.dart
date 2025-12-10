@@ -554,6 +554,8 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
           'Unknown';
       final userProfileImage = userDoc.data()?['profileImage'] ?? '';
 
+      print('댓글 작성자 정보: userName=$userName, profileImage=$userProfileImage');
+
       final commentText = _commentController.text.trim();
 
       // Firestore에 댓글 저장
@@ -1376,6 +1378,8 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                       final userProfileImage =
                                           commentData['userProfileImage'] ?? '';
 
+                                      print('댓글 표시: userName=$userName, profileImage=$userProfileImage, isEmpty=${userProfileImage.isEmpty}');
+
                                       // 시간 포맷
                                       String timeAgo = '방금 전';
                                       if (createdAt != null) {
@@ -1406,16 +1410,23 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                                 final currentUser = FirebaseAuth.instance.currentUser;
                                                 if (currentUser?.uid == commentUid) {
                                                   // 내 프로필
-                                                  Navigator.pushNamed(context, '/profile');
+                                                  Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                      builder: (context) => const ProfileScreen(),
+                                                    ),
+                                                  );
                                                 } else {
                                                   // 다른 사용자 프로필
-                                                  Navigator.pushNamed(
+                                                  Navigator.push(
                                                     context,
-                                                    '/other_user_profile',
-                                                    arguments: {
-                                                      'userId': commentUid,
-                                                      'userName': userName,
-                                                    },
+                                                    MaterialPageRoute(
+                                                      builder: (context) => OtherUserProfileScreen(
+                                                        userId: commentUid,
+                                                        userName: userName,
+                                                        profileImage: userProfileImage,
+                                                      ),
+                                                    ),
                                                   );
                                                 }
                                               },
@@ -1426,7 +1437,12 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                                     userProfileImage.isNotEmpty
                                                     ? NetworkImage(
                                                         userProfileImage,
-                                                      )
+                                                      ) as ImageProvider
+                                                    : null,
+                                                onBackgroundImageError: userProfileImage.isNotEmpty
+                                                    ? (exception, stackTrace) {
+                                                        print('프로필 이미지 로드 실패: $userProfileImage');
+                                                      }
                                                     : null,
                                                 child: userProfileImage.isEmpty
                                                     ? const Icon(
@@ -1450,16 +1466,23 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                                           final currentUser = FirebaseAuth.instance.currentUser;
                                                           if (currentUser?.uid == commentUid) {
                                                             // 내 프로필
-                                                            Navigator.pushNamed(context, '/profile');
+                                                            Navigator.push(
+                                                              context,
+                                                              MaterialPageRoute(
+                                                                builder: (context) => const ProfileScreen(),
+                                                              ),
+                                                            );
                                                           } else {
                                                             // 다른 사용자 프로필
-                                                            Navigator.pushNamed(
+                                                            Navigator.push(
                                                               context,
-                                                              '/other_user_profile',
-                                                              arguments: {
-                                                                'userId': commentUid,
-                                                                'userName': userName,
-                                                              },
+                                                              MaterialPageRoute(
+                                                                builder: (context) => OtherUserProfileScreen(
+                                                                  userId: commentUid,
+                                                                  userName: userName,
+                                                                  profileImage: userProfileImage,
+                                                                ),
+                                                              ),
                                                             );
                                                           }
                                                         },
