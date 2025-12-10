@@ -1401,22 +1401,41 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                           children: [
-                                            CircleAvatar(
-                                              radius: 18,
-                                              backgroundColor: Colors.grey[300],
-                                              backgroundImage:
-                                                  userProfileImage.isNotEmpty
-                                                  ? NetworkImage(
-                                                      userProfileImage,
-                                                    )
-                                                  : null,
-                                              child: userProfileImage.isEmpty
-                                                  ? const Icon(
-                                                      Icons.person,
-                                                      size: 20,
-                                                      color: Colors.white,
-                                                    )
-                                                  : null,
+                                            GestureDetector(
+                                              onTap: () {
+                                                final currentUser = FirebaseAuth.instance.currentUser;
+                                                if (currentUser?.uid == commentUid) {
+                                                  // 내 프로필
+                                                  Navigator.pushNamed(context, '/profile');
+                                                } else {
+                                                  // 다른 사용자 프로필
+                                                  Navigator.pushNamed(
+                                                    context,
+                                                    '/other_user_profile',
+                                                    arguments: {
+                                                      'userId': commentUid,
+                                                      'userName': userName,
+                                                    },
+                                                  );
+                                                }
+                                              },
+                                              child: CircleAvatar(
+                                                radius: 18,
+                                                backgroundColor: Colors.grey[300],
+                                                backgroundImage:
+                                                    userProfileImage.isNotEmpty
+                                                    ? NetworkImage(
+                                                        userProfileImage,
+                                                      )
+                                                    : null,
+                                                child: userProfileImage.isEmpty
+                                                    ? const Icon(
+                                                        Icons.person,
+                                                        size: 20,
+                                                        color: Colors.white,
+                                                      )
+                                                    : null,
+                                              ),
                                             ),
                                             const SizedBox(width: 10),
                                             Expanded(
@@ -1426,12 +1445,31 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                                                 children: [
                                                   Row(
                                                     children: [
-                                                      Text(
-                                                        userName,
-                                                        style: const TextStyle(
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                          fontSize: 14,
+                                                      GestureDetector(
+                                                        onTap: () {
+                                                          final currentUser = FirebaseAuth.instance.currentUser;
+                                                          if (currentUser?.uid == commentUid) {
+                                                            // 내 프로필
+                                                            Navigator.pushNamed(context, '/profile');
+                                                          } else {
+                                                            // 다른 사용자 프로필
+                                                            Navigator.pushNamed(
+                                                              context,
+                                                              '/other_user_profile',
+                                                              arguments: {
+                                                                'userId': commentUid,
+                                                                'userName': userName,
+                                                              },
+                                                            );
+                                                          }
+                                                        },
+                                                        child: Text(
+                                                          userName,
+                                                          style: const TextStyle(
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                            fontSize: 14,
+                                                          ),
                                                         ),
                                                       ),
                                                       const SizedBox(width: 8),

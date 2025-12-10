@@ -173,26 +173,62 @@ class _CommentModalState extends State<CommentModal> {
                       final commentUserId = commentData['uid'] ?? '';
 
                       return ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: Colors.grey,
-                          backgroundImage: profileImage.isNotEmpty
-                              ? NetworkImage(profileImage)
-                              : null,
-                          child: profileImage.isEmpty
-                              ? const Icon(
-                                  Icons.person,
-                                  color: Colors.white,
-                                  size: 20,
-                                )
-                              : null,
+                        leading: GestureDetector(
+                          onTap: () {
+                            if (currentUserId == commentUserId) {
+                              // 내 프로필
+                              Navigator.pushNamed(context, '/profile');
+                            } else {
+                              // 다른 사용자 프로필
+                              Navigator.pushNamed(
+                                context,
+                                '/other_user_profile',
+                                arguments: {
+                                  'userId': commentUserId,
+                                  'userName': userName,
+                                },
+                              );
+                            }
+                          },
+                          child: CircleAvatar(
+                            backgroundColor: Colors.grey,
+                            backgroundImage: profileImage.isNotEmpty
+                                ? NetworkImage(profileImage)
+                                : null,
+                            child: profileImage.isEmpty
+                                ? const Icon(
+                                    Icons.person,
+                                    color: Colors.white,
+                                    size: 20,
+                                  )
+                                : null,
+                          ),
                         ),
                         title: Row(
                           children: [
-                            Text(
-                              userName,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
+                            GestureDetector(
+                              onTap: () {
+                                if (currentUserId == commentUserId) {
+                                  // 내 프로필
+                                  Navigator.pushNamed(context, '/profile');
+                                } else {
+                                  // 다른 사용자 프로필
+                                  Navigator.pushNamed(
+                                    context,
+                                    '/other_user_profile',
+                                    arguments: {
+                                      'userId': commentUserId,
+                                      'userName': userName,
+                                    },
+                                  );
+                                }
+                              },
+                              child: Text(
+                                userName,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                             const SizedBox(width: 8),
