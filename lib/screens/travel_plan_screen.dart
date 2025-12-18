@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'travel_plan_setup_screen.dart';
 import 'travel_plan_detail_screen.dart'; // [신규] 상세 화면 import
-import 'translator_screen.dart';
 import '../models/travel_plan_model.dart';
 import '../services/firestore_service.dart';
 
@@ -42,17 +41,6 @@ class _TravelPlanScreenState extends State<TravelPlanScreen> {
           ),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(
-              Icons.translate,
-              color: Colors.black,
-              size: 26,
-            ),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const TranslatorScreen()),
-            ),
-          ),
           IconButton(
             icon: const Icon(
               Icons.add_circle_outline,
