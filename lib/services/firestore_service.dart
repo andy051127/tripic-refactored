@@ -569,10 +569,11 @@ class FirestoreService {
 
   // --- [댓글 기능] ---
 
-  // 1. 댓글 추가
+  // 1. 댓글 추가 (답글 지원)
   Future<void> addComment({
     required String postId,
     required String content,
+    String? parentId, // 답글일 경우 부모 댓글 ID
   }) async {
     User? user = _auth.currentUser;
     if (user == null) throw Exception("로그인이 필요합니다.");
@@ -595,6 +596,8 @@ class FirestoreService {
         'userProfileImage': userProfileImage,
         'content': content,
         'timestamp': FieldValue.serverTimestamp(),
+        'parentId': parentId, // 부모 댓글 ID 저장
+        'likes': [], // 좋아요 누른 사용자 UID 리스트
       });
     } catch (e) {
       print("댓글 추가 실패: $e");
@@ -635,6 +638,32 @@ class FirestoreService {
         .collection('comments')
         .snapshots()
         .map((snapshot) => snapshot.docs.length);
+  }
+
+  // 5. 댓글 좋아요 토글
+  Future<void> toggleCommentLike(String postId, String commentId) async {
+    User? user = _auth.currentUser;
+    if (user == null) throw Exception("로그인이 필요합니다.");
+
+    final commentRef = _db
+        .collection('posts')
+        .doc(postId)
+        .collection('comments')
+        .doc(commentId);
+
+    return _db.runTransaction((transaction) async {
+      final snapshot = await transaction.get(commentRef);
+      if (!snapshot.exists) return;
+
+      List<dynamic> likes = List.from(snapshot.data()?['likes'] ?? []);
+      if (likes.contains(user.uid)) {
+        likes.remove(user.uid);
+      } else {
+        likes.add(user.uid);
+      }
+
+      transaction.update(commentRef, {'likes': likes});
+    });
   }
 
   // --- [DM/채팅 기능] ---

@@ -53,58 +53,61 @@ class HelpScreen extends StatelessWidget {
           children: [
             // 상단 안내 문구
             Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            color: Colors.grey[100],
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
-                  "무엇을 도와드릴까요?",
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                SizedBox(height: 8),
-                Text("자주 묻는 질문을 확인해보세요.", style: TextStyle(color: Colors.grey)),
-              ],
-            ),
-          ),
-
-          // FAQ 리스트
-          Expanded(
-            child: ListView.builder(
-              itemCount: _faqList.length,
-              itemBuilder: (context, index) {
-                final faq = _faqList[index];
-                return ExpansionTile(
-                  title: Text(
-                    faq['question']!,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w500,
-                      fontSize: 15,
-                    ),
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              color: Colors.grey[100],
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    "무엇을 도와드릴까요?",
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
-                  children: [
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 16,
+                  SizedBox(height: 8),
+                  Text(
+                    "자주 묻는 질문을 확인해보세요.",
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+
+            // FAQ 리스트
+            Expanded(
+              child: ListView.builder(
+                itemCount: _faqList.length,
+                itemBuilder: (context, index) {
+                  final faq = _faqList[index];
+                  return ExpansionTile(
+                    title: Text(
+                      faq['question']!,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w500,
+                        fontSize: 15,
                       ),
-                      color: Colors.grey[50],
-                      child: Text(
-                        faq['answer']!,
-                        style: const TextStyle(
-                          color: Colors.black87,
-                          height: 1.5,
+                    ),
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 16,
+                        ),
+                        color: Colors.grey[50],
+                        child: Text(
+                          faq['answer']!,
+                          style: const TextStyle(
+                            color: Colors.black87,
+                            height: 1.5,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                );
-              },
+                    ],
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
         ),
       ),
     );

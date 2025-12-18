@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart'; // [추가] 쿠퍼티노 피커 사용
 import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart';
 import '../models/travel_plan_model.dart';
@@ -602,7 +603,10 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
                     controller: searchController,
                     decoration: InputDecoration(
                       hintText: '국가 또는 도시 검색',
-                      prefixIcon: const Icon(Icons.search, color: Color(0xFF4CA1AF)),
+                      prefixIcon: const Icon(
+                        Icons.search,
+                        color: Color(0xFF4CA1AF),
+                      ),
                       suffixIcon: searchQuery.isNotEmpty
                           ? IconButton(
                               icon: const Icon(Icons.clear),
@@ -626,7 +630,10 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF4CA1AF), width: 2),
+                        borderSide: const BorderSide(
+                          color: Color(0xFF4CA1AF),
+                          width: 2,
+                        ),
                       ),
                     ),
                     onChanged: (value) {
@@ -646,7 +653,9 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
                           if (searchQuery.isEmpty) ...[
                             // 기존 드롭다운 방식
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(8),
@@ -657,7 +666,9 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
                                   isExpanded: true,
                                   hint: const Text("국가 선택"),
                                   value: tempCountry,
-                                  items: _countriesAndCities.keys.map((country) {
+                                  items: _countriesAndCities.keys.map((
+                                    country,
+                                  ) {
                                     final flag = _countryFlags[country] ?? '🌍';
                                     return DropdownMenuItem(
                                       value: country,
@@ -665,7 +676,9 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
                                         children: [
                                           Text(
                                             flag,
-                                            style: const TextStyle(fontSize: 20),
+                                            style: const TextStyle(
+                                              fontSize: 20,
+                                            ),
                                           ),
                                           const SizedBox(width: 8),
                                           Text(country),
@@ -689,13 +702,15 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
                                 // 검색어로 필터링
                                 final filteredResults = <Map<String, String>>[];
                                 final lowerQuery = searchQuery.toLowerCase();
-                                
+
                                 for (var entry in _countriesAndCities.entries) {
                                   final country = entry.key;
                                   final cities = entry.value;
-                                  
+
                                   // 국가명 검색
-                                  if (country.toLowerCase().contains(lowerQuery)) {
+                                  if (country.toLowerCase().contains(
+                                    lowerQuery,
+                                  )) {
                                     for (var city in cities) {
                                       filteredResults.add({
                                         'country': country,
@@ -705,7 +720,9 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
                                   } else {
                                     // 도시명 검색
                                     for (var city in cities) {
-                                      if (city.toLowerCase().contains(lowerQuery)) {
+                                      if (city.toLowerCase().contains(
+                                        lowerQuery,
+                                      )) {
                                         filteredResults.add({
                                           'country': country,
                                           'city': city,
@@ -714,14 +731,18 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
                                     }
                                   }
                                 }
-                                
+
                                 if (filteredResults.isEmpty) {
                                   return Center(
                                     child: Padding(
                                       padding: const EdgeInsets.all(40.0),
                                       child: Column(
                                         children: [
-                                          Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+                                          Icon(
+                                            Icons.search_off,
+                                            size: 64,
+                                            color: Colors.grey[400],
+                                          ),
                                           const SizedBox(height: 16),
                                           Text(
                                             '검색 결과가 없습니다',
@@ -735,15 +756,18 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
                                     ),
                                   );
                                 }
-                                
+
                                 return Column(
                                   children: filteredResults.map((result) {
                                     final country = result['country']!;
                                     final city = result['city']!;
                                     final flag = _countryFlags[country] ?? '🌍';
-                                    
+
                                     return ListTile(
-                                      leading: Text(flag, style: const TextStyle(fontSize: 24)),
+                                      leading: Text(
+                                        flag,
+                                        style: const TextStyle(fontSize: 24),
+                                      ),
                                       title: Text(
                                         city,
                                         style: const TextStyle(
@@ -752,7 +776,10 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
                                         ),
                                       ),
                                       subtitle: Text(country),
-                                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                                      trailing: const Icon(
+                                        Icons.arrow_forward_ios,
+                                        size: 16,
+                                      ),
                                       onTap: () {
                                         setModalState(() {
                                           tempCountry = country;
@@ -771,7 +798,9 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
                           // 도시 선택 드롭다운
                           if (searchQuery.isEmpty) ...[
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
                               decoration: BoxDecoration(
                                 color: tempCountry == null
                                     ? Colors.grey.shade200
@@ -785,7 +814,9 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
                                   hint: const Text("도시 선택"),
                                   value: tempCity,
                                   items: tempCountry != null
-                                      ? _countriesAndCities[tempCountry]!.map((city) {
+                                      ? _countriesAndCities[tempCountry]!.map((
+                                          city,
+                                        ) {
                                           return DropdownMenuItem(
                                             value: city,
                                             child: Text(city),
@@ -811,7 +842,9 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
                               decoration: BoxDecoration(
                                 color: Colors.green.shade50,
                                 borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.green.shade200),
+                                border: Border.all(
+                                  color: Colors.green.shade200,
+                                ),
                               ),
                               child: Row(
                                 children: [
@@ -1132,14 +1165,140 @@ class _TravelPlanSetupScreenState extends State<TravelPlanSetupScreen> {
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 10),
-                _buildTextInputBox("체크인 날짜/시간", (v) => hCheckIn = v),
+                GestureDetector(
+                  onTap: () {
+                    DateTime initialDate = _startDate ?? DateTime.now();
+                    showCupertinoModalPopup(
+                      context: context,
+                      builder: (context) => Container(
+                        height: 280,
+                        color: Colors.white,
+                        child: Column(
+                          children: [
+                            Container(
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                              color: Colors.grey[100],
+                              child: CupertinoButton(
+                                padding: EdgeInsets.zero,
+                                minSize: 0,
+                                child: const Text("완료"),
+                                onPressed: () => Navigator.pop(context),
+                              ),
+                            ),
+                            Expanded(
+                              child: CupertinoDatePicker(
+                                mode: CupertinoDatePickerMode.dateAndTime,
+                                initialDateTime: initialDate,
+                                use24hFormat: true,
+                                onDateTimeChanged: (DateTime newDate) {
+                                  setModalState(() {
+                                    hCheckIn = DateFormat(
+                                      'MM.dd HH:mm',
+                                    ).format(newDate);
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 16,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      hCheckIn.isEmpty ? "체크인 시간 선택" : hCheckIn,
+                      style: TextStyle(
+                        color: hCheckIn.isEmpty
+                            ? Colors.grey[600]
+                            : Colors.black,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 20),
                 const Text(
                   "4. 체크아웃 (선택)",
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 10),
-                _buildTextInputBox("체크아웃 날짜/시간", (v) => hCheckOut = v),
+                GestureDetector(
+                  onTap: () {
+                    DateTime initialDate = _startDate ?? DateTime.now();
+                    showCupertinoModalPopup(
+                      context: context,
+                      builder: (context) => Container(
+                        height: 280,
+                        color: Colors.white,
+                        child: Column(
+                          children: [
+                            Container(
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                              color: Colors.grey[100],
+                              child: CupertinoButton(
+                                padding: EdgeInsets.zero,
+                                minSize: 0,
+                                child: const Text("완료"),
+                                onPressed: () => Navigator.pop(context),
+                              ),
+                            ),
+                            Expanded(
+                              child: CupertinoDatePicker(
+                                mode: CupertinoDatePickerMode.dateAndTime,
+                                initialDateTime: initialDate,
+                                use24hFormat: true,
+                                onDateTimeChanged: (DateTime newDate) {
+                                  setModalState(() {
+                                    hCheckOut = DateFormat(
+                                      'MM.dd HH:mm',
+                                    ).format(newDate);
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 16,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      hCheckOut.isEmpty ? "체크아웃 시간 선택" : hCheckOut,
+                      style: TextStyle(
+                        color: hCheckOut.isEmpty
+                            ? Colors.grey[600]
+                            : Colors.black,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 30),
                 const Text(
                   "숙소 추가하기",
