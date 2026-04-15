@@ -1,4 +1,2 @@
 ## 앱 완성: 테스트 해보고 생기는 오류나 문제점들 아래에 적어주세요 ##
---> eeee
-ssssss
-sss
+qwertyuiopasdfghjklzxcvbnm
