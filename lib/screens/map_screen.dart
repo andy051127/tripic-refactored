@@ -37,8 +37,8 @@ class _MapScreenState extends State<MapScreen> {
   String? _searchedUserName; // 검색된 사용자 이름
   String? _selectedCountry; // 선택된 국가
 
-  // ⚠️ 중요: Google Cloud Console에서 발급받은 실제 API 키로 교체하세요
-  static const String _googleApiKey = 'AIzaSyBZt7UnBDxY-D6jrsuj_Y7Q5JSolghwwjg';
+  // 빌드 시 --dart-define으로 전달한 장소 검색 키
+  static const String _googleApiKey = String.fromEnvironment('GOOGLE_PLACES_API_KEY');
 
   // 초기 위치 (서울 시청)
   static const LatLng _kSeoulCityHall = LatLng(37.5666805, 126.9784147);
@@ -381,6 +381,14 @@ class _MapScreenState extends State<MapScreen> {
 
   // Google Places API 검색
   Future<void> _searchWithGooglePlaces(String query) async {
+    if (_googleApiKey.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('장소 검색 API 키가 설정되지 않았습니다.')),
+        );
+      }
+      return;
+    }
     try {
       // Places API - Text Search 사용
       final String url =
